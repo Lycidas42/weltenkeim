@@ -56,6 +56,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .stat.glaube b{color:var(--glaube)}
 .stat.holz b{color:var(--holz)}
 .stat.pop b{color:var(--soul)}
+.stat.zeit b{color:var(--sky)}
+@media (max-width:420px){.res{gap:4px}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
 .chip.round{width:38px;padding:8px 0;font-family:var(--f-display);font-size:18px;line-height:1}
@@ -166,6 +168,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
       <div class="stat holz"><span class="lbl">Holz</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
       <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
+      <div class="stat zeit"><span class="lbl">Uhrzeit</span><b id="vT">8:00</b><small id="vTs">Morgen</small></div>
     </div>
     <div class="top-actions">
       <button class="chip" id="btnShrine">Schrein</button>
@@ -202,7 +205,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">
     <header><h2>Weltenkeim</h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <div class="credits">
-      <p>Prototyp: Idle-Dorf trifft Gottspiel. Bewohner fällen Holz, beten am Schrein und erzeugen so Glauben, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
+      <p>Prototyp: Idle-Dorf trifft Gottspiel. Bewohner fällen Holz, beten am Schrein und erzeugen so Glauben. Mittags machen sie Pause am Brunnen, abends holen sie ihre Laternen hervor und nachts schlafen sie in ihren Hütten, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
       <ul>
         <li><b>Hand</b>: Bewohner packen und werfen. Bäume packen und halten oder nach oben ziehen, um sie auszureißen, dann werfen: Bei der Landung werden sie zu Holz. Deinen Tiergeist antippen, um ihn zu erziehen.</li>
         <li><b>Tiergeist</b>: handelt selbstständig. Was du nach einer Tat streichelst, tut er öfter, was du mit einem Klaps tadelst, seltener. Im Panel kannst du ihn umbenennen, seine Gestalt wählen und ihm folgen.</li>
