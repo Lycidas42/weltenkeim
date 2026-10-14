@@ -261,10 +261,10 @@ const SIZE = 48, SEG = 127, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2;
 // Der Prozessionsweg führt vom Rand des Dorfplatzes (Inselmitte) den Hügel hinauf.
 var SHRINE_AT = { x: 4.4, z: -7.8 };
 var SACRED_SEG = (() => { const d = Math.hypot(SHRINE_AT.x, SHRINE_AT.z), ux = SHRINE_AT.x / d, uz = SHRINE_AT.z / d; return { ax: ux * 2.95, az: uz * 2.95, bx: SHRINE_AT.x - ux * 2.2, bz: SHRINE_AT.z - uz * 2.2, ux, uz, len: d - 5.15 }; })();
-// Wohnsiedlung: drei Gassen führen strahlenförmig vom Dorfplatz weg (abseits von Schreinweg, Lager und Windmühle);
-// die Häuser stehen zu beiden Seiten, die Tür zur Gasse. Winkel in Grad (x = cos, z = sin).
-var LANES = [80, 150, 220].map(d => { const a = d * Math.PI / 180; return { ux: Math.cos(a), uz: Math.sin(a), s0: 3, s1: 9.7 }; });
-function laneDist(x, z) { let best = 1e9; for (const L of LANES) { const t = clamp(x * L.ux + z * L.uz, L.s0, L.s1); best = Math.min(best, Math.hypot(x - L.ux * t, z - L.uz * t)); } return best; }
+// Runddorf: ein Ringweg läuft um den Dorfplatz, die Häuser stehen gleichmäßig auf einem Kreis dahinter (Tür zum Platz),
+// jeder Garten liegt genau hinter seinem Haus. RING_R = Ringweg, HOUSE_R = Häuser, GARDEN_R = Gärten.
+var RING_R = 3.75, HOUSE_R = 5.7, GARDEN_R = 7.25;
+function laneDist(x, z) { return Math.abs(Math.hypot(x, z) - RING_R); } // Abstand zum Ringweg
 // Abstand zum Weg (Strecke vom Dorfplatz zum Schreinplatz); Breite des Wegs ±0,6
 function sacredDist(x, z) { const S0 = SACRED_SEG, t = clamp(((x - S0.ax) * S0.ux + (z - S0.az) * S0.uz) / S0.len, 0, 1); return Math.hypot(x - (S0.ax + S0.ux * S0.len * t), z - (S0.az + S0.uz * S0.len * t)); }
 const H = new Float32Array(N * N), J = new Float32Array(N * N), DRY = new Float32Array(N * N), BARE = new Float32Array(N * N);
@@ -804,13 +804,15 @@ const mill = place(gMill, MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_
 let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o; });
 
 const sites = [];
-// je Gasse und Seite ein Haus alle 1,6 Einheiten; gebaut wird von innen nach außen, Gassen und Seiten abwechselnd
-for (const s0 of [4, 5.6, 7.2, 8.8]) for (const side of [1, -1]) for (const L of LANES) {
-  const px = -L.uz * side, pz = L.ux * side, x = L.ux * s0 + px * 1.5, z = L.uz * s0 + pz * 1.5, h = heightAt(x, z);
-  let slope = 0; for (const [dx, dz] of [[.8, 0], [-.8, 0], [0, .8], [0, -.8]]) slope = Math.max(slope, Math.abs(heightAt(x + dx, z + dz) - h));
-  if (h < .3 || slope > .45 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.9 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.6 || onSacred(x, z, 1.5)) continue;
-  sites.push({ x, z, ry: Math.atan2(-px, -pz), used: false }); // Tür (+z des Modells) zur Gasse
+// 20 Plätze im Abstand von 18° auf dem Hauskreis; Schreinweg und Lager bleiben frei. Gebaut wird von Süden (Kameraseite)
+// aus abwechselnd nach beiden Seiten, so wächst das Dorf gleichmäßig um den Platz.
+for (let k = 0; k < 20; k++) {
+  const a = (k + .5) / 20 * Math.PI * 2, x = Math.cos(a) * HOUSE_R, z = Math.sin(a) * HOUSE_R, h = heightAt(x, z);
+  if (h < .3 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 3 || onSacred(x, z, 1.1)) continue;
+  sites.push({ x, z, ry: Math.atan2(-x, -z), a, used: false }); // Tür (+z des Modells) zum Platz
 }
+const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+sites.sort((p, q) => angDist(p.a, Math.PI / 2) - angDist(q.a, Math.PI / 2));
 const houses = [];
 // Nachts leuchten die Fenster: die Scheiben liegen im Texturatlas (8×4 Felder) in Spalte 6, Zeile 1
 const winMask = (() => { const cv = document.createElement('canvas'); cv.width = 8; cv.height = 4; const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 8, 4); g.fillStyle = '#fff'; g.fillRect(6, 1, 1, 1);
@@ -850,8 +852,8 @@ const gardenGeo = (() => {
 function addHouse(site) {
   site.used = true; const b = houses.length % 2, h = place(b ? gHomeB : gHomeA, site.x, site.z, site.ry, SB); h.b = b;
   h.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
-  const back = 1.45, gx = site.x - Math.sin(site.ry) * back, gz = site.z - Math.cos(site.ry) * back; // hinter dem Haus
-  if (heightAt(gx, gz) > .3) { const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
+  const back = GARDEN_R - HOUSE_R, gx = site.x - Math.sin(site.ry) * back, gz = site.z - Math.cos(site.ry) * back; // hinter dem Haus, nach außen
+  if (heightAt(gx, gz) > .3 && !onSacred(gx, gz, .9) && Math.hypot(gx - SHRINE_POS.x, gz - SHRINE_POS.z) > 4) { const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
   houses.push(h); return h;
 }
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
