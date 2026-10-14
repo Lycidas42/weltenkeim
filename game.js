@@ -330,13 +330,27 @@ tGeo.computeVertexNormals();
 const NOISE_GLSL = `float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vns(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hsh(i), hsh(i + vec2(1., 0.)), f.x), mix(hsh(i + vec2(0., 1.)), hsh(i + vec2(1., 1.)), f.x), f.y); }`;
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 });
-const terrainU = { uWet: { value: 0 } };
+const terrainU = { uWet: { value: 0 }, uRain: { value: 0 }, uT: { value: 0 }, uDep: { value: null }, uSkyH: { value: null } };
 terrainMat.onBeforeCompile = sh => {
-  sh.uniforms.uWet = terrainU.uWet;
+  Object.assign(sh.uniforms, terrainU);
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.)).xyz;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nuniform float uWet;\n' + NOISE_GLSL)
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nuniform float uWet, uRain, uT; uniform sampler2D uDep; uniform vec3 uSkyH;\n' + NOISE_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
-      { float n = vns(vWP.xz * 1.3) * .45 + vns(vWP.xz * 4.3) * .33 + vns(vWP.xz * 12.) * .22; diffuseColor.rgb *= (.86 + n * .28) * (1. - .2 * uWet * step(.05, vWP.y)); } // nass: dunkler`);
+      { float n = vns(vWP.xz * 1.3) * .45 + vns(vWP.xz * 4.3) * .33 + vns(vWP.xz * 12.) * .22; diffuseColor.rgb *= (.86 + n * .28) * (1. - .2 * uWet * step(.05, vWP.y)); } // nass: dunkler
+      // Pfützen: Wasserspiegel in den Mulden, bei mehr Nässe höher (größere, zusammenfließende Pfützen)
+      float pDep = texture2D(uDep, (vWP.xz + ${HALF.toFixed(1)}) / ${SIZE.toFixed(1)} * ${((N - 1) / N).toFixed(5)} + ${(.5 / N).toFixed(5)}).r * .3 + (vns(vWP.xz * 2.3) - .5) * .004;
+      float pLev = mix(.2, .004, sqrt(uWet)), puddle = uWet > .02 ? smoothstep(pLev, pLev + .006, pDep) : 0.;
+      float pRim = uWet > .02 ? smoothstep(pLev - .02, pLev, pDep) * (1. - puddle) : 0.;
+      diffuseColor.rgb *= 1. - pRim * .3;
+      if (puddle > 0.) {
+        vec2 rp = vWP.xz * 5.; vec2 ri = floor(rp), rf = fract(rp) - .5; float rh = hsh(ri), rt = fract(uT * .8 + rh);
+        float ring = smoothstep(.05, 0., abs(length(rf + (rh - .5) * .3) - rt * .45)) * (1. - rt) * uRain;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.07, .09, .1) + ring * .3, puddle * .85);
+      }`)
+    .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      roughnessFactor = mix(roughnessFactor, .08, puddle);`)
+    .replace('#include <opaque_fragment>', `{ float fres = .15 + .5 * pow(1. - max(dot(normal, normalize(vViewPosition)), 0.), 3.); outgoingLight = mix(outgoingLight, uSkyH * .6, fres * puddle); }
+      #include <opaque_fragment>`);
 };
 const terrain = new THREE.Mesh(tGeo, terrainMat);
 terrain.receiveShadow = true; terrain.castShadow = true; terrain.frustumCulled = false;
@@ -347,8 +361,32 @@ const hTexData = new Uint8Array(N * N), hTex = new THREE.DataTexture(hTexData, N
 hTex.magFilter = hTex.minFilter = THREE.LinearFilter;
 function updateHTex() { for (let k = 0; k < N * N; k++) hTexData[k] = clamp(Math.round((H[k] + 3) / 5 * 255), 0, 255); hTex.needsUpdate = true; }
 updateHTex();
+// Muldentiefe für Pfützen: wie weit liegt ein Geländepunkt unter dem Mittel seiner Umgebung (Radius etwa 2,3 Einheiten).
+// Nur echte Mulden an Land bekommen Wasser; mit der Nässe steigt der Wasserspiegel, Pfützen wachsen und fließen ineinander.
+const depData = new Uint8Array(N * N), depTex = new THREE.DataTexture(depData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+depTex.magFilter = depTex.minFilter = THREE.LinearFilter;
+function updateDepth() {
+  // Priority Flood: von Rand und Meer aus wird das Gelände „geflutet“; wo Wasser nicht abfließen kann, entsteht eine Mulde.
+  // DEPTH = Wasserstand bis zum Überlaufen minus Geländehöhe. Kleine Unebenheiten (unter 2 cm) zählen nicht.
+  // Mikrorelief (wenige Zentimeter): echter Boden hat kleine Senken, das glatte Gelände sonst kaum
+  const Hm = new Float32Array(N * N); for (let k = 0; k < N * N; k++) { const x = -HALF + (k % N) * CELL, z = -HALF + ((k / N) | 0) * CELL; Hm[k] = H[k] + noise(x * .5 + 17, z * .5 - 4) * .07 + noise(x * 1.3 - 9, z * 1.3 + 2) * .025; }
+  const filled = new Float32Array(N * N), done = new Uint8Array(N * N), heap = [], hv = [];
+  const push = (k, v) => { let i = heap.length; heap.push(k); hv.push(v); while (i > 0) { const p = (i - 1) >> 1; if (hv[p] <= v) break; heap[i] = heap[p]; hv[i] = hv[p]; i = p; } heap[i] = k; hv[i] = v; };
+  const pop = () => { const top = heap[0], lk = heap.pop(), lv = hv.pop(); if (heap.length) { let i = 0; while (true) { let c = 2 * i + 1; if (c >= heap.length) break; if (c + 1 < heap.length && hv[c + 1] < hv[c]) c++; if (hv[c] >= lv) break; heap[i] = heap[c]; hv[i] = hv[c]; i = c; } heap[i] = lk; hv[i] = lv; } return top; };
+  for (let k = 0; k < N * N; k++) { const i = k % N, j = (k / N) | 0; if (i === 0 || j === 0 || i === N - 1 || j === N - 1 || H[k] < .02) { filled[k] = Hm[k]; done[k] = 1; push(k, Hm[k]); } }
+  while (heap.length) {
+    const k = pop(), i = k % N, j = (k / N) | 0, lv = filled[k];
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+      const n = jj * N + ii; if (done[n]) continue; done[n] = 1; filled[n] = Math.max(Hm[n], lv); push(n, filled[n]);
+    }
+  }
+  for (let k = 0; k < N * N; k++) { const d = filled[k] - Hm[k]; depData[k] = d > .015 && H[k] > .3 && H[k] < 3.3 ? clamp(Math.round(d / .3 * 255), 0, 255) : 0; }
+  depTex.needsUpdate = true;
+}
+updateDepth(); terrainU.uDep.value = depTex; terrainU.uSkyH.value = sky.hor;
 let terrainDirty = false, terrainT = 0;
-function updateTerrain(dt) { terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); }
+function updateTerrain(dt) { terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 // Wasser: Wellen und Brandung im Vertex-Shader, Kräuselung durch Wind (Böen ziehen als Flecken übers Wasser),
 // Farbe nach Tiefe (türkis im Flachen, tiefblau draußen), Schaum am Strand und bei starkem Wind Schaumkronen,
 // Spiegelung des Himmels am flachen Blickwinkel, Sonnenglitzern über die Lichtberechnung.
@@ -1293,60 +1331,8 @@ function updateWeatherRain(dt) {
   }
   wrainGeo.attributes.position.needsUpdate = true;
 }
-// Pfützen: an tieferen Stellen im Gelände und in Senken auf Wegen, Gassen und dem Dorfplatz. Sie wachsen mit der Nässe
-// von der tiefsten Stelle aus (unregelmäßiger Rand), spiegeln den Himmel und zeigen bei Regen Tropfenringe.
-const puddles = [];
-{
-  const blur = (x, z, r) => { let s0 = 0; for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; s0 += heightAt(x + Math.cos(a) * r, z + Math.sin(a) * r); } return s0 / 8; };
-  const cand = [];
-  for (let x = -HALF * .9; x < HALF * .9; x += .55) for (let z = -HALF * .9; z < HALF * .9; z += .55) {
-    const px = x + rnd(.2), pz = z + rnd(.2), h = heightAt(px, pz); if (h < .35 || h > 3.2) continue;
-    const dip = blur(px, pz, 1.3) - h;                                              // Mulde: tiefer als die Umgebung
-    const way = sacredDist(px, pz) < .5 || laneDist(px, pz) < .45 || Math.hypot(px, pz) < PLAZA.r - .2;
-    const score = dip * 20 + (way ? .35 + noise(px * 1.7, pz * 1.7) * .5 : 0);
-    if (score > .25) cand.push({ x: px, z: pz, score, way });
-  }
-  cand.sort((a, b) => b.score - a.score);
-  // bis zu 22 Plätze für Wege und Dorfplatz, der Rest für Mulden im Gelände
-  const pick = (list, max) => { let n = 0; for (const c of list) { if (n >= max || puddles.length >= 70) break; if (puddles.some(q => Math.hypot(q.x - c.x, q.z - c.z) < 1.4)) continue; n++;
-    puddles.push({ x: c.x, z: c.z, s: .55 + Math.min(.7, c.score * .35) + Math.random() * .25, r: Math.random() * 6.28, fill: .55 + Math.min(.45, c.score * .3) }); } };
-  pick(cand.filter(c => c.way), 22);
-  for (const c of cand) { if (puddles.length >= 70) break; if (puddles.some(q => Math.hypot(q.x - c.x, q.z - c.z) < 1.4)) continue; puddles.push({ x: c.x, z: c.z, s: .55 + Math.min(.7, c.score * .35) + Math.random() * .25, r: Math.random() * 6.28, fill: .55 + Math.min(.45, c.score * .3) }); }
-}
-const puddleU = { uWet: { value: 0 }, uRain: { value: 0 }, uT: { value: 0 }, uSkyH: { value: sky.hor } };
-const puddleTex = (() => { // unregelmäßiger Fleck: innen hell, nach außen dunkel; der Rand ist die Schwelle
-  const S0 = 64, cv = document.createElement('canvas'); cv.width = cv.height = S0; const g = cv.getContext('2d'), img = g.createImageData(S0, S0);
-  for (let j = 0; j < S0; j++) for (let i = 0; i < S0; i++) { const x = i / S0 * 2 - 1, y = j / S0 * 2 - 1, a = Math.atan2(y, x), r = Math.hypot(x, y) / (.72 + .2 * noise(Math.cos(a) * 1.6 + 3, Math.sin(a) * 1.6) + .08 * Math.sin(a * 3)), v = clamp(1 - r, 0, 1) * 255, k = (j * S0 + i) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255; }
-  g.putImageData(img, 0, 0); return new THREE.CanvasTexture(cv);
-})();
-const puddleMat = new THREE.MeshStandardMaterial({ color: 0x1d262d, roughness: .18, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
-puddleMat.onBeforeCompile = sh => {
-  Object.assign(sh.uniforms, puddleU); sh.uniforms.uTex = { value: puddleTex };
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vPU; varying vec3 vWP2;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvPU = uv; vWP2 = (modelMatrix * instanceMatrix * vec4(transformed, 1.)).xyz;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uWet, uRain, uT; uniform vec3 uSkyH; uniform sampler2D uTex; varying vec2 vPU; varying vec3 vWP2;\n' + NOISE_GLSL)
-    .replace('#include <color_fragment>', `
-      float pv = texture2D(uTex, vPU).r, thr = 1. - uWet;            // je nasser, desto weiter reicht die Pfütze
-      float pa = smoothstep(thr, thr + .1, pv);
-      if (pa < .01) discard;
-      vec2 rp = vWP2.xz * 5.; vec2 ri = floor(rp), rf = fract(rp) - .5; float rh = hsh(ri), rt = fract(uT * .8 + rh);
-      float ring = smoothstep(.05, 0., abs(length(rf + (rh - .5) * .3) - rt * .45)) * (1. - rt) * uRain; // Tropfenringe
-      diffuseColor.rgb += ring * .35; float rim = 1. - smoothstep(thr + .02, thr + .16, pv); diffuseColor.rgb *= 1. - rim * .35; diffuseColor.a = pa * .88; // dunkler, nasser Rand`)
-    .replace('#include <opaque_fragment>', `{ float fres = .12 + .45 * pow(1. - max(dot(normal, normalize(vViewPosition)), 0.), 3.); outgoingLight = mix(outgoingLight, uSkyH * .55, fres); }
-      #include <opaque_fragment>`);
-};
-const puddleMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), puddleMat, Math.max(1, puddles.length));
-puddleMesh.receiveShadow = true; puddleMesh.frustumCulled = false; puddleMesh.renderOrder = 1; puddleMesh.visible = false; scene.add(puddleMesh);
-let puddleT = 0;
-function updatePuddles(dt, t) {
-  const w = weather.wet; puddleU.uWet.value = w; puddleU.uRain.value = smooth(.3, .9, weather.rain); puddleU.uT.value = t;
-  puddleMesh.visible = w > .03; if (!puddleMesh.visible || (puddleT -= dt) > 0) return; puddleT = .5;
-  puddles.forEach((q, i) => { // nicht unter Gebäuden, Bäumen und Felsen; Höhe folgt dem Gelände
-    const blocked = navReady && blockedAt(navV, q.x, q.z);
-    const paved = sacredDist(q.x, q.z) < .62 || Math.hypot(q.x - PLAZA.x, q.z - PLAZA.z) < PLAZA.r + .05; // auf Pflaster über den Platten
-    dummy.position.set(q.x, heightAt(q.x, q.z) + (paved ? .045 : .012), q.z); dummy.rotation.set(0, q.r, 0); dummy.scale.set(blocked ? 0 : q.s * 2 * q.fill, 1, blocked ? 0 : q.s * 1.6 * q.fill); dummy.updateMatrix(); puddleMesh.setMatrixAt(i, dummy.matrix);
-  });
-  puddleMesh.count = puddles.length; puddleMesh.instanceMatrix.needsUpdate = true;
-}
+// Pfützen: Wasserstand in den Mulden des Geländes (siehe Gelände-Shader und updateDepth). Hier nur die Werte je Frame.
+function updatePuddles(dt, t) { terrainU.uWet.value = weather.wet; terrainU.uRain.value = smooth(.3, .9, weather.rain); terrainU.uT.value = t; }
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
 const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4, transparent: true, opacity: .55, depthWrite: false })); // halb durchsichtig, damit man sieht, wo es regnet
 rainCloud.castShadow = true; rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
@@ -3140,7 +3126,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, forestAlert, puddles, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, forestAlert, depData, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
