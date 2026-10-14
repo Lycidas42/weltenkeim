@@ -87,7 +87,7 @@ camera.position.set(13, 15, 19);
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 1, 0);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
-controls.minDistance = 7; controls.maxDistance = 48; controls.maxPolarAngle = 1.42; // flach genug, um Sonne, Mond und Sterne am Horizont zu sehen
+controls.minDistance = 7; controls.maxDistance = 58; controls.maxPolarAngle = 1.42; // flach genug, um Sonne, Mond und Sterne am Horizont zu sehen
 controls.screenSpacePanning = false;
 
 const hemi = new THREE.HemisphereLight(0xdff1ff, 0x6a5a3a, 1.15); scene.add(hemi);
@@ -95,7 +95,7 @@ const sun = new THREE.DirectionalLight(0xfff0d4, 2.3);
 sun.position.set(18, 28, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
-Object.assign(sun.shadow.camera, { left: -27, right: 27, top: 27, bottom: -27, near: 1, far: 80 });
+Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, near: 1, far: 100 });
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
 scene.add(sun); // tagsüber Sonne, nachts Mondlicht
 
@@ -269,7 +269,7 @@ function updateDay(dt, t) {
   const sunUp = sunDir.y >= moonDir.y, body = sunUp ? sunDir : moonDir;
   // Licht fällt nie flacher als etwa 20°, sonst werden die Schatten endlos; am Horizont blendet es aus, damit der Wechsel Sonne/Mond nicht springt
   lightDir.copy(body); lightDir.y = Math.max(lightDir.y, .35); lightDir.normalize();
-  sun.position.copy(lightDir).multiplyScalar(40); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
+  sun.position.copy(lightDir).multiplyScalar(50); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
   hemi.color.copy(sky.hemiS); hemi.groundColor.copy(sky.hemiG); hemi.intensity = sky.hi;
   scene.fog.color.copy(sky.hor); scene.fog.near = 42 - 18 * weather.rain; scene.fog.far = 105 - 30 * weather.rain; // Regen: diesig
   skyG.position.copy(camera.position);
@@ -288,7 +288,7 @@ const workTime = () => S.hour >= WAKE && S.hour < BED && !(S.hour >= LUNCH[0] &&
 const dayPhase = h => h < WAKE || h >= 21 ? 'Nachtruhe' : h < 8 ? 'Morgen' : h < 12 ? 'Vormittag' : h < 13.5 ? 'Mittagspause' : h < 18 ? 'Nachmittag' : 'Abend';
 
 /* ------------------------------------------------------------------ terrain */
-const SIZE = 48, SEG = 127, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2;
+const SIZE = 64, SEG = 167, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2; // Insel etwa ein Drittel größer als anfangs (48)
 // Lage des Schreins: auf einem sanften Hügel nordöstlich vor dem Dorf, mit dem Gebirge dahinter.
 // Der Prozessionsweg führt vom Rand des Dorfplatzes (Inselmitte) den Hügel hinauf.
 var SHRINE_AT = { x: 4.4, z: -7.8 };
@@ -547,6 +547,7 @@ scene.add(water);
 // Später lassen sich ausgetretene Pfade mit Stein zu Straßen ausbauen (dafür ist WEAR die Grundlage).
 const WEAR = new Float32Array(N * N), WEAR_MAX = 40, wearDirty = new Set();
 const PATH_C = new THREE.Color(0xa88a5c), PATH_C2 = new THREE.Color(0x957548);
+if (S.pathsN !== N) S.paths = []; // gespeicherte Pfade passen nur zur gleichen Rastergröße
 if (Array.isArray(S.paths)) for (let i = 0; i + 1 < S.paths.length; i += 2) { const k = S.paths[i] | 0; if (k >= 0 && k < N * N) WEAR[k] = Math.min(WEAR_MAX, +S.paths[i + 1] || 0); }
 function vertexColor(k) {
   const c = terrainColor(H[k], J[k], k), w = WEAR[k];
@@ -570,7 +571,7 @@ function updateWear(dt) {
   for (const k of wearDirty) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
   wearDirty.clear(); tCol.needsUpdate = true;
 }
-function savePaths() { const out = []; for (let k = 0; k < WEAR.length; k++) if (WEAR[k] > 3) out.push(k, Math.round(WEAR[k])); S.paths = out; }
+function savePaths() { const out = []; for (let k = 0; k < WEAR.length; k++) if (WEAR[k] > 3) out.push(k, Math.round(WEAR[k])); S.paths = out; S.pathsN = N; }
 for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
 tCol.needsUpdate = true;
 function sculpt(px, pz, dir, dt) {
@@ -1085,7 +1086,7 @@ const stumpSwarm = new Swarm(parts(gStump), 500);
 const trees = [];
 const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r);
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
-for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
+for (let tries = 0; tries < 4000 && trees.length < 165; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
   if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
@@ -1098,9 +1099,9 @@ const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || streamDist(x, z) < 1 +
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
-for (let tries = 0; tries < 3000 && rocks.length < 16; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
-for (let tries = 0; tries < 3000 && rocks.length < 56; tries++) { // mittlere Felsen, gern in Gruppen um die großen
-  const o = Math.random() < .55 ? rocks[Math.floor(Math.random() * 16)] : null, a = Math.random() * 6.28, r = o ? o.s + .4 + Math.random() * 1.2 : 0;
+for (let tries = 0; tries < 3000 && rocks.length < 24; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
+for (let tries = 0; tries < 3000 && rocks.length < 84; tries++) { // mittlere Felsen, gern in Gruppen um die großen
+  const o = Math.random() < .55 ? rocks[Math.floor(Math.random() * 24)] : null, a = Math.random() * 6.28, r = o ? o.s + .4 + Math.random() * 1.2 : 0;
   addRock(o ? o.x + Math.cos(a) * r : rnd(HALF * .88), o ? o.z + Math.sin(a) * r : rnd(HALF * .88), .2 + Math.random() * .3);
 }
 { const cnt = ROCK_GEOS.map(() => 0); for (const r of rocks) rockMeshes[r.v].setColorAt(cnt[r.v]++, COL.setScalar(r.tint)); }
@@ -1108,7 +1109,7 @@ for (let tries = 0; tries < 3000 && rocks.length < 56; tries++) { // mittlere Fe
 const bushes = [];
 // kleine Büsche ohne eigenen Schatten (spart Rechenzeit)
 const bushMeshes = BUSH_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 120); m.castShadow = false; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
-for (let tries = 0; tries < 6000 && bushes.length < 170; tries++) {
+for (let tries = 0; tries < 6000 && bushes.length < 260; tries++) {
   const x = rnd(HALF * .88), z = rnd(HALF * .88), h = heightAt(x, z);
   if (h < .5 || h > 2.7 || keepFree(x, z) || treeNear(x, z, .6) || rocks.some(r => Math.hypot(r.x - x, r.z - z) < r.s + .3)) continue;
   if (Math.random() > (treeNear(x, z, 2.2) ? .8 : .22)) continue;
@@ -1162,7 +1163,7 @@ function coverKind(geo, mat, items, o) {
   const BARE_AT = (x, z) => { const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL); return i < 0 || j < 0 || i >= N || j >= N ? 0 : BARE[j * N + i]; };
   const grassC = [0x86b54b, 0x76a842, 0x9cbc55, 0x6e9e3e];
   const grass = [];
-  for (let tries = 0; tries < 80000 && grass.length < 9000; tries++) {
+  for (let tries = 0; tries < 120000 && grass.length < 12500; tries++) {
     const x = rnd(HALF * .92), z = rnd(HALF * .92), h = heightAt(x, z);
     if (h < .42 || h > 2.8) continue;
     const dens = (.3 + .7 * smooth(-.35, .45, noise(x * .22 + 5, z * .22))) * (1 - smooth(.3, .42, BARE_AT(x, z)));
@@ -1172,7 +1173,7 @@ function coverKind(geo, mat, items, o) {
   coverKind(tuftGeo(), grassMat, grass, { hmin: .38, hmax: 2.9 });
   const PAL = [0xf6f3e8, 0xf2cf3a, 0xec86ad, 0x9c82dc, 0xdc4a3c, 0x75a6e6, 0xf09a3e];
   const flowers = [];
-  for (let c = 0; c < 90; c++) {
+  for (let c = 0; c < 140; c++) {
     let cx = 0, cz = 0, ok = false;
     for (let t = 0; t < 30 && !ok; t++) { cx = rnd(HALF * .85); cz = rnd(HALF * .85); const h = heightAt(cx, cz); ok = h > .5 && h < 2.2; }
     if (!ok) continue;
@@ -1198,7 +1199,7 @@ function coverKind(geo, mat, items, o) {
   for (const t of trees) if (TREE_FOREST.includes(t.type) && Math.random() < .55) for (let k = 0; k < 1 + (Math.random() < .4); k++) { const a = Math.random() * 6.28, r = .35 + Math.random() * .5; ferns.push({ x: t.x + Math.cos(a) * r, z: t.z + Math.sin(a) * r, r: Math.random() * 6.28, s: .8 + Math.random() * .6, c: 0xffffff }); }
   coverKind(fernGeo, plantMat, ferns, { hmin: .45, hmax: 2.9 });
   const pebbles = [[], []];
-  for (let k = 0; k < 520; k++) {
+  for (let k = 0; k < 760; k++) {
     let x, z; const u = Math.random();
     if (u < .45 && rocks.length) { const o = rocks[Math.floor(Math.random() * rocks.length)], a = Math.random() * 6.28, r = o.s * (1.05 + Math.random() * .9); x = o.x + Math.cos(a) * r; z = o.z + Math.sin(a) * r; }
     else { x = rnd(HALF * .9); z = rnd(HALF * .9); const h = heightAt(x, z); if (!(h > -.05 && h < .45) && BARE_AT(x, z) < .3) { k--; continue; } }
@@ -1206,8 +1207,8 @@ function coverKind(geo, mat, items, o) {
   }
   pebbles.forEach((pb, k) => coverKind(pebbleGeos[k], plantMat, pb, { hmin: -.08, hmax: 4.5, sink: .25 }));
   const shells = [], drift = [], SH = [0xfff6ec, 0xf6d3c6, 0xe9c9a0, 0xffe4ef];
-  for (let tries = 0; tries < 8000 && shells.length < 110; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > -.04 && h < .3) shells.push({ x, z, r: Math.random() * 6.28, s: .7 + Math.random() * .6, c: SH[Math.floor(Math.random() * 4)] }); }
-  for (let tries = 0; tries < 8000 && drift.length < 12; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > .02 && h < .22) drift.push({ x, z, r: Math.random() * 6.28, s: 1 + Math.random() * .7, c: 0xffffff }); }
+  for (let tries = 0; tries < 8000 && shells.length < 170; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > -.04 && h < .3) shells.push({ x, z, r: Math.random() * 6.28, s: .7 + Math.random() * .6, c: SH[Math.floor(Math.random() * 4)] }); }
+  for (let tries = 0; tries < 8000 && drift.length < 18; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > .02 && h < .22) drift.push({ x, z, r: Math.random() * 6.28, s: 1 + Math.random() * .7, c: 0xffffff }); }
   coverKind(shellGeo, plantMat, shells, { hmin: -.06, hmax: .4 });
   coverKind(driftGeo, plantMat, drift, { hmin: -.02, hmax: .35, sink: -.03, shadow: true });
 }
@@ -1386,11 +1387,11 @@ function cloudGeo(n) {
   return paint(g, (x, y, z, ny, c) => c.set(0xc5cfdb).lerp(COL2.set(0xffffff), clamp(smooth(-.1, .9, y) * .8 + (ny > .4 ? .25 : 0), 0, 1)).multiplyScalar(.97 + .05 * jit(x, y, z)));
 }
 const CLOUD_GEOS = [5, 7, 9, 11].map(cloudGeo);
-const CLOUD_N = 22, clouds = [], cloudCol = new THREE.Color();
+const CLOUD_N = 30, clouds = [], cloudCol = new THREE.Color();
 for (let i = 0; i < CLOUD_N; i++) {
   const m = new THREE.Mesh(CLOUD_GEOS[i % 4], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, transparent: true, opacity: 0, depthWrite: false }));
   m.castShadow = true; m.renderOrder = 3; scene.add(m);
-  clouds.push({ m, x: rnd(40), z: rnd(40), y: 21 + Math.random() * 5, s: 2.2 + Math.random() * 2, rot: Math.random() * 6.28, rank: Math.random(), vis: 0 });
+  clouds.push({ m, x: rnd(52), z: rnd(52), y: 21 + Math.random() * 5, s: 2.2 + Math.random() * 2, rot: Math.random() * 6.28, rank: Math.random(), vis: 0 });
 }
 const cloudDummy = new THREE.Vector3(), segA = new THREE.Vector3(), segB = new THREE.Vector3();
 function updateClouds(dt) {
@@ -1400,7 +1401,7 @@ function updateClouds(dt) {
   clouds.forEach((c, i) => {
     c.x += dx * sp; c.z += dz * sp;
     // was hinausweht, kommt auf der anderen Seite wieder herein
-    if (c.x * dx + c.z * dz > 42) { c.x -= dx * 84; c.z -= dz * 84; c.x += -dz * rnd(15); c.z += dx * rnd(15); }
+    if (c.x * dx + c.z * dz > 54) { c.x -= dx * 108; c.z -= dz * 108; c.x += -dz * rnd(15); c.z += dx * rnd(15); }
     const want = c.rank * CLOUD_N < n ? 1 : 0; c.vis += (want - c.vis) * Math.min(1, dt * .5);
     const sc = c.s * (.7 + cv * .7);
     c.m.position.set(c.x, c.y, c.z); c.m.rotation.y = c.rot; c.m.scale.set(sc, sc * (.75 + cv * .35), sc);
@@ -1504,8 +1505,8 @@ function wildSpot(x0, z0, r) {
   }
   return null;
 }
-for (let k = 0; k < 13; k++) {
-  const deer = k < 5, at = wildSpot(0, 0, 22); if (!at) continue;
+for (let k = 0; k < 20; k++) {
+  const deer = k < 8, at = wildSpot(0, 0, 29); if (!at) continue;
   wild.push({ kind: deer ? 'reh' : 'hase', ...at, h: Math.random() * 6.28, state: 'idle', timer: Math.random() * 4, ph: Math.random() * 6.28, sp: 0, m: deer ? makeDeer() : makeHare(), threatT: 0 });
 }
 // Fische: kleine Schwärme im flachen Wasser, ab und zu springt einer (mit Spritzer und Wellenring)
@@ -1513,13 +1514,13 @@ const fishGeo = mergeGeometries([
   paint(new THREE.SphereGeometry(1, 8, 5).scale(.028, .035, .1), (x, y, z, ny, c) => c.set(y > .005 ? 0x4c6a78 : 0xc9d6dc)),
   paint(new THREE.ConeGeometry(.035, .06, 4).rotateX(-Math.PI / 2).scale(.3, 1, 1).translate(0, 0, -.12), (x, y, z, ny, c) => c.set(0x5b7987)),
 ]);
-const FISH_N = 36, fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .4, metalness: .2 }), FISH_N);
+const FISH_N = 54, fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .4, metalness: .2 }), FISH_N);
 fishMesh.frustumCulled = false; fishMesh.userData.noSnow = true; scene.add(fishMesh);
 const waterDepthAt = (x, z) => -.02 - heightAt(x, z);
 {
   let tries = 0;
-  for (let sch = 0; sch < 6 && tries < 2000; tries++) { // sechs Schwärme
-    const a = Math.random() * 6.28, r = 12 + Math.random() * 12, cx = Math.cos(a) * r, cz = Math.sin(a) * r, d = waterDepthAt(cx, cz);
+  for (let sch = 0; sch < 9 && tries < 3000; tries++) { // neun Schwärme
+    const a = Math.random() * 6.28, r = 14 + Math.random() * 20, cx = Math.cos(a) * r, cz = Math.sin(a) * r, d = waterDepthAt(cx, cz);
     if (d < .35 || d > 1.6) continue;
     sch++; const hd = Math.random() * 6.28;
     for (let k = 0; k < 6; k++) fish.push({ x: cx + rnd(.6), z: cz + rnd(.6), h: hd + rnd(.4), sp: .35 + Math.random() * .2, ph: Math.random() * 6.28, jump: 0, s: .85 + Math.random() * .4 });
@@ -3339,7 +3340,7 @@ function frame() {
   if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
     camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
   const tr = Math.hypot(controls.target.x, controls.target.z);
-  if (tr > 18) { const k = 18 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
+  if (tr > 25) { const k = 25 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
   controls.target.y = 1;
   controls.update();
 
