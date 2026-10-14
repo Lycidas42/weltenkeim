@@ -159,9 +159,9 @@ const CREATURES = {
   cat: { label: 'Katze', spirit: 'Katzengeist', file: 'Cat', h: 1.35, walk: 1.9, run: 3.6, ws: 1.2, head: 'Bone003', eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
-const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_church_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
+const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
   'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb'];
-const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand] = await Promise.all(files.map(load));
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 class Swarm {
@@ -174,8 +174,75 @@ class Swarm {
 const SB = 1.5, ST = 1.25;
 const statics = [];
 function place(gltf, x, z, ry = 0, s = SB) { const o = shadowify(gltf.scene.clone(true)); o.scale.setScalar(s); o.rotation.y = ry; scene.add(o); const e = { o, x, z }; statics.push(e); return e; }
-const CHURCH = { x: 0, z: -2.6 }, WELL = { x: 1.4, z: 1.1 }, PRAY = { x: 0, z: -1.2 }, CENTER = { x: 0, z: 0.4 };
-place(gChurch, CHURCH.x, CHURCH.z, 0, 1.7);
+const SHRINE_POS = { x: 0, z: -2.4 }, WELL = { x: 1.4, z: 1.1 }, PRAY = { x: 0, z: -.7 }, CENTER = { x: 0, z: 0.4 };
+// Schrein des Weltenkeims: sechseckiger Steinsockel, sechs Runensteine, darüber schwebt leuchtend der Keim.
+// Jede Weihestufe (S.temple) lässt eine weitere Rune aufleuchten.
+const shrine = (() => {
+  const g = new THREE.Group(), mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: .9, flatShading: true });
+  const stone = mat(0xb5afa3), stone2 = mat(0xa29c90), stone3 = mat(0x8f897e), moss = mat(0x6f8f4a);
+  const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  add(new THREE.CylinderGeometry(1.05, 1.14, .16, 6), stone, 0, .06);
+  add(new THREE.CylinderGeometry(1.07, 1.07, .02, 6), moss, 0, .15);
+  add(new THREE.CylinderGeometry(.62, .7, .12, 6), stone2, 0, .22);
+  add(new THREE.CylinderGeometry(.12, .19, .4, 6), stone3, 0, .48);
+  add(new THREE.CylinderGeometry(.25, .14, .09, 6), stone2, 0, .72);
+  const runeOff = new THREE.MeshStandardMaterial({ color: 0x4a5b66, roughness: .6, flatShading: true });
+  const runeOn = new THREE.MeshStandardMaterial({ color: 0x9fdcff, emissive: 0x4fb4ff, emissiveIntensity: 1.6, roughness: .4, flatShading: true });
+  const runes = [];
+  for (let k = 0; k < 6; k++) {
+    const a = (k + .5) / 6 * Math.PI * 2, m = new THREE.Group();
+    m.position.set(Math.sin(a) * .87, .14, Math.cos(a) * .87); m.rotation.set(rnd(.08), a, rnd(.08)); g.add(m);
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(.07, .125, .52 + (k % 2) * .08, 4, 1).translate(0, .26, 0), stone3); m.add(st);
+    // Rune: senkrechter Strich mit zwei schrägen Zweigen, liegt auf der Außenseite des Steins
+    const rg = mergeGeometries([new THREE.BoxGeometry(.03, .2, .02), new THREE.BoxGeometry(.022, .09, .02).rotateZ(.7).translate(.03, .05, 0), new THREE.BoxGeometry(.022, .09, .02).rotateZ(-.7).translate(-.03, .05, 0)]);
+    const r = new THREE.Mesh(rg.translate(0, .26, 0), runeOff); r.position.z = .095; r.rotation.x = -.075; m.add(r); runes.push(r);
+  }
+  const seed = add(new THREE.IcosahedronGeometry(.12, 0).scale(1, 1.4, 1), new THREE.MeshStandardMaterial({ color: 0xffe7a8, emissive: 0xffb83d, emissiveIntensity: 1.1, roughness: .3, flatShading: true }), 0, 1);
+  seed.castShadow = true;
+  // weicher Lichtschein um den Keim
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,220,140,.9)'); gr.addColorStop(.35, 'rgba(255,190,90,.35)'); gr.addColorStop(1, 'rgba(255,170,60,0)');
+  cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  halo.position.y = 1; g.add(halo);
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(g); statics.push({ o: g, x: SHRINE_POS.x, z: SHRINE_POS.z });
+  return { g, seed, halo, runes, runeOn, runeOff, pulse: 0 };
+})();
+// Glaubensfunken: steigen beim Gebet vom Bewohner zum Keim auf
+const MOTE_N = 40, moteMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(.04, 0), new THREE.MeshBasicMaterial({ color: 0xffe08a, toneMapped: false }), MOTE_N);
+moteMesh.frustumCulled = false; moteMesh.count = 0; scene.add(moteMesh);
+const motes = [], moteV = new THREE.Vector3();
+function spawnMote(x, y, z) { if (motes.length >= MOTE_N) motes.shift(); motes.push({ a: new THREE.Vector3(x, y, z), t: 0, side: rnd(1) }); }
+function updateShrine(dt, t) {
+  const S0 = shrine, top = S0.g.position.y + 1, lit = Math.min(6, S.temple);
+  S0.runes.forEach((r, k) => { r.material = k < lit ? S0.runeOn : S0.runeOff; });
+  S0.pulse = Math.max(0, S0.pulse - dt * 1.5);
+  S0.seed.position.y = 1 + Math.sin(t * 1.6) * .04; S0.seed.rotation.y = t * .6;
+  S0.seed.material.emissiveIntensity = 1.1 + S0.pulse * 1.4 + Math.sin(t * 2.3) * .1;
+  S0.halo.position.y = S0.seed.position.y; S0.halo.scale.setScalar(.85 + S0.pulse * .5 + Math.sin(t * 2.3) * .04);
+  for (let i = motes.length - 1; i >= 0; i--) {
+    const m = motes[i]; m.t += dt / 1.1;
+    if (m.t >= 1) { motes.splice(i, 1); S0.pulse = Math.min(1, S0.pulse + .35); continue; }
+  }
+  motes.forEach((m, i) => {
+    const k = m.t, e = k * k * (3 - 2 * k), dx = SHRINE_POS.x - m.a.x, dz = SHRINE_POS.z - m.a.z;
+    // Bogen nach oben, leicht seitlich geschwungen
+    moteV.set(m.a.x + dx * e + dz * m.side * .25 * Math.sin(k * Math.PI), m.a.y + (top - m.a.y) * e + Math.sin(k * Math.PI) * .45, m.a.z + dz * e - dx * m.side * .25 * Math.sin(k * Math.PI));
+    dummy.position.copy(moteV); dummy.rotation.set(t * 3, t * 4, 0); dummy.scale.setScalar(1 - k * .5); dummy.updateMatrix(); moteMesh.setMatrixAt(i, dummy.matrix);
+  });
+  moteMesh.count = motes.length; moteMesh.instanceMatrix.needsUpdate = true;
+}
+// Gebet: knien, Arme zum Himmel heben (Funke steigt auf), tief verbeugen, aufrichten
+const PRAY_T = 1.7;
+function prayPose(p) {
+  const sm = x => x * x * (3 - 2 * x);
+  if (p < .35) { const e = sm(p / .35); return { arm: -1.2 - 1.65 * e, splay: .1 + .35 * e, tilt: -.18 * e }; }
+  if (p < .5) return { arm: -2.85, splay: .45, tilt: -.18 };
+  if (p < .75) { const e = sm((p - .5) / .25); return { arm: -2.85 + .95 * e, splay: .45 - .3 * e, tilt: -.18 + .93 * e }; }
+  const e = sm((p - .75) / .25); return { arm: -1.9 + .7 * e, splay: .15 - .05 * e, tilt: .75 * (1 - e) };
+}
 place(gWell, WELL.x, WELL.z, 0.4, 1.3);
 const mill = place(gMill, -3.8, -1.2, 0.5, 1.6);
 let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o; });
@@ -183,7 +250,7 @@ let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o;
 const sites = [];
 for (const [r, n, off] of [[4.4, 8, .3], [6.2, 10, 0], [7.9, 12, .2]]) for (let i = 0; i < n; i++) {
   const a = off + i / n * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (Math.hypot(x - CHURCH.x, z - CHURCH.z) < 2.6 || Math.hypot(x + 3.8, z + 1.2) < 2.2 || Math.hypot(x - WELL.x, z - WELL.z) < 1.6) continue;
+  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 2.6 || Math.hypot(x + 3.8, z + 1.2) < 2.2 || Math.hypot(x - WELL.x, z - WELL.z) < 1.6) continue;
   sites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false });
 }
 const houses = [];
@@ -774,7 +841,7 @@ function addHolz(n, x, y, z) { S.holz += n; if (x !== undefined) floatText(x, y 
 /* ------------------------------------------------------------------ villager AI */
 function walk(v, x, z, next) { v.state = 'walk'; v.tx = x; v.tz = z; v.next = next; }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
-function goPray(v) { const a = .2 * Math.PI + Math.random() * .6 * Math.PI, r = .5 + Math.random() * 1.5; walk(v, PRAY.x + Math.cos(a) * r, PRAY.z + Math.sin(a) * r, 'pray'); }
+function goPray(v) { const a = Math.random() * Math.PI * 2, r = 1.35 + Math.random() * .6; walk(v, SHRINE_POS.x + Math.cos(a) * r, SHRINE_POS.z + Math.sin(a) * r, 'pray'); }
 function findTree(x, z) {
   let best = null, bd = 1e9;
   for (let i = 0; i < 10; i++) { const t = trees[Math.floor(Math.random() * trees.length)]; if (!t || !t.alive || t.gone || t.reserved || t.g < .7) continue; const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd) { bd = d; best = t; } }
@@ -796,7 +863,7 @@ function arrive(v) {
   switch (v.next) {
     case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
     case 'store': v.carry = 0; addHolz(1); holzAcc++; if (Math.random() < .6) goPray(v); else idle(v, 1); break;
-    case 'pray': v.state = 'pray'; v.timer = 3.4; v.h = Math.atan2(CHURCH.x - v.x, CHURCH.z - v.z); break;
+    case 'pray': v.state = 'pray'; v.timer = 2 * PRAY_T; v.h = Math.atan2(SHRINE_POS.x - v.x, SHRINE_POS.z - v.z); break;
     default: idle(v, .8 + Math.random() * 2.5);
   }
 }
@@ -814,7 +881,12 @@ function updateVillager(v, dt, t) {
       }
     }
       if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
-    case 'pray': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
+    case 'pray': {
+      const k = dt * (v.haste > 0 ? 2 : 1), before = ((2 * PRAY_T - v.timer) / PRAY_T) % 1; v.timer -= k;
+      const now = ((2 * PRAY_T - v.timer) / PRAY_T) % 1;
+      if (before < .4 && now >= .4 && v.timer > 0) spawnMote(v.x + Math.sin(v.h) * .05, v.y + .45, v.z + Math.cos(v.h) * .05); // Arme oben: Funke steigt auf
+    }
+      if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'flee': v.timer -= dt; if (stepTo(v, v.tx, v.tz, 2.2 * dt) || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
     case 'grabbed': return;
@@ -1242,8 +1314,8 @@ $('btnReset').addEventListener('click', e => {
 let skipSave = false;
 
 const SHRINE = [
-  { id: 'temple', title: () => `Tempel weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Tempel strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },
-  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Tempel.' : 'Kein Platz. Deine Bewohner bauen aus Holz neue Häuser.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
+  { id: 'temple', title: () => `Schrein weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Schrein strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },
+  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : 'Kein Platz. Deine Bewohner bauen aus Holz neue Häuser.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
   { id: 'hand', title: () => `Hand stärken (Stufe ${S.hand + 1})`, desc: () => 'Formen wirkt 35 % weiter und kräftiger.', cost: handCost, buy: () => { S.hand++; } }
 ];
 function renderShrine() {
@@ -1341,12 +1413,13 @@ function frame() {
   villagers.forEach((v, i) => {
     const L = v.look;
     let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25;
+    v.kn = v.state === 'pray' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
     if (v.state === 'walk' || v.state === 'flee') {
       const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
     } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
-    else if (v.state === 'pray') { tilt = .35 + Math.sin(t * 2 + v.ph) * .08; armA = armB = -1.35; splay = -.12; }
+    else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'grabbed' || v.state === 'falling') {
       const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
       leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
@@ -1355,7 +1428,13 @@ function frame() {
     dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
     const M = dummy.matrix;
     const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
-    part(vParts.legL, .038, HIP_Y, leg, 0); part(vParts.legR, -.038, HIP_Y, -leg, 0);
+    let legA = leg, legB = -leg;
+    if (v.kn > 0) { // auf den Fersen sitzen: Beine liegen hinten flach am Boden, Körper sinkt ab
+      const kl = 1.45 - tilt; legA += (kl - legA) * v.kn; legB += (kl - legB) * v.kn;
+      bob -= v.kn * HIP_Y * VS * L.s * .8;
+      dummy.position.y = v.y + bob; dummy.updateMatrix();
+    }
+    part(vParts.legL, .038, HIP_Y, legA, 0); part(vParts.legR, -.038, HIP_Y, legB, 0);
     part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay);
     vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
     vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
@@ -1372,6 +1451,7 @@ function frame() {
   });
   for (const m of vAll) m.instanceMatrix.needsUpdate = true;
   updateChips(dt);
+  updateShrine(dt, t);
 
   // trees
   const tc2 = [0, 0]; let sc = 0;
