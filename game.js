@@ -2733,7 +2733,25 @@ function renderPortrait(dt, t) {
   P.pivot.position.y = Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .3 * CREATURES[P.rig.id].h / 1.45;
   P.rig.mixer.update(dt);
   if (P.rig.model.userData.fur) updateFur(P.rig.model.userData.fur, t);
+  portraitMouthTree();
   P.renderer.render(P.scene, P.cam);
+}
+// Stamm im Maul auch im Porträt (wie in der Welt, das Tier blickt hier nach +z)
+function portraitMouthTree() {
+  const P = portrait;
+  if (!P.mouth) { P.mouth = TK.map(g => { const o = g.scene.clone(true); o.visible = false; P.scene.add(o); return o; }); P.sack = gSack.scene.clone(true); P.sack.visible = false; P.scene.add(P.sack); }
+  P.mouth.forEach(o => o.visible = false); P.sack.visible = false;
+  if (!(fox.carry || fox.carryGoods) || !P.rig) return;
+  const C = CREATURES[P.rig.id], m = P.rig.model, head = m.userData.head || (m.userData.head = m.getObjectByName(C.head || 'Head'));
+  if (!head) return;
+  if (fox.carryGoods) { P.scene.updateMatrixWorld(true); head.getWorldPosition(mouthV); const h = Math.atan2(mouthV.x, mouthV.z); mouthV.x += Math.sin(h) * C.h * .17; mouthV.z += Math.cos(h) * C.h * .17; mouthV.y -= C.h * .2; P.sack.position.copy(mouthV); P.sack.rotation.set(0, h, 0); P.sack.scale.setScalar(1.5 * C.h / 1.45); P.sack.visible = true; return; }
+  const o = P.mouth[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
+  P.scene.updateMatrixWorld(true); head.getWorldPosition(mouthV);
+  const h = Math.atan2(mouthV.x, mouthV.z); // Blickrichtung: von der Mitte des Tiers zum Kopf
+  mouthF.set(Math.sin(h), 0, Math.cos(h)); mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;
+  const side = mouthTmp.set(Math.cos(h), 0, -Math.sin(h)), cs = side.x * P.cam.position.x + side.z * P.cam.position.z > 0 ? -1 : 1; // Krone von der Kamera weg
+  o.quaternion.setFromAxisAngle(tmpV.set(0, 1, 0), h + (cs < 0 ? Math.PI : 0)).multiply(mouthZ); o.scale.setScalar(s);
+  o.position.copy(mouthV).addScaledVector(side, -TREE_H * s * .1 * cs); o.visible = true;
 }
 const tmpV2 = new THREE.Vector2();
 useCreature(S.creature, gCreature);
@@ -2945,7 +2963,10 @@ function chooseJob(v) {
 // Träger: freie Dorfbewohner bringen Stämme aus dem Lager zur Sägemühle und Bretter zurück ins Lager.
 // Was unterwegs ist, wird pro Mühle mitgezählt, so tragen immer nur so viele, wie gebraucht werden.
 const MILL_BUF = 4;
-function hauling(hs, kind, res) { let n = 0; for (const v of villagers) if (v.haul && v.haul.hut === hs && v.haul.kind === kind && (!res || v.haul.res === res)) n += v.haul.n; return n; }
+function hauling(hs, kind, res) { let n = 0; for (const v of villagers) if (v.haul && v.haul.hut === hs && v.haul.kind === kind && (!res || v.haul.res === res)) n += v.haul.n;
+  if (kind === 'pick' && fox.haul && fox.haul.take && fox.haul.hut === hs && fox.state === 'walk' && fox.next === 'haulPick') n += res ? fox.haul.take[res] || 0 : 0; // die Kreatur ist schon unterwegs
+  if ((kind === 'in' || kind === 'feed') && fox.haul && fox.haul.supply && fox.haul.hut === hs && (fox.state === 'haulUp' || (fox.state === 'walk' && ['haulLager', 'haulDeliver'].includes(fox.next)))) n += fox.carryGoods ? fox.carryGoods[fox.haul.supply] || 0 : fox.haul.n;
+  return n; }
 // Spezialisten legen ihre Ware an der eigenen Hütte ab (Holzfäller, Jäger, Fischer, Bauer); Träger bringen sie ins Lager
 function walkDrop(v, goods) {
   if (goods) { v.drop = goods; v.dropAt = v.hut; }
@@ -3297,11 +3318,13 @@ function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'i
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
 function foxFinish(a) {
   fox.last = a; fox.lastT = clock.elapsedTime; foxIdle(5 + Math.random() * 4); fox.act = null;
-  toast(`${S.name} hat ${ACT_DESC[a]}. Lob oder Tadel?`, 4.5);
+  fox.lastDesc = fox.desc || ACT_DESC[a]; fox.desc = null;
+  toast(`${S.name} hat ${fox.lastDesc}. Lob oder Tadel?`, 4.5);
   $('btnFox').classList.add('pulse');
   renderFox();
 }
 function foxChoose() {
+  if (fox.haul || fox.carryGoods) { if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k]; fox.haul = null; fox.carryGoods = null; } // abgebrochenes Tragen: Waren gehen ins Lager
   // ab und zu hinlegen und ausruhen
   if (foxActs.lie && Math.random() < .25) { // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
     const p = restSpot(); if (Math.hypot(p.x - fox.x, p.z - fox.z) > .15) { foxWalk(p.x, p.z, 'rest'); return; }
@@ -3309,6 +3332,7 @@ function foxChoose() {
   }
   const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
   let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
+  if (a === 'help' && Math.random() < .55 && foxHaul()) { fox.act = 'help'; return; } // Waren von einer Hütte ins Lager tragen
   if (a !== 'play') {
     let best = null, bd = 1e9;
     for (const t of trees) { if (!t.alive || t.gone || t.reserved || t.g < .7) continue; const d = (t.x - fox.x) ** 2 + (t.z - fox.z) ** 2; if (d < bd) { bd = d; best = t; } }
@@ -3316,6 +3340,29 @@ function foxChoose() {
   }
   fox.act = a;
   if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); }
+}
+// Tragen: Hütte mit wartenden Waren suchen, bis zu 3 Stück auf einmal (die meisten zuerst), ins Lager bringen
+const FOX_CARRY = 3;
+function foxHaul() {
+  let best = null, bs = 0;
+  for (const h of huts) {
+    const take = {}; let n = 0;
+    const avail = Object.keys(h.goods).map(k => [k, Math.floor(h.goods[k] - hauling(h, 'pick', k))]).filter(([, a]) => a > 0).sort((a, b) => b[1] - a[1]);
+    for (const [k, a] of avail) { const t = Math.min(a, FOX_CARRY - n); if (t > 0) { take[k] = t; n += t; } }
+    if (n < 2) continue;
+    const score = n * 10 - Math.hypot(h.x - fox.x, h.z - fox.z); if (score > bs || !best) { bs = score; best = { hut: h, take, n }; }
+  }
+  // oder Nachschub aus dem Lager zu einer Werkstatt (Stämme zur Säge, Korn zur Mühle, Mehl zur Bäckerei)
+  let sup = null, ss = 0;
+  for (const h of huts) {
+    const P = PROC[h.role], res = h.role === 'sawyer' ? 'logs' : P && P.inp; if (!res) continue;
+    const have = h.role === 'sawyer' ? h.logs : h.inp, room = (h.role === 'sawyer' ? MILL_BUF : P.buf) - have - hauling(h, h.role === 'sawyer' ? 'in' : 'feed');
+    const n = Math.min(FOX_CARRY, room, Math.floor(S[res])); if (n < 2) continue;
+    const score = n * 10 + (have === 0 ? 15 : 0) - Math.hypot(h.x - LAGER.x, h.z - LAGER.z) * .5; if (score > ss || !sup) { ss = score; sup = { hut: h, res, n }; }
+  }
+  if (sup && (!best || ss > bs)) { fox.haul = { hut: sup.hut, supply: sup.res, n: sup.n }; const p = lagerDrop(); foxWalk(p.x, p.z, 'haulLager'); return true; }
+  if (!best) return false;
+  fox.haul = best; const p = hutWork(best.hut); foxWalk(p.x, p.z, 'haulPick'); return true;
 }
 // Liegeplatz: rundum frei im Umkreis der halben Körperlänge (Gebäude, Bäume, Felsen, Wasser)
 function restSpot() {
@@ -3343,6 +3390,7 @@ function updateFox(dt, t) {
     case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
+    case 'haulUp': anim(fox.timer > .4 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { if (fox.haul && fox.haul.supply) { const p = hutWork(fox.haul.hut); foxWalk(p.x, p.z, 'haulDeliver'); } else { const p = localPt(lager, .2, 1.9); foxWalk(p.x, p.z, 'haulStore'); } } break;
     case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); } break;
     case 'walk': anim('walk'); if (followPath(fox, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
@@ -3350,6 +3398,27 @@ function updateFox(dt, t) {
         // Baum ablegen: er liegt kurz vor dem Lager und wird zu Stämmen
         const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
         addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
+      }
+      else if (fox.next === 'haulPick') { // Waren aufnehmen (so viele noch da sind)
+        const H = fox.haul, g = {}; let n = 0;
+        if (H && huts.includes(H.hut)) for (const k in H.take) { const t = Math.min(H.take[k], Math.floor(H.hut.goods[k] || 0)); if (t > 0) { H.hut.goods[k] -= t; g[k] = t; n += t; } }
+        if (!n) { fox.haul = null; foxIdle(1); } else { fox.carryGoods = g; fox.state = 'haulUp'; fox.timer = 1.1; fox.h = Math.atan2(H.hut.x - fox.x, H.hut.z - fox.z); }
+      }
+      else if (fox.next === 'haulLager') { // Nachschub im Lager aufnehmen
+        const H = fox.haul, n = H ? Math.min(H.n, Math.floor(S[H.supply])) : 0;
+        if (!n || !huts.includes(H.hut)) { fox.haul = null; foxIdle(1); } else { S[H.supply] -= n; fox.carryGoods = { [H.supply]: n }; fox.state = 'haulUp'; fox.timer = 1.1; fox.h = Math.atan2(LAGER.x - fox.x, LAGER.z - fox.z); }
+      }
+      else if (fox.next === 'haulDeliver') { // in der Werkstatt abladen
+        const H = fox.haul, g = fox.carryGoods || {}, k = Object.keys(g)[0], n = k ? g[k] : 0;
+        if (H && huts.includes(H.hut) && n) { if (H.hut.role === 'sawyer') H.hut.logs += n; else H.hut.inp += n; } else if (k) S[k] += n; // Werkstatt weg: zurück ins Lager
+        floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h, fox.z, `${resText(k, n)} abgeladen`, 'h');
+        fox.carryGoods = null; fox.haul = null; fox.desc = `${resText(k, n)} zur ${H ? ROLES[H.hut.role].hut : 'Werkstatt'} getragen`; foxFinish('help');
+      }
+      else if (fox.next === 'haulStore') { // im Lager abladen
+        const g = fox.carryGoods || {}, out = [];
+        for (const k in g) { if (k === 'logs') S.logs += g[k]; else S[k] += g[k]; out.push(resText(k, g[k])); }
+        floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h, fox.z, `+${out.join(', ')}`, 'h');
+        fox.carryGoods = null; fox.haul = null; fox.desc = `${out.join(', ')} ins Lager getragen`; foxFinish('help');
       }
       else if (fox.next === 'rest') { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); }
@@ -3395,7 +3464,7 @@ const foxGlow = new THREE.PointLight(0xffd27a, 0, 9, 1.6); foxGlow.position.y = 
 const foxRing = new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false }));
 scene.add(foxRing);
 function foxCast(x, z) {
-  if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && fox.next === 'store')) return;
+  if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && ['store', 'haulStore', 'haulDeliver'].includes(fox.next))) return;
   if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
   fox.h = Math.atan2(x - fox.x, z - fox.z); glowT = GLOW_T;
   if (foxActs.cast) { fox.state = 'cast'; fox.timer = .1; foxOnce('cast'); } // Dauer regelt foxOnce else { fox.hop = .5; foxIdle(1.5); }
@@ -3638,20 +3707,29 @@ function updateFallen(dt) {
 // Der Tiergeist trägt einen Baum quer im Maul (wie einen Stock); hängt an der Kopfposition des Modells.
 const mouthTrees = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2), mouthV = new THREE.Vector3(), mouthF = new THREE.Vector3();
+const mouthSack = shadowify(gSack.scene.clone(true)); mouthSack.visible = false; scene.add(mouthSack);
 function updateMouthTree() {
-  mouthTrees.forEach(o => o.visible = false);
+  mouthTrees.forEach(o => o.visible = false); mouthSack.visible = false;
+  if (fox.carryGoods && foxModel) { // Sack mit Waren im Maul
+    const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
+    if (head) { head.getWorldPosition(mouthV); mouthV.x += Math.sin(fox.h) * C.h * .17; mouthV.z += Math.cos(fox.h) * C.h * .17; mouthV.y -= C.h * .2; mouthSack.position.copy(mouthV); mouthSack.rotation.set(0, fox.h, 0); mouthSack.scale.setScalar(1.5 * C.h / 1.45); mouthSack.visible = true; }
+    return;
+  }
   if (!fox.carry || !foxModel) return;
   const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
   if (!head) return;
   const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
   head.getWorldPosition(mouthV); mouthF.set(Math.sin(fox.h), 0, Math.cos(fox.h));
-  mouthV.addScaledVector(mouthF, C.h * .17).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
-  mouthQ.copy(foxPivot.quaternion).multiply(mouthZ);                   // Stamm quer zur Laufrichtung
+  mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
+  // Krone auf die von der Kamera abgewandte Seite (mit etwas Trägheit, damit sie nicht hin und her springt)
+  const side = mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), dc = side.x * (camera.position.x - fox.x) + side.z * (camera.position.z - fox.z);
+  if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
+  mouthQ.copy(foxPivot.quaternion); if (cs < 0) mouthQ.multiply(mouthFlip); mouthQ.multiply(mouthZ); // Stamm quer zur Laufrichtung
   o.quaternion.copy(mouthQ); o.scale.setScalar(s);
-  o.position.copy(mouthV).addScaledVector(mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), -TREE_H * s * .3); // Krone zeigt nach +x: Fuß um ein Drittel zur Gegenseite, so liegt das untere Drittel des Stamms im Maul
+  o.position.copy(mouthV).addScaledVector(side, -TREE_H * s * .1 * cs); // Krone zeigt nach +x: das Maul packt den Stamm knapp über dem Wurzelende, die Krone liegt seitlich neben dem Kopf
   o.visible = true;
 }
-const mouthTmp = new THREE.Vector3();
+const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 function updateTrees(dt, t) {
   updateFallen(dt);
   if (treeGrab) {
@@ -3727,7 +3805,7 @@ function placeFoxUI(dt) {
   if ((badgeT -= dt) <= 0 || !dt) {
     badgeT = .25;
     $('badgeName').textContent = full ? S.name : ''; $('badgeNow').textContent = full ? `${foxDoing()}.` : '';
-    $('badgeAsk').textContent = ask ? (full ? `Hat ${ACT_DESC[fox.last]}: Lob oder Tadel?` : 'Lob oder Tadel?') : '';
+    $('badgeAsk').textContent = ask ? (full ? `Hat ${fox.lastDesc || ACT_DESC[fox.last]}: Lob oder Tadel?` : 'Lob oder Tadel?') : '';
     $('badgeBars').innerHTML = full ? ['help', 'play', 'mischief'].map(k => `<span>${ACT_LABEL[k]}</span><i><u style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></u></i>`).join('') : '';
   }
   // über dem Kopf, bei offenem Menü über dem oberen Knopf; am Bildschirmrand halten
@@ -4051,7 +4129,7 @@ function renderShrine() {
 function renderFox() {
   $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
   const t = clock.elapsedTime;
-  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${ACT_DESC[fox.last]}. Deine Reaktion prägt ${pron().ihn}.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ${pron().ihn}.`;
+  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${fox.lastDesc || ACT_DESC[fox.last]}. Deine Reaktion prägt ${pron().ihn}.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ${pron().ihn}.`;
   $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
   renderForms();
 }
@@ -4065,6 +4143,10 @@ function foxDoing() {
   switch (fox.state) {
     case 'walk':
       if (fox.next === 'store') return 'trägt einen Baum im Maul zum Lager';
+      if (fox.next === 'haulPick' && fox.haul) return `läuft zur ${ROLES[fox.haul.hut.role].hut}, um Waren ins Lager zu tragen`;
+      if (fox.next === 'haulLager' && fox.haul) return `läuft zum Lager, um Nachschub für die ${ROLES[fox.haul.hut.role].hut} zu holen`;
+      if (fox.next === 'haulDeliver' && fox.carryGoods && fox.haul) return `trägt ${Object.keys(fox.carryGoods).map(k => resText(k, fox.carryGoods[k])).join(', ')} zur ${ROLES[fox.haul.hut.role].hut}`;
+      if (fox.next === 'haulStore' && fox.carryGoods) return `trägt ${Object.keys(fox.carryGoods).map(k => resText(k, fox.carryGoods[k])).join(', ')} zum Lager`;
       if (fox.next === 'play') return 'läuft zum Dorfplatz, um zu spielen';
       return fox.act === 'help' ? 'läuft zu einem Baum, um Holz zu holen' : 'schleicht zu einem Baum und führt etwas im Schilde';
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
@@ -4072,6 +4154,7 @@ function foxDoing() {
     case 'rest': return 'hat sich hingelegt und döst';
     case 'cast': return 'wirkt mit dir ein Wunder';
     case 'pickup': return 'hebt den gefällten Baum auf';
+    case 'haulUp': return 'nimmt die Waren ins Maul';
     default: return fox.idleA === 'eat' ? 'schnuppert am Boden' : 'schaut sich um';
   }
 }
@@ -4415,7 +4498,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, PROC, puffs, handHelp, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
