@@ -3458,7 +3458,12 @@ function updateFox(dt, t) {
     foxRing.position.set(fox.x, surfaceAt(fox.x, fox.z) + .08, fox.z);
   }
   foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
-  foxPivot.rotation.y = fox.h;
+  // Das Modell dreht sich weich in die Laufrichtung (gleich schnell bei jeder Bildrate, höchstens etwa 260° pro Sekunde),
+  // statt an jeder Ecke des Weges sprunghaft umzuschwenken
+  if (fox.vh === undefined) fox.vh = fox.h;
+  const dvh = Math.atan2(Math.sin(fox.h - fox.vh), Math.cos(fox.h - fox.vh));
+  fox.vh += Math.sign(dvh) * Math.min(Math.abs(dvh) * (1 - Math.exp(-dt * 7)), dt * 4.5);
+  foxPivot.rotation.y = fox.vh;
   foxMixer.update(dt);
   updateMouthTree();
 }
@@ -3716,14 +3721,14 @@ function updateMouthTree() {
   mouthTrees.forEach(o => o.visible = false); mouthSack.visible = false;
   if (fox.carryGoods && foxModel) { // Sack mit Waren im Maul
     const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
-    if (head) { head.getWorldPosition(mouthV); mouthV.x += Math.sin(fox.h) * C.h * .17; mouthV.z += Math.cos(fox.h) * C.h * .17; mouthV.y -= C.h * .2; mouthSack.position.copy(mouthV); mouthSack.rotation.set(0, fox.h, 0); mouthSack.scale.setScalar(1.5 * C.h / 1.45); mouthSack.visible = true; }
+    if (head) { head.getWorldPosition(mouthV); const fh = foxPivot.rotation.y; mouthV.x += Math.sin(fh) * C.h * .17; mouthV.z += Math.cos(fh) * C.h * .17; mouthV.y -= C.h * .2; mouthSack.position.copy(mouthV); mouthSack.rotation.set(0, fh, 0); mouthSack.scale.setScalar(1.5 * C.h / 1.45); mouthSack.visible = true; }
     return;
   }
   if (!fox.carry || !foxModel) return;
   const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
   if (!head) return;
   const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
-  head.getWorldPosition(mouthV); mouthF.set(Math.sin(fox.h), 0, Math.cos(fox.h));
+  head.getWorldPosition(mouthV); mouthF.set(Math.sin(foxPivot.rotation.y), 0, Math.cos(foxPivot.rotation.y));
   mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
   // Krone auf die von der Kamera abgewandte Seite (mit etwas Trägheit, damit sie nicht hin und her springt)
   const side = mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), dc = side.x * (camera.position.x - fox.x) + side.z * (camera.position.z - fox.z);
