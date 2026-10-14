@@ -2203,9 +2203,10 @@ function updateWild(dt, t) {
       if (a.timer <= 0) removeAnimal(a);
       continue;
     }
-    const deer = a.kind === 'reh';
+    const deer = a.kind === 'reh', stunned = (a.stun = Math.max(0, (a.stun || 0) - dt)) > 0;
+    if (stunned && Math.random() < dt * 3) spawnMote(a.x + rnd(.15), heightAt(a.x, a.z) + (deer ? .5 : .2), a.z + rnd(.15)); // gebannt: Funken steigen auf
     a.threatT -= dt;
-    if (a.threatT <= 0) { // Gefahr prüfen
+    if (a.threatT <= 0 && !stunned) { // Gefahr prüfen
       a.threatT = .3; let tx = 0, tz = 0, n = 0;
       const near = (x, z, r) => { const d = Math.hypot(a.x - x, a.z - z); if (d < r) { tx += (a.x - x) / (d || 1); tz += (a.z - z) / (d || 1); n++; } };
       // eher gelassen, damit man sie beobachten kann: nur wer sehr nahe kommt, scheucht sie auf
@@ -2217,7 +2218,8 @@ function updateWild(dt, t) {
         a.state = 'flee'; setGoal(a, px, pz, navV); a.sp = deer ? 2.6 : 3; a.timer = 2;
       }
     }
-    if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; } }
+    if (stunned) a.state = 'idle';
+    else if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; } }
     else { a.timer -= dt; if (followPath(a, a.sp * dt) || (a.state === 'flee' && a.timer <= 0)) { a.state = 'idle'; a.timer = 3 + Math.random() * 6; } }
     const y = heightAt(a.x, a.z), M = a.m, moving = a.state !== 'idle', fast = a.state === 'flee';
     if (deer) {
@@ -3016,7 +3018,7 @@ const JOB = {
   hunter(v) { // Wild suchen, anpirschen, zielen, schießen; Beute holen und ins Lager bringen
     if (v.prey && v.prey.state === 'dead' && wild.includes(v.prey)) { walk(v, v.prey.x + rnd(.2), v.prey.z + rnd(.2), 'pickup'); return; }
     let best = null, bd = 26 * 26;
-    for (const a of wild) { if (a.state === 'dead' || villagers.some(o => o !== v && o.prey === a)) continue; const d = (a.x - v.hut.x) ** 2 + (a.z - v.hut.z) ** 2; if (d < bd) { bd = d; best = a; } }
+    for (const a of wild) { if (a.state === 'dead' || villagers.some(o => o !== v && o.prey === a)) continue; const d = (a.x - v.hut.x) ** 2 + (a.z - v.hut.z) ** 2 - (a.stun > 0 ? 1e4 : 0); if (d < bd) { bd = d; best = a; } }
     if (!best) { atHut(v); return; }
     v.prey = best; const dx = v.x - best.x, dz = v.z - best.z, d = Math.hypot(dx, dz) || 1, r = best.kind === 'reh' ? 4.6 : 3.6;
     walk(v, best.x + dx / d * r, best.z + dz / d * r, 'aim'); v.stalk = true;
@@ -3048,7 +3050,7 @@ const arrowMat = new THREE.MeshStandardMaterial({ color: 0x6b4527, roughness: .8
 function shoot(v) {
   const a = v.prey; if (!a || !wild.includes(a) || a.state === 'dead') { v.prey = null; idle(v, .5); return; }
   const o = new THREE.Mesh(arrowGeo, arrowMat); o.userData.noSnow = true; scene.add(o);
-  const hit = Math.random() < (a.kind === 'reh' ? .55 : .65), tx = a.x + (hit ? 0 : rnd(.8)), tz = a.z + (hit ? 0 : rnd(.8));
+  const hit = a.stun > 0 || Math.random() < (a.kind === 'reh' ? .55 : .65), tx = a.x + (hit ? 0 : rnd(.8)), tz = a.z + (hit ? 0 : rnd(.8));
   arrows.push({ o, v, a, hit, x0: v.x + Math.sin(v.h) * .1, z0: v.z + Math.cos(v.h) * .1, y0: v.y + .32, x1: tx, z1: tz, y1: heightAt(tx, tz) + (a.kind === 'reh' ? .35 : .1), t: 0, dur: Math.hypot(tx - v.x, tz - v.z) / 9, stuck: 0 });
 }
 function updateArrows(dt) {
@@ -3750,6 +3752,72 @@ function pick(cx, cy) {
   hitOk = false; return false;
 }
 function screenDist(x, y, z, cx, cy) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return Math.hypot((tmpV.x + 1) / 2 * r.width + r.left - cx, (1 - tmpV.y) / 2 * r.height + r.top - cy); }
+// Die Hand hilft bei allem, was die Arbeiter tun: säen, gießen, ernten, Vieh füttern, Fische greifen, Wild bannen
+// und erlegtes Wild aufheben, Setzlinge pflanzen, eine Ladung in Säge, Mühle oder Bäckerei verarbeiten und Waren ins Lager bringen.
+function handHelp(cx, cy) {
+  // Wildtiere (nach Bildschirmabstand): lebend bannen, erlegt aufheben
+  let wa = null, wd = 38;
+  for (const a of wild) { const d = screenDist(a.x, heightAt(a.x, a.z) + (a.kind === 'reh' ? .3 : .1), a.z, cx, cy); if (d < wd) { wd = d; wa = a; } }
+  if (wa) {
+    const y = heightAt(wa.x, wa.z);
+    if (wa.state === 'dead') { const n = wa.kind === 'reh' ? 3 : 1; for (const v of villagers) if (v.prey === wa) { v.prey = null; if (v.state === 'walk' && v.next === 'pickup') idle(v, .3); } removeAnimal(wa); S.meat += n; floatText(wa.x, y + .6, wa.z, `+${resText('meat', n)}`, 'h'); return true; }
+    wa.stun = 15; wa.state = 'idle'; wa.timer = 1; floatText(wa.x, y + .7, wa.z, 'Gebannt', 's');
+    // der nächste freie Jäger nimmt es ins Visier
+    const hs = villagers.filter(v => v.role === 'hunter' && v.hut && !v.carry && ['idle', 'walk', 'aim'].includes(v.state) && !(v.prey && v.prey.state === 'dead'));
+    hs.sort((a, b) => Math.hypot(a.x - wa.x, a.z - wa.z) - Math.hypot(b.x - wa.x, b.z - wa.z));
+    if (hs[0]) { for (const v of villagers) if (v.prey === wa) v.prey = null; hs[0].prey = null; JOB.hunter(hs[0]); }
+    return true;
+  }
+  if (!hitOk) return false;
+  // Felder: leer → säen, wachsend → gießen, reif → ernten
+  const fl = fieldAt(hit.x, hit.z);
+  if (fl) {
+    const y = heightAt(fl.x, fl.z), C = CROPS[fl.c];
+    if (fl.by && fl.by.field === fl) { const v = fl.by; v.field = null; fl.by = null; if (['sow', 'harvest'].includes(v.state) || (v.state === 'walk' && ['sow', 'harvest'].includes(v.next))) idle(v, .3); } // der Bauer muss nicht mehr hin
+    if (fl.state === 'reif') harvestByHand(fl);
+    else if (fl.state === 'leer') { fl.state = 'grow'; fl.g = 0; floatText(fl.x, y + .5, fl.z, `${C.label} gesät`, 's'); for (let k = 0; k < 10; k++) { const p = farmPt(fl.F, fl.lx + rnd(FARM.fw / 2), fl.lz + rnd(FARM.fd / 2)); spawnChips(p.x, heightAt(p.x, p.z) + .05, p.z, Math.random() * 6.28); } }
+    else if (fl.water > 30) toast(`${C.label}: zu ${Math.floor(fl.g * 100)} % gewachsen, gerade gegossen.`, 2);
+    else { // gießen: Tropfen fallen aufs Feld, eine Weile wächst es doppelt so schnell
+      fl.water = 60; floatText(fl.x, y + .5, fl.z, `${C.label} gegossen`, 's');
+      for (let k = 0; k < 40; k++) { if (spray.length >= SPRAY_N) spray.shift(); const p = farmPt(fl.F, fl.lx + rnd(FARM.fw / 2), fl.lz + rnd(FARM.fd / 2)); spray.push({ x: p.x, y: heightAt(p.x, p.z) + .8 + Math.random() * .5, z: p.z, vx: 0, vy: -1 - Math.random(), vz: 0, t: 0, life: .7, s: Math.random() * .5 }); }
+    }
+    return true;
+  }
+  // Weide: Tiere füttern, Milch, Eier und Fleisch gleich ins Lager
+  for (const F of farms) {
+    const dx = hit.x - F.x, dz = hit.z - F.z, c = Math.cos(F.ry), sn = Math.sin(F.ry), lx = dx * c - dz * sn, lz = dx * sn + dz * c, P = FARM.pen;
+    if (lx > P.x0 && lx < P.x1 && lz > P.z0 && lz < P.z1) {
+      F.feedT = 9; const g = { milk: Math.floor(F.milk), eggs: Math.floor(F.eggs), meat: Math.floor(F.pork) }; F.milk -= g.milk; F.eggs -= g.eggs; F.pork -= g.meat;
+      const out = Object.keys(g).filter(k => g[k] > 0).map(k => { S[k] += g[k]; return resText(k, g[k]); });
+      floatText(hit.x, hit.y + .6, hit.z, out.length ? `Gefüttert: +${out.join(', ')}` : 'Gefüttert', out.length ? 'h' : 's'); return true;
+    }
+  }
+  // Hütten und Werkstätten: wartende Waren ins Lager, sonst eine Ladung verarbeiten
+  let hb = null, hd = 1e9;
+  for (const h of huts) { const d = Math.hypot(hit.x - h.x, hit.z - h.z), sd = screenDist(h.x, heightAt(h.x, h.z) + .5, h.z, cx, cy); if ((d < 1.05 || sd < 42) && d < hd) { hd = d; hb = h; } }
+  if (hb) {
+    const y = heightAt(hb.x, hb.z) + 1.2, out = [];
+    for (const k in hb.goods) { const n = Math.floor(hb.goods[k] - hauling(hb, 'pick', k)); if (n > 0) { hb.goods[k] -= n; S[k] += n; out.push(resText(k, n)); } }
+    if (hb.role === 'sawyer' && hb.planks > 0) { const n = hb.planks - hauling(hb, 'out'); if (n > 0) { hb.planks -= n; S.holz += n; out.push(`${n} Bretter`); } }
+    if (out.length) { floatText(hb.x, y, hb.z, `Ins Lager: ${out.join(', ')}`, 'h'); return true; }
+    const P = PROC[hb.role];
+    if (P && hb.inp >= P.n) { hb.inp -= P.n; hb.goods[P.out] = (hb.goods[P.out] || 0) + P.m; hb.busy = 1.5; floatText(hb.x, y, hb.z, `+${resText(P.out, P.m)} ${P.verb}`, 'h'); return true; }
+    if (hb.role === 'sawyer' && hb.logs >= 1) { hb.logs--; hb.planks += 2; hb.sawing = 1; floatText(hb.x, y, hb.z, '+2 Bretter gesägt', 'h'); return true; }
+    toast(P ? `${ROLES[hb.role].hut}: Es fehlt ${RES[P.inp][1]}.` : hb.role === 'sawyer' ? 'Sägemühle: Es fehlen Stämme.' : `${ROLES[hb.role].hut}: Gerade nichts abzuholen.`, 2);
+    return true;
+  }
+  // Wasser: einen Fisch greifen
+  if (heightAt(hit.x, hit.z) < -.05) {
+    let fi = -1, fd = 1.1 * 1.1; fish.forEach((f, i) => { const d = (f.x - hit.x) ** 2 + (f.z - hit.z) ** 2; if (d < fd && !f.jump) { fd = d; fi = i; } });
+    if (fi >= 0) { const f = fish[fi]; fish.splice(fi, 1); splash(f.x, f.z); S.fish += 1; floatText(f.x, .6, f.z, `+${resText('fish', 1)}`, 'h'); return true; }
+    return false;
+  }
+  // Baumstumpf oder freier Baumplatz: Setzling pflanzen
+  let tb = null, td = .5;
+  for (const t of trees) { if (t.alive || t.gone || t.reserved) continue; const d = Math.hypot(t.x - hit.x, t.z - hit.z); if (d < td) { td = d; tb = t; } }
+  if (tb) { Object.assign(tb, { alive: true, g: .12, stumpT: 0, regrow: 0, type: treeKindAt(tb.x, tb.z) }); floatText(tb.x, heightAt(tb.x, tb.z) + .5, tb.z, 'Gepflanzt', 's'); return true; }
+  return false;
+}
 function onToolDown(cx, cy) {
   pick(cx, cy); handShown = hitOk;
   if (tool === 'hand') {
@@ -3757,12 +3825,7 @@ function onToolDown(cx, cy) {
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) { grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; best.drop = null; } best.state = 'grabbed'; }
-    else if (!heldTree.on) {
-      const fl = hitOk && fieldAt(hit.x, hit.z);
-      if (fl && fl.state === 'reif') harvestByHand(fl); // reifes Feld abernten
-      else if (fl) toast(fl.state === 'leer' ? 'Dieses Feld muss erst besät werden.' : `${CROPS[fl.c].label}: zu ${Math.round(fl.g * 100)} % gewachsen.`, 2);
-      else { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
-    }
+    else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
   } else if (tool === 'miracle' && hitOk) { tryMiracle(hit); pressing = false; return; }
   pressing = true;
 }
@@ -3811,7 +3874,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
   get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
-  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen, reife Felder abernten. ${S.name} antippen für Streicheln, Klaps und mehr.`; },
+  get hand() { return `Bewohner packen, Bäume ausreißen. Bei der Arbeit helfen: Felder säen, gießen, ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name} antippen für mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -4324,7 +4387,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, PROC, puffs, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, PROC, puffs, handHelp, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
