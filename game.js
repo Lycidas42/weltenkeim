@@ -1104,7 +1104,7 @@ for (let i = 0; i < 18; i++) {
 // Bauernhöfe brauchen Platz: ebenes, offenes Land weiter draußen. Im Hofraum zeigt z zum Dorf: Wohnhaus vorn links,
 // Weide mit Hühnerstall vorn rechts, dahinter vier Felder nebeneinander. Die Plätze werden gleich zu Beginn
 // reserviert, damit dort keine Bäume, Felsen und Büsche stehen.
-const FARM = { house: [-1.6, 1.35], fw: 1.4, fd: 2.0, fz: -1.5, fx: [-2.4, -.8, .8, 2.4], pen: { x0: .3, x1: 3.35, z0: .4, z1: 2.85, xm: 2.05 }, coop: [-2.85, 2.75], trough: [1.9, 2.62], troughs: [[1.17, .8], [2.7, .7]], hay: [[3.72, .95], [3.72, 1.42]], lx0: -3.4, lx1: 3.6, lz0: -2.8, lz1: 3.15 };
+const FARM = { house: [-1.6, 1.35], fw: 1.4, fd: 2.0, fz: -1.5, fx: [-2.4, -.8, .8, 2.4], pen: { x0: .3, x1: 3.35, z0: .4, z1: 2.85, xm: 2.05 }, coop: [-2.85, 2.3], coopRamp: .45, trough: [1.9, 2.62], troughs: [[1.17, .8], [2.7, .7]], hay: [[3.72, .95], [3.72, 1.42]], lx0: -3.4, lx1: 3.6, lz0: -2.8, lz1: 3.15 };
 const farmSites = [];
 {
   const cand = [];
@@ -1198,6 +1198,13 @@ function makeStock(kind) {
       ...[-1, 1].map(sx => P(new THREE.ConeGeometry(.03, .06, 3).rotateX(.6).rotateZ(-sx * .4).translate(sx * .045, .065, .02), 0xe09a93))]), head);
     for (const [x, z] of [[.07, .1], [-.07, .1], [.07, -.1], [-.07, -.1]]) leg(x, .12, z, .12, .026, 0xe9a7a0, 0x8f5f58);
     g.scale.setScalar(.85);
+  } else if (kind === 'hahn') { // Hahn: größer, rotbraun, hoher Kamm, Kehllappen, dunkel schillernder Schwanz
+    body = new THREE.Group(); g.add(body);
+    add(mergeGeometries([P(new THREE.SphereGeometry(1, 8, 6).scale(.055, .05, .07).translate(0, .11, 0), 0xa9482a), P(new THREE.SphereGeometry(1, 7, 5).scale(.032, .045, .035).translate(0, .155, .035), 0xd9893a),
+      P(new THREE.SphereGeometry(.03, 7, 5).translate(0, .19, .05), 0xc9702e), P(new THREE.BoxGeometry(.01, .04, .05).translate(0, .23, .048), 0xd8352a), P(new THREE.SphereGeometry(.012, 4, 3).scale(1, 1.5, 1).translate(0, .162, .07), 0xd8352a),
+      P(new THREE.ConeGeometry(.011, .028, 4).rotateX(Math.PI / 2).translate(0, .188, .088), 0xe9b53a),
+      ...[-.5, 0, .5].map(a => P(new THREE.SphereGeometry(1, 5, 4).scale(.012, .07, .03).rotateX(-.5).rotateZ(a * .4).translate(a * .02, .18, -.075), 0x24423a)),
+      ...[-1, 1].map(sx => P(new THREE.CylinderGeometry(.006, .006, .07, 3).translate(sx * .022, .035, 0), 0xe9b53a))]), body);
   } else { // Huhn
     const col = Math.random() < .35 ? 0xb06a35 : 0xf4f1ea;
     body = new THREE.Group(); g.add(body);
@@ -1226,10 +1233,18 @@ function buildFarm(e, F) {
     if (nx) { const [qx, qz] = nx, L = Math.hypot(qx - px, qz - pz), yy = (y + at(qx, qz)) / 2, ry = Math.atan2(qx - px, qz - pz); for (const h of [.13, .25]) B(.025, .035, L, (px + qx) / 2, yy + h, (pz + qz) / 2, wood, ry); }
   }
   // Hühnerstall auf Stelzen mit Satteldach und Rampe (neben dem Haus, die Hühner laufen frei)
-  { const [cx, cz] = FARM.coop, y = at(cx, cz); for (const [ox, oz] of [[-.25, -.18], [.25, -.18], [-.25, .18], [.25, .18]]) B(.05, .16, .05, cx + ox, y + .08, cz + oz, dark);
-    B(.62, .32, .44, cx, y + .32, cz, 0xb5523b); B(.12, .14, .02, cx, y + .26, cz + .225, 0x3a2a20);
-    for (const sx of [-1, 1]) { const r = new THREE.BoxGeometry(.72, .035, .3).rotateX(sx * .62).translate(cx, y + .56, cz + sx * .12); parts.push(paint(r, (px, py, pz, ny, cc) => cc.set(0x6e4526))); }
-    parts.push(paint(new THREE.BoxGeometry(.12, .02, .32).rotateX(.5).translate(cx, y + .1, cz + .36), (px, py, pz, ny, cc) => cc.set(wood))); }
+  { const [cx, cz] = FARM.coop, y = at(cx, cz); for (const [ox, oz] of [[-.36, -.25], [.36, -.25], [-.36, .25], [.36, .25]]) B(.06, .22, .06, cx + ox, y + .11, cz + oz, dark);
+    B(.82, .42, .58, cx, y + .41, cz, 0xb5523b); for (const ox of [-.41, .41]) for (const oz of [-.29, .29]) B(.05, .44, .05, cx + ox, y + .41, cz + oz, 0xe8e0cc); // Eckbalken
+    B(.15, .17, .02, cx, y + .3, cz + .295, 0x2a1e16); B(.19, .03, .03, cx, y + .4, cz + .3, 0xe8e0cc); // Tür mit Sturz
+    B(.14, .1, .02, cx + .24, y + .45, cz + .295, 0xf2d48a); B(.16, .02, .03, cx + .24, y + .39, cz + .3, 0xe8e0cc); // Fensterchen
+    B(.3, .2, .2, cx - .5, y + .32, cz - .08, 0xa94a35); parts.push(paint(new THREE.BoxGeometry(.34, .03, .26).rotateZ(.35).translate(cx - .5, y + .45, cz - .08), (px, py, pz, ny, cc) => cc.set(0x6e4526))); // Legenest
+    for (const sx of [-1, 1]) { const r = new THREE.BoxGeometry(.94, .04, .4).rotateX(sx * .6).translate(cx, y + .74, cz + sx * .16); parts.push(paint(r, (px, py, pz, ny, cc) => cc.set(0x6e4526).multiplyScalar(ny > .3 ? 1 : .8))); }
+    const gable = new THREE.Shape([new THREE.Vector2(-.29, 0), new THREE.Vector2(.29, 0), new THREE.Vector2(0, .2)]);
+    for (const sx of [-1, 1]) parts.push(paint(new THREE.ExtrudeGeometry(gable, { depth: .02, bevelEnabled: false }).rotateY(Math.PI / 2).translate(cx + sx * .4 - .01, y + .62, cz), (px, py, pz, ny, cc) => cc.set(0xb5523b)));
+    // Hühnerleiter von der Tür zum Boden, mit Sprossen
+    const R = FARM.coopRamp, L = Math.hypot(R, .21), ang = Math.atan2(.21, R), mz = cz + .29 + R / 2;
+    parts.push(paint(new THREE.BoxGeometry(.14, .02, L).rotateX(ang).translate(cx, y + .115, mz), (px, py, pz, ny, cc) => cc.set(wood)));
+    for (let k = 1; k < 5; k++) { const u = k / 5; B(.14, .015, .015, cx, y + .21 * (1 - u) + .025, cz + .29 + R * u, dark); } }
   // je ein Futtertrog an der Vorderseite der beiden Koppeln, Heuballen draußen neben der Weide
   { for (const [tx, w] of FARM.troughs) { const tz = FARM.trough[1], y = at(tx, tz); B(w, .14, .22, tx, y + .07, tz - .1, wood); B(w - .08, .03, .16, tx, y + .13, tz - .1, 0xc9a24a); }
     for (const [hx, hz] of FARM.hay) parts.push(paint(new THREE.CylinderGeometry(.2, .2, .32, 10).rotateZ(Math.PI / 2).translate(hx, at(hx, hz) + .2, hz), (px, py, pz, ny, cc) => cc.set(0xd9b65a).multiplyScalar(.9 + .1 * Math.sin(py * 60)))); }
@@ -1253,9 +1268,9 @@ function buildFarm(e, F) {
     fields.push(f); F.fields.push(f);
   });
   // Vieh auf der Weide
-  for (const [kind, n] of [['kuh', 2], ['schwein', 2], ['huhn', 5]]) for (let k = 0; k < n; k++) {
+  for (const [kind, n] of [['kuh', 2], ['schwein', 2], ['huhn', 5], ['hahn', 1]]) for (let k = 0; k < n; k++) {
     let lx = 0, lz = 0;
-    if (kind === 'huhn') for (let t = 0; t < 40; t++) { lx = rnd(3) - .5; lz = 1.5 + rnd(1.5); if (yardOk(lx, lz)) break; }
+    if (kind === 'huhn' || kind === 'hahn') for (let t = 0; t < 40; t++) { lx = rnd(3) - .5; lz = 1.5 + rnd(1.5); if (yardOk(lx, lz)) break; }
     else { const Z = stockZone(kind); lx = Z.x0 + Math.random() * (Z.x1 - Z.x0); lz = Z.z0 + Math.random() * (Z.z1 - Z.z0); }
     stock.push({ kind, F, lx, lz, h: Math.random() * 6.28, tx: lx, tz: lz, moving: false, timer: Math.random() * 3, ph: Math.random() * 6.28, m: makeStock(kind) });
   }
@@ -1266,7 +1281,7 @@ function stockZone(kind) { const P = FARM.pen, zz = { z0: P.z0 + .3, z1: FARM.tr
 function yardOk(lx, lz) {
   const P = FARM.pen, [hx, hz] = FARM.house, [cx, cz] = FARM.coop, inR = (x0, x1, z0, z1) => lx > x0 && lx < x1 && lz > z0 && lz < z1;
   if (lx < -3.25 || lx > 3.5 || lz < -.3 || lz > 3.1) return false;
-  if (inR(P.x0 - .12, P.x1 + .12, P.z0 - .12, P.z1 + .12) || inR(hx - .78, hx + .78, hz - .95, hz + .95) || inR(cx - .42, cx + .42, cz - .32, cz + .5)) return false;
+  if (inR(P.x0 - .12, P.x1 + .12, P.z0 - .12, P.z1 + .12) || inR(hx - .78, hx + .78, hz - .95, hz + .95) || inR(cx - .72, cx + .5, cz - .38, cz + .85)) return false;
   return Math.hypot(lx + 2.95, lz - .55) > .38 && Math.hypot(lx + .45, lz - .5) > .2 && FARM.hay.every(([x, z]) => Math.hypot(lx - x, lz - z) > .32);
 }
 const fieldAt = (x, z, m = .15) => fields.find(f => { const dx = x - f.x, dz = z - f.z, c = Math.cos(f.ry), sn = Math.sin(f.ry); return Math.abs(dx * c - dz * sn) < FARM.fw / 2 + m && Math.abs(dx * sn + dz * c) < FARM.fd / 2 + m; });
@@ -1302,14 +1317,32 @@ function updateFarm(dt, t) {
   }
   // Vieh: grast, zieht über die Weide, beim Füttern kommt es zum Trog
   for (const a of stock) {
-    const F = a.F, P = FARM.pen, chick = a.kind === 'huhn', feed = F.feedT > 0;
+    const F = a.F, P = FARM.pen, chick = a.kind === 'huhn' || a.kind === 'hahn', feed = F.feedT > 0;
     a.timer -= dt;
+    if (chick) { // Hühnerhaus: abends die Leiter hinauf und hinein, morgens (jedes zu seiner Zeit) wieder heraus
+      if (a.wake === undefined) a.wake = 6 + Math.random() * .8;
+      const [cx, cz] = FARM.coop, footZ = cz + .29 + FARM.coopRamp, bed = S.hour >= 19.2 || S.hour < a.wake;
+      if (a.kind === 'hahn') { // kräht morgens, sobald er draußen ist
+        if (S.hour > 12) a.crowed = false;
+        else if (!a.crowed && !a.coop && S.hour >= 6 && S.hour < 7.5) { a.crowed = true; const p = farmPt(F, a.lx, a.lz); floatText(p.x, heightAt(p.x, p.z) + .5, p.z, 'Kikeriki!', 'w'); }
+      }
+      if (a.coop === 'in') { if (bed) { a.m.g.visible = false; continue; } a.coop = 'down'; a.rp = 1; a.m.g.visible = true; }
+      if (a.coop === 'up' || a.coop === 'down') {
+        a.rp = clamp(a.rp + (a.coop === 'up' ? dt : -dt) * .9, 0, 1); a.lx = cx; a.lz = footZ - a.rp * FARM.coopRamp; a.h = a.coop === 'up' ? Math.PI : 0;
+        if (a.coop === 'up' && a.rp >= 1) { a.coop = 'in'; a.m.g.visible = false; continue; }
+        if (a.coop === 'down' && a.rp <= 0) { a.coop = null; a.moving = false; a.timer = .3; }
+        const M = a.m, p = farmPt(F, a.lx, a.lz); M.body.rotation.x = 0; M.legs.forEach(L => { L.rotation.x = 0; });
+        M.g.position.set(p.x, heightAt(p.x, p.z) + a.rp * .21 + Math.abs(Math.sin(t * 14 + a.ph)) * .015, p.z); M.g.rotation.y = a.h + F.ry; continue;
+      }
+      if (bed && !a.moving) { // zur Leiter laufen
+        if (Math.hypot(a.lx - cx, a.lz - footZ) < .06) { a.coop = 'up'; a.rp = 0; continue; }
+        a.tx = cx; a.tz = footZ; a.moving = true; a.timer = 0;
+      }
+    }
     if (!a.moving && a.timer <= 0) {
-      if (chick) { // nachts in den Stall, sonst herumlaufen und picken (bei der Fütterung zum Bauern)
-        const night = sky.night > .55, [cx, cz] = FARM.coop;
+      if (chick) { // herumlaufen und picken (bei der Fütterung zum Bauern)
         let tx = a.lx, tz = a.lz, ok = false;
-        if (night) { tx = cx + rnd(.1); tz = cz + .45; ok = true; }
-        else for (let k = 0; k < 10 && !ok; k++) { tx = (feed ? FARM.trough[0] - 1.9 : a.lx) + rnd(1.2); tz = (feed ? FARM.pen.z1 + .1 : a.lz) + rnd(feed ? .2 : 1.2); ok = yardOk(tx, tz) && [.25, .5, .75].every(u => yardOk(a.lx + (tx - a.lx) * u, a.lz + (tz - a.lz) * u)); }
+        for (let k = 0; k < 10 && !ok; k++) { tx = (feed ? FARM.trough[0] - 1.9 : a.lx) + rnd(1.2); tz = (feed ? FARM.pen.z1 + .1 : a.lz) + rnd(feed ? .2 : 1.2); ok = yardOk(tx, tz) && [.25, .5, .75].every(u => yardOk(a.lx + (tx - a.lx) * u, a.lz + (tz - a.lz) * u)); }
         if (ok) { a.tx = tx; a.tz = tz; a.moving = true; } else a.timer = 1;
       } else {
         const Z = stockZone(a.kind), trough = FARM.troughs[a.kind === 'kuh' ? 0 : 1];
@@ -1321,7 +1354,7 @@ function updateFarm(dt, t) {
     const sp = a.kind === 'kuh' ? .3 : a.kind === 'schwein' ? .4 : .55;
     if (a.moving) {
       const dx = a.tx - a.lx, dz = a.tz - a.lz, d = Math.hypot(dx, dz);
-      if (d < .05) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); }
+      if (d < .05) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); if (chick && (S.hour >= 19.2 || S.hour < a.wake)) a.timer = 0; }
       else { const st = Math.min(d, sp * dt); a.lx += dx / d * st; a.lz += dz / d * st; let dh = Math.atan2(dx, dz) - a.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); a.h += dh * Math.min(1, dt * 5); }
     }
     if (!chick) { // Abstand zu den anderen Tieren der Koppel halten
@@ -1329,7 +1362,6 @@ function updateFarm(dt, t) {
       for (const b of stock) if (b !== a && b.F === F && b.kind === a.kind) { const dx = a.lx - b.lx, dz = a.lz - b.lz, d = Math.hypot(dx, dz); if (d < R && d > 1e-4) { const k = (R - d) * .5; a.lx += dx / d * k; a.lz += dz / d * k; } }
       a.lx = clamp(a.lx, Z.x0, Z.x1); a.lz = clamp(a.lz, Z.z0, Z.z1);
     }
-    const inCoop = chick && sky.night > .55 && !a.moving && Math.hypot(a.lx - FARM.coop[0], a.lz - FARM.coop[1] - .45) < .2; a.m.g.visible = !inCoop; // schläft im Stall
     const M = a.m, p = farmPt(F, a.lx, a.lz), y = heightAt(p.x, p.z), cyc = t * (chick ? 16 : 7) + a.ph, sw = a.moving ? Math.sin(cyc) * .5 : 0;
     M.legs.forEach((L, k) => { L.rotation.x = (k === 0 || k === 3 ? sw : -sw); });
     if (chick) M.body.rotation.x = a.moving ? 0 : Math.max(0, Math.sin(t * 3 + a.ph)) ** 6 * .9; // pickt
@@ -1547,7 +1579,7 @@ function buildingObstacles() {
     for (const f of F.fields) rects.push({ x: f.x, z: f.z, ry: f.ry, hx: FARM.fw / 2, hz: FARM.fd / 2 });
     const P = FARM.pen, fr = (lx, lz, hx, hz) => { const p = farmPt(F, lx, lz); rects.push({ x: p.x, z: p.z, ry: F.ry, hx, hz }); };
     fr((P.x0 + P.x1) / 2, P.z0, (P.x1 - P.x0) / 2 + .04, .04); fr((P.x0 + P.x1) / 2, P.z1, (P.x1 - P.x0) / 2 + .04, .04); fr(P.x0, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2); fr(P.x1, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2);
-    fr(FARM.coop[0], FARM.coop[1], .36, .26); for (const [hx, hz] of FARM.hay) { const p = farmPt(F, hx, hz); circles.push({ x: p.x, z: p.z, r: .22 }); }
+    fr(FARM.coop[0] - .1, FARM.coop[1] + .05, .56, .38); for (const [hx, hz] of FARM.hay) { const p = farmPt(F, hx, hz); circles.push({ x: p.x, z: p.z, r: .22 }); }
     circles.push({ x: F.barrow.x, z: F.barrow.z, r: .3 }, { x: F.bucket.x, z: F.bucket.z, r: .14 });
   }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
@@ -2740,29 +2772,46 @@ function fishStep(v, dt) {
   if (v.timer > 0) return;
   if (v.fp === 'cast') { v.fp = 'wait'; v.timer = 3 + Math.random() * 6; return; }
   if (v.fp === 'wait') { v.fp = 'bite'; v.timer = .9; return; }
-  // Biss: einholen
-  let near = -1, nd = 8 * 8; fish.forEach((f, i) => { const d = (f.x - J.bob.x) ** 2 + (f.z - J.bob.z) ** 2; if (d < nd && !f.jump) { nd = d; near = i; } });
-  if (near >= 0 || Math.random() < .35) {
-    if (near >= 0) fish.splice(near, 1);
-    v.catch = (v.catch || 0) + 1; floatText(v.x, v.y + .7, v.z, 'Fisch!', 'h'); splash(J.bob.x, J.bob.z);
-  } else floatText(v.x, v.y + .7, v.z, 'Nichts', 'w');
+  if (v.fp === 'bite') { // Anhieb: hängt ein Fisch dran? Dann die Schnur einholen (Rolle kurbeln)
+    let near = -1, nd = 8 * 8; fish.forEach((f, i) => { const d = (f.x - J.bob.x) ** 2 + (f.z - J.bob.z) ** 2; if (d < nd && !f.jump) { nd = d; near = i; } });
+    v.hooked = near >= 0 || Math.random() < .35;
+    if (near >= 0 && v.hooked) fish.splice(near, 1);
+    if (v.hooked) splash(J.bob.x, J.bob.z);
+    v.fp = 'reel'; v.timer = REEL_T; return;
+  }
+  // eingeholt: Fisch in den Korb oder leerer Haken
+  if (v.hooked) { v.catch = (v.catch || 0) + 1; floatText(v.x, v.y + .7, v.z, 'Fisch!', 'h'); } else floatText(v.x, v.y + .7, v.z, 'Nichts', 'w');
+  v.hooked = false;
   if (v.catch >= 3) { v.catch = 0; v.carry = 4; walkDrop(v, { fish: 3 }); return; }
   v.fp = 'cast'; v.timer = .9;
 }
+const REEL_T = 2.2;
 const lines = [], LINE_N = 12;
 function updateFishingLines(t) {
-  const fishers = villagers.filter(v => v.state === 'fish' && v.fp !== 'cast' && v.hut && v.hut.jetty);
+  const fishers = villagers.filter(v => v.state === 'fish' && v.hut && v.hut.jetty && !(v.fp === 'cast' && v.timer > .45));
   while (lines.length < fishers.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(LINE_N * 3), 3));
     const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe8e8e0, transparent: true, opacity: .7 })); l.frustumCulled = false; scene.add(l);
     const b = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd8352a, roughness: .5 })); b.userData.noSnow = true; scene.add(b);
-    lines.push({ l, b });
+    const f = new THREE.Mesh(fishGeo, fishMesh.material); f.userData.noSnow = true; f.scale.setScalar(1.3); scene.add(f); // Fisch am Haken
+    lines.push({ l, b, f });
   }
   lines.forEach((L, k) => {
-    const v = fishers[k]; L.l.visible = L.b.visible = !!v; if (!v) return;
+    const v = fishers[k]; L.l.visible = L.b.visible = !!v; L.f.visible = false; if (!v) return;
     const J = v.hut.jetty, dip = v.fp === 'bite' ? -.05 - Math.abs(Math.sin(t * 18)) * .04 : Math.sin(t * 2 + v.ph) * .015;
     if (!v.tip) { L.l.visible = L.b.visible = false; return; }
-    const tipx = v.tip.x, tipz = v.tip.z, tipy = v.tip.y, bx = J.bob.x, bz = J.bob.z, by = -.02 + dip, sag = v.fp === 'bite' ? .03 : .22, arr = L.l.geometry.attributes.position.array;
+    const tipx = v.tip.x, tipz = v.tip.z, tipy = v.tip.y, arr = L.l.geometry.attributes.position.array;
+    let bx = J.bob.x, bz = J.bob.z, by = -.02 + dip, sag = v.fp === 'bite' ? .03 : .22;
+    if (v.fp === 'cast') { // Pose fliegt im Bogen hinaus
+      const u = smooth(.45, 0, v.timer); bx = tipx + (J.bob.x - tipx) * u; bz = tipz + (J.bob.z - tipz) * u; by = tipy + (-.02 - tipy) * u + Math.sin(u * Math.PI) * .7; sag = .02;
+    } else if (v.fp === 'reel') { // einholen: Pose (und Fisch) kommen heran, zum Schluss aus dem Wasser bis unter die Rutenspitze
+      const u = 1 - v.timer / REEL_T, e = smooth(0, 1, u), lift = smooth(.72, 1, u);
+      bx = J.bob.x + (tipx - J.bob.x) * e * .97; bz = J.bob.z + (tipz - J.bob.z) * e * .97; by = -.02 + (tipy - .32 - -.02) * lift + (v.hooked && lift < .05 ? Math.sin(t * 22) * .03 : 0); sag = .02;
+      if (v.hooked) { // zappelt am Haken
+        L.f.visible = true; L.f.position.set(bx, by - (lift > 0 ? .13 : .03), bz);
+        L.f.rotation.set(lift > 0 ? Math.PI / 2 : 0, v.h + Math.sin(t * 17) * .5, lift > 0 ? Math.sin(t * 23) * .4 : Math.sin(t * 20) * .3, 'YXZ');
+      }
+    }
     for (let k = 0; k < LINE_N; k++) { const u = k / (LINE_N - 1); arr[k * 3] = tipx + (bx - tipx) * u; arr[k * 3 + 1] = tipy + (by - tipy) * u - Math.sin(u * Math.PI) * sag * (1 - u * .5); arr[k * 3 + 2] = tipz + (bz - tipz) * u; }
     L.l.geometry.attributes.position.needsUpdate = true;
     L.b.position.set(bx, by, bz);
@@ -3492,7 +3541,7 @@ function renderWork() {
     { const at = {}; for (const h of huts) if (sp[h.role] !== undefined) for (const g in h.goods) if (h.goods[g] > 0) at[g] = (at[g] || 0) + h.goods[g];
       const list = Object.keys(at).map(g => resText(g, at[g])); if (list.length) notes.push(`An den Hütten zum Abholen: ${list.join(', ')}.`); }
     if (id === 'hof') { const st = n => fields.filter(f => f.state === n).length, an = k => stock.filter(a => a.kind === k).length;
-      notes.push(fields.length ? `Felder: ${st('reif')} reif, ${st('grow')} wachsen, ${st('leer')} leer. Weide: ${an('kuh')} Kühe, ${an('schwein')} Schweine, ${an('huhn')} Hühner.` : (farmSites.length ? 'Noch kein Bauernhof.' : 'Auf der Insel ist kein Platz für einen Bauernhof.'));
+      notes.push(fields.length ? `Felder: ${st('reif')} reif, ${st('grow')} wachsen, ${st('leer')} leer. Weide: ${an('kuh')} Kühe, ${an('schwein')} Schweine, ${an('huhn')} Hühner, ${an('hahn')} Hahn.` : (farmSites.length ? 'Noch kein Bauernhof.' : 'Auf der Insel ist kein Platz für einen Bauernhof.'));
       notes.push(`Im Lager: ${resText('veg', S.veg)}, ${fmt(S.milk)} Milch, ${resText('eggs', S.eggs)}.`); }
     if (id === 'fischerei') notes.push(`Fische vor der Küste: ${fish.length}. Im Lager: ${fmt(S.fish)} Fisch.`);
     if (id === 'saw') { const ms = huts.filter(h => h.role === 'sawyer'); notes.push(`An der Säge: ${ms.reduce((a, h) => a + h.logs, 0)} Stämme, ${ms.reduce((a, h) => a + h.planks, 0)} Bretter. Im Lager: ${fmt(S.logs)} ${S.logs === 1 ? 'Stamm' : 'Stämme'}, ${fmt(S.holz)} Bretter.`); }
@@ -3697,7 +3746,9 @@ function frame() {
     else if (v.state === 'aim') { const draw = smooth(1.3, .5, v.timer); armA = -1.57; armB = -1.45; splay = .08; armRz = .55 + draw * .35; tilt = -.05; leg = .2; } // Bogen spannen
     else if (v.state === 'fish') { // auswerfen: Rute von hinten oben nach vorn, dann ruhig halten; beim Biss ruckt sie hoch
       const c = v.fp === 'cast' ? smooth(.9, .1, v.timer) : 1, jerk = v.fp === 'bite' ? Math.abs(Math.sin(v.timer * 14)) * .3 : Math.sin(t * 1.3 + v.ph) * .03;
-      armB = -2.5 + c * 1.5 - jerk; armA = -.95; splay = .08; leg = .12; }
+      armB = -2.5 + c * 1.5 - jerk; armA = -.95; splay = .08; leg = .12;
+      if (v.fp === 'reel') { const u = 1 - v.timer / REEL_T; armB = -1.05 - smooth(.6, 1, u) * .55 - (v.hooked ? Math.abs(Math.sin(t * 9)) * .08 : 0); armA = -1.05 + Math.sin(t * 15) * .28; splay = .14 + Math.cos(t * 15) * .06; tilt = -.06; } // Rute heben, linke Hand kurbelt
+    }
     else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
     else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
@@ -3743,7 +3794,7 @@ function frame() {
       } else if (v.carry) part(vLantern, .15, .19, Math.sin(t * 5.5 + v.ph) * .2, 0, .13); // hängt am Holzbündel
       else { // steht neben dem Bewohner am Boden
         const c = Math.cos(v.h), sn = Math.sin(v.h), ox = .24, oz = .06, s2 = VS * L.s;
-        vTmp.makeRotationY(v.h).setPosition(v.x + ox * c + oz * sn, surfaceAt(v.x, v.z) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
+        vTmp.makeRotationY(v.h).setPosition(v.x + ox * c + oz * sn, groundAt(v.x + ox * c + oz * sn, v.z - ox * sn + oz * c) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
         vLantern.setMatrixAt(i, vOut);
       }
       vLanternGlass.setMatrixAt(i, vOut);
