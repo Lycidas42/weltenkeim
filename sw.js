@@ -53,6 +53,8 @@ const APP = [
   './assets/models/target.gltf',
   './assets/models/building_home_B_red.bin',
   './assets/models/building_home_B_red.gltf',
+  './assets/models/building_home_B_green.bin',
+  './assets/models/building_home_B_green.gltf',
   './assets/models/wheelbarrow.bin',
   './assets/models/wheelbarrow.gltf',
   './assets/models/bucket_water.bin',
