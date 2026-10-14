@@ -56,7 +56,18 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .stat.glaube b{color:var(--glaube)}
 .stat.holz b{color:var(--holz)}
 .stat.pop b{color:var(--soul)}
+.stat.zeit{grid-template-columns:auto auto;column-gap:6px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.stat.zeit .lbl{grid-column:1/-1}
 .stat.zeit b{color:var(--sky)}
+.stat.zeit small{grid-column:1/-1}
+.stat.zeit:active{transform:scale(.96)}
+#tDial{width:34px;height:19px;align-self:center;grid-row:2;grid-column:2;overflow:visible}
+#tDial .arc{fill:none;stroke:var(--line);stroke-width:1.4;stroke-dasharray:2 2.4}
+#tDial .hz{stroke:var(--ink-dim);stroke-width:1.2;opacity:.6}
+#tDial .sun{fill:var(--glaube);filter:drop-shadow(0 0 3px rgba(243,192,77,.9))}
+#tDial .moon circle{fill:#dfe6f7}
+#tDial .moon .cut{fill:var(--panel-solid)}
+#tDial[data-body="sun"] .moon,#tDial[data-body="moon"] .sun{display:none}
 @media (max-width:420px){.res{gap:4px}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
@@ -168,7 +179,12 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
       <div class="stat holz"><span class="lbl">Holz</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
       <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
-      <div class="stat zeit"><span class="lbl">Uhrzeit</span><b id="vT">8:00</b><small id="vTs">Morgen</small></div>
+      <button class="stat zeit" id="btnTime" aria-label="Uhrzeit, tippen zum Wechsel zwischen Tag und Nacht">
+        <span class="lbl">Uhrzeit</span>
+        <svg id="tDial" viewBox="0 0 36 20" aria-hidden="true" data-body="sun"><path class="arc" d="M4 17a14 13 0 0 1 28 0"/><path class="hz" d="M1 17.5h34"/>
+          <g id="tBody" transform="translate(18 4)"><circle class="sun" r="3.6"/><g class="moon"><circle r="3.4"/><circle class="cut" r="3" cx="1.8" cy="-1.2"/></g></g></svg>
+        <b id="vT">8:00</b><small id="vTs">Morgen</small>
+      </button>
     </div>
     <div class="top-actions">
       <button class="chip" id="btnShrine">Schrein</button>

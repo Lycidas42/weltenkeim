@@ -163,8 +163,19 @@ function visualDir(d, out) {
   return out.set(d.x / hz * Math.cos(ve), Math.sin(ve), d.z / hz * Math.cos(ve));
 }
 const lightDir = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
+// Zeitraffer bis zur Zielstunde (Tipp auf die Uhrzeit): Tag <-> Nacht in wenigen Sekunden
+let skipTo = null;
+const isDaytime = h => h >= 6 && h < 20;
+function toggleDayNight() {
+  const toNight = skipTo !== null ? skipTo < 12 : isDaytime(S.hour); // läuft schon ein Zeitraffer, kehrt ein zweiter Tipp ihn um
+  skipTo = toNight ? 21.3 : 6.6;
+  toast(toNight ? 'Die Nacht bricht herein.' : 'Ein neuer Tag beginnt.', 2.2);
+}
 function updateDay(dt, t) {
-  S.hour = (S.hour + dt * hourRate(S.hour)) % 24;
+  if (skipTo !== null) { // vorwärts bis zur Zielstunde, höchstens 3 Spielstunden pro Sekunde
+    const left = (skipTo - S.hour + 24) % 24, step = Math.min(left, dt * 3);
+    S.hour = (S.hour + step) % 24; if (left - step < 1e-3) { S.hour = skipTo; skipTo = null; }
+  } else S.hour = (S.hour + dt * hourRate(S.hour)) % 24;
   const h = S.hour; sampleSky(h);
   const ts = (h - 6.2) / 13.6 * Math.PI, tm = ((h - 19.6 + 24) % 24) / 10.8 * Math.PI; // Sonne 6:12–19:48, Mond 19:36–6:24
   sunDir.set(Math.cos(ts), Math.sin(ts) * .9, .4).normalize(); moonDir.set(-Math.cos(tm), Math.sin(tm) * .8, -.3).normalize();
@@ -1469,6 +1480,7 @@ function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidd
 function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
+$('btnTime').addEventListener('click', toggleDayNight);
 $('btnFox').addEventListener('click', () => openSheet('sheetFox'));
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
@@ -1768,6 +1780,12 @@ function frame() {
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
     $('vH').textContent = fmt(S.holz); $('vHn').textContent = construction ? 'Haus im Bau' : (freeSite() ? `Haus ab ${houseCost()}` : 'Dorf voll');
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = dayPhase(S.hour);
+    { // Sonne bzw. Mond auf dem kleinen Himmelsbogen in der Uhrzeit-Kachel
+      const sunUp = sunDir.y >= moonDir.y, a = sunUp ? (S.hour - 6.2) / 13.6 * Math.PI : ((S.hour - 19.6 + 24) % 24) / 10.8 * Math.PI, k = clamp(a, 0, Math.PI);
+      const dial = $('tDial'); dial.dataset.body = sunUp ? 'sun' : 'moon';
+      $('tBody').setAttribute('transform', `translate(${(18 - 14 * Math.cos(k)).toFixed(1)} ${(17 - 13 * Math.sin(k)).toFixed(1)})`);
+      $('btnTime').setAttribute('aria-label', `Uhrzeit ${$('vT').textContent}, ${$('vTs').textContent}. Tippen: ${isDaytime(S.hour) ? 'zur Nacht' : 'zum Tag'} vorspulen`);
+    }
     $('vP').textContent = `${villagers.length}/${cap()}`; $('vPh').textContent = `${houses.length} ${houses.length === 1 ? 'Haus' : 'Häuser'}`;
     document.querySelectorAll('#ctxMiracle button').forEach(b => b.classList.toggle('poor', S.glaube < MIRACLES[b.dataset.m].cost));
     if (!$('sheetShrine').hidden) { const bs = $('shrineItems').querySelectorAll('[data-buy]'); bs.forEach(b => { const it = SHRINE.find(x => x.id === b.dataset.buy); b.disabled = !(S.glaube >= it.cost() && (!it.ok || it.ok())); }); }
