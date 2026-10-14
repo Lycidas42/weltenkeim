@@ -66,6 +66,16 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .stat small{font-size:11px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
 .stat.glaube b{color:var(--glaube)}
 .stat.pop b{color:var(--soul)}
+.stat.wetter{text-align:left;font:inherit;color:inherit;cursor:pointer}
+.stat.wetter .wxrow{display:flex;align-items:center;gap:5px}
+.stat.wetter b{font-size:17px;color:var(--ink)}
+.stat.wetter svg{width:21px;height:21px;fill:none;stroke:var(--glaube);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.stat.wetter.paused small{color:var(--glaube)}
+.stat.wetter:active{transform:scale(.96)}
+.wxopts{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.wxopts button[aria-checked="true"]{background:rgba(243,192,77,.16);color:var(--glaube)}
+#wxLock[aria-checked="false"] .i-play,#wxLock[aria-checked="true"] .i-pause{display:none}
+#wxLock[aria-checked="true"]{color:var(--glaube)}
 .stat.zeit{grid-template-columns:auto auto;column-gap:6px;text-align:left;font:inherit;color:inherit;cursor:pointer}
 .stat.zeit .lbl{grid-column:1/-1}
 .stat.zeit b{color:var(--sky)}
@@ -88,7 +98,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #tmSkip{color:var(--sky)}
 #tmPause[aria-checked="false"] .i-play,#tmPause[aria-checked="true"] .i-pause{display:none}
 #tmPause[aria-checked="true"]{color:var(--glaube)}
-@media (max-width:420px){.res,.tiles{gap:4px}.store .sitem .nm{display:none}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
+@media (max-width:420px){.stat.wetter .lbl{letter-spacing:.04em}.stat.wetter b{font-size:15px}.res,.tiles{gap:4px}.store .sitem .nm{display:none}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
 .chip.round{width:38px;padding:8px 0;font-family:var(--f-display);font-size:18px;line-height:1}
@@ -232,6 +242,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
           <g id="tBody" transform="translate(18 4)"><circle class="sun" r="3.6"/><g class="moon"><circle r="3.4"/><circle class="cut" r="3" cx="1.8" cy="-1.2"/></g></g></svg>
         <b id="vT">8:00</b><small id="vTs">Morgen</small>
       </button>
+      <button class="stat wetter" id="btnWx" aria-label="Wetter, tippen für Wettermenü" aria-haspopup="menu" aria-expanded="false">
+        <span class="lbl">Wetter</span>
+        <span class="wxrow"><svg id="wxIc" viewBox="0 0 24 24" aria-hidden="true"></svg><b id="vW">Heiter</b></span><small id="vWs">leichter Wind</small>
+      </button>
      </div>
      <!-- Lager: alle vorrätigen Rohstoffe; weitere (Stein, Erz) kommen als weitere .sitem dazu -->
      <button class="store" id="btnStore" aria-label="Lager, tippen für Arbeit">
@@ -249,6 +263,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
     </div>
   </header>
+  <div class="time-menu" id="wxMenu" role="menu" hidden>
+    <div id="wxOpts" class="wxopts"></div>
+    <button id="wxLock" role="menuitemcheckbox" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-pause"><path d="M9 5v14M15 5v14"/></g><g class="i-play"><path d="M8 5l11 7-11 7z"/></g></svg><span id="wxLockL">Wetter festhalten</span></button>
+  </div>
   <div class="time-menu" id="timeMenu" role="menu" hidden>
     <button id="tmSkip" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-night"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></g><g class="i-day"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg><span id="tmSkipL">Zur Nacht vorspulen</span></button>
     <button id="tmPause" role="menuitemcheckbox" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-pause"><path d="M9 5v14M15 5v14"/></g><g class="i-play"><path d="M8 5l11 7-11 7z"/></g></svg><span id="tmPauseL">Zeit anhalten</span></button>

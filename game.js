@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -191,8 +191,10 @@ function rollWeather() { let r = Math.random(); for (const k in WEATHER) { r -= 
 function setWeather(k) { if (WEATHER[k]) S.weather = k; }
 function updateWeather(dt, t) {
   const h = S.hour, lh = weather.lastH; weather.lastH = h;
-  if ((lh < 5 && h >= 5) || (lh > h && h >= 5)) setWeather(rollWeather());          // neuer Tag
-  if (lh < 13 && h >= 13 && Math.random() < .3) setWeather(rollWeather());           // Umschwung am Mittag
+  if (!S.weatherLocked) { // vom Spieler festgehaltenes Wetter bleibt
+    if ((lh < 5 && h >= 5) || (lh > h && h >= 5)) setWeather(rollWeather());          // neuer Tag
+    if (lh < 13 && h >= 13 && Math.random() < .3) setWeather(rollWeather());           // Umschwung am Mittag
+  }
   const W = WEATHER[S.weather], k = Math.min(1, dt * .06);                            // Übergang über einige Sekunden
   weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
   weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
@@ -250,6 +252,12 @@ const dayPhase = h => h < WAKE || h >= 21 ? 'Nachtruhe' : h < 8 ? 'Morgen' : h <
 
 /* ------------------------------------------------------------------ terrain */
 const SIZE = 48, SEG = 127, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2;
+// Lage des Schreins: auf einem sanften Hügel nordöstlich vor dem Dorf, mit dem Gebirge dahinter.
+// Der Prozessionsweg führt vom Rand des Dorfplatzes (Inselmitte) den Hügel hinauf.
+var SHRINE_AT = { x: 4.4, z: -7.8 };
+var SACRED_SEG = (() => { const d = Math.hypot(SHRINE_AT.x, SHRINE_AT.z), ux = SHRINE_AT.x / d, uz = SHRINE_AT.z / d; return { ax: ux * 2.95, az: uz * 2.95, bx: SHRINE_AT.x - ux * 2.2, bz: SHRINE_AT.z - uz * 2.2, ux, uz, len: d - 5.15 }; })();
+// Abstand zum Weg (Strecke vom Dorfplatz zum Schreinplatz); Breite des Wegs ±0,6
+function sacredDist(x, z) { const S0 = SACRED_SEG, t = clamp(((x - S0.ax) * S0.ux + (z - S0.az) * S0.uz) / S0.len, 0, 1); return Math.hypot(x - (S0.ax + S0.ux * S0.len * t), z - (S0.az + S0.uz * S0.len * t)); }
 const H = new Float32Array(N * N), J = new Float32Array(N * N), DRY = new Float32Array(N * N), BARE = new Float32Array(N * N);
 // Strand: knapp über und unter dem Wasser wird das Gelände flacher, so entstehen ein breiter Sandstreifen und flaches, helles Ufer
 const beach = h => h >= 0 ? (h < 1 ? h * (.42 + .58 * smooth(.25, 1, h)) : h) : h * (.45 + .55 * smooth(-.2, -1.6, h));
@@ -264,6 +272,15 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   H[k] = h; J[k] = clamp(.5 + noise(x * .35, z * .35) * .8, 0, 1);
   DRY[k] = fbm(x * .13 + 21, z * .13 - 9); BARE[k] = fbm(x * .21 - 5, z * .21 + 14) + noise(x * .9, z * .9) * .12;
 }
+{
+  const hill = (x, z) => 1.3 * smooth(4.6, 1.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z));
+  let top = 0; { const i = Math.round((SHRINE_AT.x + HALF) / CELL), j = Math.round((SHRINE_AT.z + HALF) / CELL); top = H[j * N + i] + 1.3; }
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = -HALF + i * CELL, z = -HALF + j * CELL, k = j * N + i, d = Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z);
+    if (d > 4.7) continue;
+    H[k] += hill(x, z); H[k] += (top - H[k]) * smooth(3.2, 2.5, d); // Kuppe eben
+  }
+}
 function heightAt(x, z) {
   const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
   if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -3;
@@ -271,7 +288,6 @@ function heightAt(x, z) {
   return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + N] * (1 - u) + H[k + N + 1] * u) * v;
 }
 const surfaceAt = (x, z) => Math.max(heightAt(x, z), -0.12);
-var SACRED_T = { x0: -.6, x1: .6, z0: 1.5, z1: 8.7 }; // Weg zum Schrein (Gelände darunter erdig), entspricht SACRED
 const C = { deep: new THREE.Color(0xb7a06a), wet: new THREE.Color(0xc8ad74), sand: new THREE.Color(0xecd9a0), g1: new THREE.Color(0x82b047), g2: new THREE.Color(0x5a8d36),
   dry: new THREE.Color(0xa6ad52), bare: new THREE.Color(0x8f7a54), rock: new THREE.Color(0x8e8476), snow: new THREE.Color(0xf2f1ea) };
 const tc = new THREE.Color(), tg = new THREE.Color();
@@ -280,7 +296,10 @@ function terrainColor(h, jit, k = -1) {
   if (h < -.02) return tc.copy(C.deep).lerp(C.wet, smooth(-1.4, -.02, h));
   tc.copy(C.wet).lerp(C.sand, smooth(-.02, .1, h));                         // nasser Sand an der Wasserlinie
   const sg = .3 + (jit - .5) * .14; tc.lerp(tg, smooth(sg, sg + .14, h));   // unregelmäßige Grenze Sand/Gras
-  if (k >= 0 && typeof SACRED_T !== 'undefined') { const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL; tc.lerp(C.bare, smooth(.35, 0, Math.max(SACRED_T.x0 - x, x - SACRED_T.x1, SACRED_T.z0 - z, z - SACRED_T.z1, 0)) * .85); }
+  if (k >= 0) { // erdiger Boden unter Weg, Dorfplatz und Schreinplatz (Fugen zwischen den Platten)
+    const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL;
+    tc.lerp(C.bare, Math.max(smooth(.95, .5, sacredDist(x, z)), smooth(3.3, 2.9, Math.hypot(x, z)), smooth(2.6, 2.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z))) * .85);
+  }
   if (k >= 0) { // Wiese: trockene Flecken und kahle Erdstellen
     const gw = smooth(.45, .6, h) * (1 - smooth(2.5, 2.9, h));
     tc.lerp(C.dry, smooth(.05, .35, DRY[k]) * .55 * gw);
@@ -556,10 +575,13 @@ class Swarm {
 const SB = 1.5, ST = 1.25;
 const statics = [];
 function place(gltf, x, z, ry = 0, s = SB) { const o = shadowify(gltf.scene.clone(true)); o.scale.setScalar(s); o.rotation.y = ry; scene.add(o); const e = { o, x, z }; statics.push(e); return e; }
-// Der Schrein steht in der Inselmitte; ein Prozessionsweg führt von Süden (+z) zu ihm
-const SHRINE_POS = { x: 0, z: 0 }, LAGER = { x: 3.7, z: -3.1 }, WELL = { x: -3.1, z: 2.7 }, PRAY = { x: 0, z: 2.6 }, CENTER = { x: 2.2, z: 3.4 };
-const SACRED = { x0: -.6, x1: .6, z0: 1.5, z1: 8.7 }; // Weg aus Steinplatten
-const onSacred = (x, z, m = 0) => x > SACRED.x0 - m && x < SACRED.x1 + m && z > SACRED.z0 - m && z < SACRED.z1 + m;
+// Dorfplatz in der Inselmitte (Dorflinde, Brunnen), Lager am Platz; der Schrein liegt auf dem Hügel (SHRINE_AT)
+const SHRINE_POS = SHRINE_AT, PLAZA = { x: 0, z: 0, r: 2.95 }, LAGER = { x: 4.7, z: 1.4 }, WELL = { x: -2.05, z: 1.55 }, MILL_POS = { x: -10, z: 1.2 };
+const SHRINE_ROT = Math.atan2(-SHRINE_POS.x, -SHRINE_POS.z); // Vorderseite (+z) zeigt zum Dorf
+const shrinePt = (lx, lz) => ({ x: SHRINE_POS.x + lx * Math.cos(SHRINE_ROT) + lz * Math.sin(SHRINE_ROT), z: SHRINE_POS.z - lx * Math.sin(SHRINE_ROT) + lz * Math.cos(SHRINE_ROT) });
+const PRAY = shrinePt(0, 2.5), CENTER = { x: -1.4, z: -3.6 };
+const onSacred = (x, z, m = 0) => sacredDist(x, z) < .6 + m;
+const LUNCH_AT = PLAZA; // Mittagspause im Schatten der Dorflinde
 // Schrein des Weltenkeims, das Herz der Insel: dreistufiger Sockel mit Goldkanten, sechs Runensteine mit Blumengirlanden,
 // Säule mit goldener Schale, darüber schwebt der leuchtende Keim mit einem Spross, umkreist von Lichtringen.
 // Davor Opfergaben und Kerzen, dahinter zwei Banner. Jede Weihestufe (S.temple) lässt eine weitere Rune aufleuchten.
@@ -639,8 +661,9 @@ const shrine = (() => {
   const pollen = new THREE.Points(polGeo, new THREE.PointsMaterial({ color: 0xffe08a, size: .07, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, map: glowTex, toneMapped: false }));
   pollen.frustumCulled = false; g.add(pollen);
   g.traverse(o => { if (o.isMesh && o.material !== ringM && o.material !== flameM) { o.castShadow = true; o.receiveShadow = true; } });
-  scene.add(g); statics.push({ o: g, x: SHRINE_POS.x, z: SHRINE_POS.z });
+  g.rotation.y = SHRINE_ROT; scene.add(g); statics.push({ o: g, x: SHRINE_POS.x, z: SHRINE_POS.z });
   staticLights.push({ x: 0, y: 1.55, z: 0, s: 4, local: true, gold: true });
+  for (const L of staticLights) if (L.local) { const w = shrinePt(L.x, L.z); L.x = w.x; L.z = w.z; } // Schreinlichter in Weltkoordinaten
   return { g, seed, halo, runes, runeOn, runeOff, pulse: 0, core, sprout, rings, flames, banners, pol, polPos, pollen };
 })();
 // Prozessionsweg: Steinplatten, Steinlaternen zu beiden Seiten, Feuerschalen am Platz, Torbogen am Dorfrand
@@ -648,18 +671,21 @@ const sacredProps = (() => {
   const M = (c, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .85, flatShading: true }, o));
   const stoneD = M(0x9a9385), wood = M(0x6b3e26), gold = M(0xdcb24c, { metalness: .3, roughness: .35, emissive: 0x4a3608, emissiveIntensity: .7 });
   const glass = new THREE.MeshBasicMaterial({ color: 0xffd78a, toneMapped: false }), flameM = new THREE.MeshBasicMaterial({ color: 0xffb347, toneMapped: false });
-  // Steinplatten auf dem Weg und rund um den Schrein
+  // Steinplatten: auf dem Weg, rund um den Schrein und als Pflaster des Dorfplatzes
+  const G = SACRED_SEG, px = -G.uz, pz = G.ux, rot = Math.atan2(G.ux, G.uz), at = (s0, u) => ({ x: G.ax + G.ux * s0 + px * u, z: G.az + G.uz * s0 + pz * u });
   const slabs = [];
-  for (let z = SACRED.z0 + .14; z < SACRED.z1 - .1; z += .3) for (let x = SACRED.x0 + .15 + ((Math.round(z / .3) % 2) ? .07 : 0); x < SACRED.x1 - .1; x += .3) slabs.push({ x: x + rnd(.02), z: z + rnd(.02), r: rnd(.12), s: .9 + Math.random() * .2 });
-  for (let r = 1.72; r < 2.3; r += .3) { const n = Math.round(r * Math.PI * 2 / .3); for (let k = 0; k < n; k++) { const a = (k + (r > 2 ? .5 : 0)) / n * Math.PI * 2; slabs.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, r: a + rnd(.1), s: .9 + Math.random() * .2 }); } }
+  for (let s0 = .1; s0 < G.len + .05; s0 += .3) for (let u = -.45 + ((Math.round(s0 / .3) % 2) ? .07 : 0); u < .5; u += .3) { const q = at(s0, u); slabs.push({ x: q.x + rnd(.02), z: q.z + rnd(.02), r: rot + rnd(.12), s: .9 + Math.random() * .2 }); }
+  const ring = (cx, cz, r0, r1) => { for (let r = r0; r < r1; r += .3) { const n = Math.round(r * Math.PI * 2 / .3); for (let k = 0; k < n; k++) { const a = (k + (Math.round(r / .3) % 2 ? .5 : 0)) / n * Math.PI * 2; slabs.push({ x: cx + Math.sin(a) * r, z: cz + Math.cos(a) * r, r: a + rnd(.1), s: .9 + Math.random() * .2 }); } } };
+  ring(SHRINE_POS.x, SHRINE_POS.z, 1.72, 2.3); ring(PLAZA.x, PLAZA.z, .95, PLAZA.r);
   const slabGeo = paint(new THREE.BoxGeometry(.27, .05, .25, 1, 1, 1), (x, y, z, ny, c) => c.set(0xcfc8b8).multiplyScalar(ny > .5 ? 1 : .8));
   const slabMesh = new THREE.InstancedMesh(slabGeo, plantMat, slabs.length); slabMesh.receiveShadow = true; slabMesh.frustumCulled = false; scene.add(slabMesh);
   slabs.forEach((sl, i) => slabMesh.setColorAt(i, COL.setScalar(.85 + Math.random() * .22)));
-  const group = (x, z) => { const o = new THREE.Group(); scene.add(o); statics.push({ o, x, z }); return o; };
+  const group = (x, z, ry = rot) => { const o = new THREE.Group(); o.rotation.y = ry; scene.add(o); statics.push({ o, x, z }); return o; };
+  const obstacles = []; // für die Wegfindung
   const add = (par, geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = m !== glass && m !== flameM; par.add(o); return o; };
   // Steinlaternen
-  for (const z of [3.7, 5.3, 6.9]) for (const sx of [-1, 1]) {
-    const x = sx * .88, o = group(x, z);
+  for (const s0 of [.7, G.len * .5, G.len - .5]) for (const sx of [-1, 1]) {
+    const { x, z } = at(s0, sx * .88), o = group(x, z); obstacles.push({ x, z, r: .14 });
     add(o, new THREE.BoxGeometry(.2, .06, .2), stoneD, 0, .03); add(o, new THREE.BoxGeometry(.09, .38, .09), stoneD, 0, .25);
     add(o, new THREE.BoxGeometry(.19, .16, .19), stoneD, 0, .52); add(o, new THREE.BoxGeometry(.12, .1, .2), glass, 0, .52); add(o, new THREE.BoxGeometry(.2, .1, .12), glass, 0, .52);
     add(o, new THREE.ConeGeometry(.17, .14, 4).rotateY(Math.PI / 4), stoneD, 0, .67);
@@ -668,23 +694,29 @@ const sacredProps = (() => {
   // Feuerschalen am Platz
   const fires = [];
   for (const sx of [-1, 1]) {
-    const x = sx * 1.25, z = 2.15, o = group(x, z);
+    const { x, z } = at(G.len - .1, sx * 1.25), o = group(x, z); obstacles.push({ x, z, r: .22 });
     for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2; const leg = add(o, new THREE.CylinderGeometry(.018, .022, .5, 5), wood, Math.sin(a) * .1, .25, Math.cos(a) * .1); leg.rotation.set(Math.cos(a) * .25, 0, -Math.sin(a) * .25); }
     add(o, new THREE.LatheGeometry([new THREE.Vector2(0, 0), new THREE.Vector2(.08, 0), new THREE.Vector2(.18, .08), new THREE.Vector2(.2, .13)], 10), gold, 0, .48);
     const f1 = add(o, new THREE.ConeGeometry(.12, .3, 7), flameM, 0, .7), f2 = add(o, new THREE.ConeGeometry(.07, .22, 6), new THREE.MeshBasicMaterial({ color: 0xfff0b0, toneMapped: false }), 0, .66);
     fires.push(f1, f2); staticLights.push({ x, z, y: .7, s: 1.1, fire: true });
   }
   // Torbogen am Beginn des Wegs, mit Girlande und goldener Tafel
-  { const z = 8.25, o = group(0, z);
+  { const { x: ox, z } = at(.15, 0), o = group(ox, z, rot + Math.PI); for (const sx of [-1, 1]) { const q = at(.15, sx * .8); obstacles.push({ x: q.x, z: q.z, r: .12 }); }
     for (const sx of [-1, 1]) { add(o, new THREE.CylinderGeometry(.06, .075, 1.4, 7), wood, sx * .8, .7); add(o, new THREE.CylinderGeometry(.1, .1, .08, 7), stoneD, sx * .8, .04); }
     add(o, new THREE.BoxGeometry(2.05, .09, .15), wood, 0, 1.43); add(o, new THREE.BoxGeometry(1.75, .07, .09), wood, 0, 1.16);
     for (const sx of [-1, 1]) { const tip = add(o, new THREE.BoxGeometry(.3, .07, .15), wood, sx * 1.12, 1.47); tip.rotation.z = sx * .35; }
     add(o, new THREE.BoxGeometry(.3, .2, .03), gold, 0, 1.29, .05);
     const gp = []; for (let i = 1; i < 14; i++) { const u = i / 14, x = -.75 + 1.5 * u, y = 1.1 - Math.sin(u * Math.PI) * .22; gp.push(paint(new THREE.IcosahedronGeometry(i % 2 ? .035 : .027, 0).translate(x, y, .05), (px, py, pz, ny, c) => c.set(i % 2 ? [0xf6f3e8, 0xf2cf3a, 0xec86ad][i % 3] : 0x4f8d3a))); }
     add(o, mergeGeometries(gp), plantMat);
-    staticLights.push({ x: 0, z, y: 1.05, s: .3 });
+    staticLights.push({ x: ox, z, y: 1.05, s: .3 });
   }
-  return { slabs, slabMesh, fires };
+  for (const sx of [-1, 1]) { const q = shrinePt(sx * 1.05, -1.55); obstacles.push({ x: q.x, z: q.z, r: .08 }); } // Bannerstangen
+  // Dorflinde in der Mitte des Platzes, mit runder Bank um den Stamm
+  const tree = place(TK[2], PLAZA.x, PLAZA.z, .7, ST * 2.3);
+  { const o = group(PLAZA.x, PLAZA.z, 0);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; const b = add(o, new THREE.BoxGeometry(.3, .04, .14), wood, Math.sin(a) * .5, .17, Math.cos(a) * .5); b.rotation.y = a; if (k % 2 === 0) add(o, new THREE.BoxGeometry(.04, .17, .04), wood, Math.sin(a) * .5, .085, Math.cos(a) * .5); } }
+  obstacles.push({ x: PLAZA.x, z: PLAZA.z, r: .62 });
+  return { slabs, slabMesh, fires, obstacles, tree };
 })();
 // Glaubensfunken: steigen beim Gebet vom Bewohner zum Keim auf
 const MOTE_N = 40, moteMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(.04, 0), new THREE.MeshBasicMaterial({ color: 0xffe08a, toneMapped: false }), MOTE_N);
@@ -756,13 +788,14 @@ function prayPose(p) {
   const e = sm((p - .75) / .25); return { arm: -1.9 + .7 * e, splay: .15 - .05 * e, tilt: .75 * (1 - e) };
 }
 place(gWell, WELL.x, WELL.z, 0.4, 1.3);
-const mill = place(gMill, -3.8, -1.2, 0.5, 1.6);
+flattenAt(MILL_POS.x, MILL_POS.z, 1.8);
+const mill = place(gMill, MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_POS.z), 1.6); // Windmühle draußen am Feldrand
 let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o; });
 
 const sites = [];
 for (const [r, n, off] of [[4.4, 8, .3], [6.2, 10, 0], [7.9, 12, .2]]) for (let i = 0; i < n; i++) {
   const a = off + i / n * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 || Math.hypot(x + 3.8, z + 1.2) < 2.2 || Math.hypot(x - WELL.x, z - WELL.z) < 1.7 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.6 || onSacred(x, z, 1.6)) continue;
+  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < PLAZA.r + .9 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 || onSacred(x, z, 1.5)) continue;
   sites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false });
 }
 const houses = [];
@@ -844,7 +877,7 @@ const hutSites = [];
 for (let i = 0; i < 18; i++) {
   const a = .15 + i / 18 * Math.PI * 2, r = 11, x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
   const slope = Math.max(...[[.8, 0], [-.8, 0], [0, .8], [0, -.8]].map(([dx, dz]) => Math.abs(heightAt(x + dx, z + dz) - h)));
-  if (h > .3 && h < 2.8 && slope < .55) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
+  if (h > .3 && h < 2.8 && slope < .55 && Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) > 5 && Math.hypot(x - MILL_POS.x, z - MILL_POS.z) > 3) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
 }
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
@@ -876,14 +909,14 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || onSacred(x, z, .9) || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
+  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || onSacred(x, z, .9) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
 worldReady = true;
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 // Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
-const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onSacred(x, z, .8 + r) || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
+const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
@@ -1008,7 +1041,7 @@ function refreshCover(budget) {
     for (let i = i0; i < i1; i++) {
       const it = K.items[i], h = heightAt(it.x, it.z);
       const wi = Math.round((it.x + HALF) / CELL), wj = Math.round((it.z + HALF) / CELL), w = wi >= 0 && wj >= 0 && wi < N && wj < N ? WEAR[wj * N + wi] : 0;
-      let vis = h > K.hmin && h < K.hmax && w < 7 && !onSacred(it.x, it.z, .15) && Math.hypot(it.x, it.z) > 2.35;
+      let vis = h > K.hmin && h < K.hmax && w < 7 && !onSacred(it.x, it.z, .15) && Math.hypot(it.x - SHRINE_POS.x, it.z - SHRINE_POS.z) > 2.35 && Math.hypot(it.x - PLAZA.x, it.z - PLAZA.z) > PLAZA.r;
       if (vis && navReady) { const c = navCell(it.x, it.z); vis = c >= 0 && !navV.g[c] || (K.hmin < 0 && navWater[c] === 1 && h > K.hmin); }
       if (!vis) { m.setMatrixAt(i, zero); continue; }
       dummy.position.set(it.x, h - K.sink * it.s, it.z); dummy.rotation.set(0, it.r, 0); dummy.scale.setScalar(it.s); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix);
@@ -1037,8 +1070,7 @@ function navObstacles() {
   for (const h of houses) rect(h, h.b ? FOOT.homeB : FOOT.homeA);
   for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
-  circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: -3.8, z: -1.2, r: .8 });
-  for (const sx of [-1, 1]) { circles.push({ x: sx * 1.25, z: 2.15, r: .22 }, { x: sx * .8, z: 8.25, r: .12 }, { x: sx * 1.05, z: -1.55, r: .08 }); for (const z of [3.7, 5.3, 6.9]) circles.push({ x: sx * .88, z, r: .14 }); }
+  circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: MILL_POS.x, z: MILL_POS.z, r: .8 }, ...sacredProps.obstacles);
   if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
   for (const r of rocks) circles.push({ x: r.x, z: r.z, r: r.s * .95 });
   for (const b of bushes) circles.push({ x: b.x, z: b.z, r: .17 * b.s });
@@ -1871,7 +1903,7 @@ function roleCount(r) { return villagers.filter(v => v.role === r).length; }
 /* ------------------------------------------------------------------ villager AI */
 function walk(v, x, z, next) { v.state = 'walk'; v.next = next; setGoal(v, x, z, navV); }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
-function goLunch(v) { const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * 1.1; walk(v, WELL.x + Math.cos(a) * r, WELL.z + Math.sin(a) * r, 'lunch'); }
+function goLunch(v) { const a = Math.random() * Math.PI * 2, r = .85 + Math.random() * 1.6; walk(v, LUNCH_AT.x + Math.cos(a) * r, LUNCH_AT.z + Math.sin(a) * r, 'lunch'); }
 function goHome(v) {
   const hs = houses[villagers.indexOf(v) % Math.max(1, houses.length)]; if (!hs) { idle(v, 2); return; }
   v.home = hs; const d = houseDoor(hs, .12 + Math.random() * .1); walk(v, d.x, d.z, 'sleep');
@@ -1977,7 +2009,7 @@ function arrive(v) {
       break;
     case 'pray': v.state = 'pray'; v.timer = 2 * PRAY_T; v.h = Math.atan2(SHRINE_POS.x - v.x, SHRINE_POS.z - v.z); break;
     case 'beg': if (v.wish && wish.kind) { v.state = 'beg'; v.timer = 0; v.h = Math.atan2(wish.at.x - v.x, wish.at.z - v.z); } else idle(v, .3); break;
-    case 'lunch': v.state = 'lunch'; v.until = LUNCH[1] + Math.random() * .4; v.h = Math.atan2(WELL.x - v.x, WELL.z - v.z); break;
+    case 'lunch': v.state = 'lunch'; v.until = LUNCH[1] + Math.random() * .4; v.h = Math.atan2(LUNCH_AT.x - v.x, LUNCH_AT.z - v.z); break;
     case 'sleep': // verschwindet in der Hütte, wacht morgens zu einer eigenen Zeit auf
       if (S.hour >= BED || S.hour < WAKE) { v.state = 'sleep'; v.wake = WAKE + Math.random() * .9; if (v.home) v.h = Math.atan2(v.home.x - v.x, v.home.z - v.z) + Math.PI; }
       else idle(v, .3);
@@ -2193,7 +2225,7 @@ const WISHES = {
     need: () => S.logs >= 25 && roleCount('sawyer') > 0 },
 };
 const wish = { kind: null, t: 0, dur: 90, by: null, cool: 25, checkT: 0, at: SHRINE_POS };
-const begSpot = () => ({ x: wish.at.x + rnd(.25), z: wish.at.z + 1.95 + Math.random() * .15 });
+const begSpot = () => shrinePt(rnd(.25), 1.95 + Math.random() * .15);
 function goBeg(v) { const p = begSpot(); walk(v, p.x, p.z, 'beg'); }
 function startWish(kind) {
   const free = villagers.filter(v => !v.role && !v.haul && !v.carry && ['idle', 'pray', 'walk'].includes(v.state));
@@ -2224,7 +2256,7 @@ function wishDone(kind) {
   if (wish.kind !== kind) return;
   const reward = Math.round(25 + villagers.length * 1.2 + S.temple * 5), W = WISHES[kind];
   addGlaube(reward, wish.at.x, shrine.g.position.y + 2, wish.at.z);
-  shrine.pulse = 1; for (let k = 0; k < 8; k++) spawnMote(wish.at.x + rnd(1.5), shrine.g.position.y + .3, wish.at.z + 1.5 + rnd(.6));
+  shrine.pulse = 1; for (let k = 0; k < 8; k++) { const q = shrinePt(rnd(1.5), 1.5 + rnd(.6)); spawnMote(q.x, shrine.g.position.y + .3, q.z); }
   for (const v of villagers) if (Math.hypot(v.x - wish.at.x, v.z - wish.at.z) < 7 && !['grabbed', 'falling', 'sleep'].includes(v.state)) v.cheer = 2.2 + Math.random() * .6;
   if (wish.by) floatText(wish.by.x, wish.by.y + .8, wish.by.z, 'Danke!', 's');
   toast(`Die Bewohner danken dir für ${W.thanks}: +${reward} Glaube.`, 4);
@@ -2579,6 +2611,29 @@ function openTimeMenu() {
   timeMenu.style.top = `${r.bottom + 6}px`; timeMenu.style.left = `${clamp(r.right - w, 16, innerWidth - w - 16)}px`;
 }
 $('btnTime').addEventListener('click', () => (timeMenu.hidden ? openTimeMenu() : closeTimeMenu()));
+// Wetter-Menü: Wetter wählen und festhalten
+const WX_ICON = {
+  klar: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/>',
+  heiter: '<circle cx="9" cy="8.5" r="3.4"/><path d="M9 2.6v1.4M3.1 8.5h1.4M4.8 4.3l1 1M13.2 4.3l-1 1"/><path d="M8 19.5a3.5 3.5 0 0 1 .5-7 4.5 4.5 0 0 1 8.6 1.3 2.9 2.9 0 0 1-.1 5.7z"/>',
+  bewoelkt: '<path d="M6.5 18a4 4 0 0 1 .6-7.95A5.2 5.2 0 0 1 17 10.8a3.6 3.6 0 0 1 .3 7.2z"/>',
+  regen: '<path d="M6.5 14.5a4 4 0 0 1 .6-7.95A5.2 5.2 0 0 1 17 7.3a3.6 3.6 0 0 1 .3 7.2z"/><path d="M8 17.5l-1 2.5M12 17.5l-1 2.5M16 17.5l-1 2.5"/>',
+};
+const wxMenu = $('wxMenu');
+$('wxOpts').innerHTML = Object.keys(WEATHER).map(k => `<button role="menuitemradio" data-wx="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${WX_ICON[k]}</svg><span>${WEATHER[k].label[0].toUpperCase() + WEATHER[k].label.slice(1)}</span></button>`).join('');
+function closeWxMenu() { if (wxMenu.hidden) return; wxMenu.hidden = true; $('btnWx').setAttribute('aria-expanded', 'false'); }
+function openWxMenu() {
+  wxMenu.querySelectorAll('[data-wx]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.wx === S.weather)));
+  $('wxLockL').textContent = S.weatherLocked ? 'Wetter wechselt wieder' : 'Wetter festhalten'; $('wxLock').setAttribute('aria-checked', String(!!S.weatherLocked));
+  wxMenu.hidden = false; $('btnWx').setAttribute('aria-expanded', 'true');
+  const r = $('btnWx').getBoundingClientRect(), w = wxMenu.offsetWidth;
+  wxMenu.style.top = `${r.bottom + 6}px`; wxMenu.style.left = `${clamp(r.right - w, 16, innerWidth - w - 16)}px`;
+}
+$('btnWx').addEventListener('click', () => (wxMenu.hidden ? openWxMenu() : closeWxMenu()));
+$('wxOpts').addEventListener('click', e => { const b = e.target.closest('[data-wx]'); if (!b) return; setWeather(b.dataset.wx); toast(`Das Wetter wird ${WEATHER[b.dataset.wx].label === 'Regen' ? 'regnerisch' : WEATHER[b.dataset.wx].label}.`, 2); save(); closeWxMenu(); });
+$('wxLock').addEventListener('click', () => { S.weatherLocked = !S.weatherLocked; toast(S.weatherLocked ? 'Das Wetter bleibt, wie es ist.' : 'Das Wetter wechselt wieder von selbst.', 2); save(); closeWxMenu(); });
+addEventListener('pointerdown', e => { if (!wxMenu.hidden && !wxMenu.contains(e.target) && !$('btnWx').contains(e.target)) closeWxMenu(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeWxMenu(); });
+const windWord = w => w < .3 ? 'windstill' : w < .5 ? 'leichter Wind' : w < .72 ? 'windig' : 'stürmisch';
 $('tmSkip').addEventListener('click', () => { toggleDayNight(); closeTimeMenu(); });
 $('tmPause').addEventListener('click', () => { S.timePaused = !S.timePaused; toast(S.timePaused ? 'Die Zeit steht still.' : 'Die Zeit läuft weiter.', 2); save(); closeTimeMenu(); });
 addEventListener('pointerdown', e => { if (!timeMenu.hidden && !timeMenu.contains(e.target) && !$('btnTime').contains(e.target)) closeTimeMenu(); });
@@ -2924,6 +2979,9 @@ function frame() {
       $('tBody').setAttribute('transform', `translate(${(18 - 14 * Math.cos(k)).toFixed(1)} ${(17 - 13 * Math.sin(k)).toFixed(1)})`);
       $('btnTime').setAttribute('aria-label', `Uhrzeit ${$('vT').textContent}, ${$('vTs').textContent}. ${S.timePaused ? 'angehalten' : 'läuft'}. Tippen für Zeitmenü`);
     }
+    { const k = S.weather; if ($('btnWx').dataset.wx !== k) { $('btnWx').dataset.wx = k; $('wxIc').innerHTML = WX_ICON[k]; $('vW').textContent = WEATHER[k].label[0].toUpperCase() + WEATHER[k].label.slice(1); }
+      $('vWs').textContent = S.weatherLocked ? 'festgehalten' : windWord(waterU.uWind.value); $('btnWx').classList.toggle('paused', !!S.weatherLocked);
+      $('btnWx').setAttribute('aria-label', `Wetter: ${$('vW').textContent}, ${$('vWs').textContent}. Tippen für Wettermenü`); }
     $('vP').textContent = `${villagers.length}/${cap()}`; $('vPh').textContent = `${houses.length} ${houses.length === 1 ? 'Haus' : 'Häuser'}`;
     document.querySelectorAll('#ctxMiracle button').forEach(b => b.classList.toggle('poor', S.glaube < MIRACLES[b.dataset.m].cost));
     if (!$('sheetShrine').hidden) { const bs = $('shrineItems').querySelectorAll('[data-buy]'); bs.forEach(b => { const it = SHRINE.find(x => x.id === b.dataset.buy); b.disabled = !(S.glaube >= it.cost() && (!it.ok || it.ok())); }); }
