@@ -154,8 +154,8 @@ const CREATURES = {
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_church_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb', 'hand/GodHand.glb'];
-const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand, gHand2] = await Promise.all(files.map(load));
+  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb'];
+const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 class Swarm {
@@ -504,9 +504,9 @@ async function setCreature(id) {
 async function loadCreature(id) {
   return creatureCache[id] || (creatureCache[id] = await load(`animals/${CREATURES[id].file}.glb`));
 }
-// Porträt im Panel: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das Fell-Modell),
-// die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, damit die Weltkamera unberührt bleibt.
-const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, hand: null, look: new THREE.Vector3(), dist: 4 };
+// Porträt im Charakter-Blatt: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das
+// Fell-Modell), die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, die Weltkamera bleibt unberührt.
+const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, look: new THREE.Vector3(), dist: 4 };
 {
   const P = portrait;
   P.scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x4d6b3c, 1.4));
@@ -518,7 +518,6 @@ const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.Pers
 async function showPortrait() {
   const P = portrait, id = fox.kind, C = CREATURES[id];
   if ((P.rig && P.rig.id === id) || P.loading === id) return;
-  if (!P.hand) { P.hand = makeHand(gHand2); P.scene.add(P.hand.g); styleHand(P.hand); }
   if (!P.renderer) {
     P.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     P.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('foxPortrait').appendChild(P.renderer.domElement);
@@ -602,32 +601,34 @@ const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
 const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
 const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: .55, slap: .42 };
 const BACK_Z = [-.3, -.15, 0, .15, .3]; // Messstellen entlang des Rückens (Anteile der Tierhöhe, + = Kopf)
-function playHand(kind, onHit) { Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile(portrait.rig) }); }
-// höchster Punkt nahe der Mittellinie an den Messstellen (relativ zum Porträt-Sockel), damit die Hand auf dem Rücken
-// aufliegt statt einzusinken
-function backProfile(rig) {
-  const h = rig ? CREATURES[rig.id].h : 1.45, out = BACK_Z.map(() => -1e9), v = new THREE.Vector3();
-  if (!rig) return out.map(() => h * .62);
-  rig.model.updateMatrixWorld(true);
-  rig.model.traverse(m => {
+function playHand(kind, onHit) {
+  // ein laufendes oder stehendes Tier hält für die Geste inne (außer es trägt gerade Holz)
+  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) { if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null; foxIdle(HAND_DUR[kind] + .6); }
+  Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile() });
+}
+// höchster Punkt nahe der Mittellinie an den Messstellen, im Raum des Tiers (foxPivot), damit die Hand auf dem
+// Rücken aufliegt statt einzusinken
+function backProfile() {
+  const h = CREATURES[fox.kind].h, out = BACK_Z.map(() => -1e9), v = new THREE.Vector3();
+  foxPivot.updateMatrixWorld(true);
+  foxModel.traverse(m => {
     if (!m.isSkinnedMesh || m.userData.shell) return;
     m.skeleton.update(); const pos = m.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 2) {
-      m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); if (Math.abs(v.x) > .12 * h) continue;
+      m.getVertexPosition(i, v); foxPivot.worldToLocal(v.applyMatrix4(m.matrixWorld)); if (Math.abs(v.x) > .12 * h) continue;
       BACK_Z.forEach((z, k) => { if (Math.abs(v.z - z * h) < .07 * h && v.y > out[k]) out[k] = v.y; });
     }
   });
-  const fur = rig.model.userData.fur ? FUR.len * 1.3 : 0, py = portrait.pivot.position.y;
-  return out.map(y => (y > -1e8 ? y - py : h * .62) + fur);
+  return out.map(y => (y > -1e8 ? y : h * .62));
 }
 function backAt(A, z, h) { // Rückenhöhe an Längsposition z (linear zwischen den Messstellen)
   const f = clamp((z / h - BACK_Z[0]) / (BACK_Z[1] - BACK_Z[0]), 0, BACK_Z.length - 1.001), i = Math.floor(f);
   return A.back[i] + (A.back[i + 1] - A.back[i]) * (f - i);
 }
 function updateHandAnim(dt, t) {
-  // im Porträt steht das Tier im Ursprung und schaut nach +Z
-  const A = handAnim, C = CREATURES[fox.kind], hand = portrait.hand; A.t += dt;
-  const s = clamp(C.h / 2.4, .5, 1);
+  // Positionen im Raum des Tiers (schaut nach +Z), dann in die Welt übertragen
+  const A = handAnim, C = CREATURES[fox.kind]; A.t += dt;
+  const s = clamp(C.h / 2.2, .55, 1.2);
   const ease = x => x * x * (3 - 2 * x), seg = (a, b) => clamp((A.t - a) / (b - a), 0, 1);
   let along = 0, lift = 0, tilt = 0, pose = HAND_POSES.relax;
   if (A.kind === 'pet') {
@@ -643,10 +644,9 @@ function updateHandAnim(dt, t) {
   }
   if (A.hit && A.t >= HAND_HIT[A.kind]) { A.hit(); A.hit = null; }
   hand.g.visible = true; hand.g.scale.setScalar(s);
-  // Handfläche liegt etwa 0,07 (Handmaß) über ihrem Ursprung auf: so knapp über Rücken bzw. Fell
-  const back = portrait.pivot.position.y + backAt(A, along * C.h, C.h);
-  hand.g.position.set(0, back + .07 * s + lift, along * C.h);
-  hand.g.rotation.set(tilt, Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
+  // Handfläche liegt etwa 0,07 (Handmaß) über ihrem Ursprung auf: so knapp über dem Rücken
+  hand.g.position.set(0, backAt(A, along * C.h, C.h) + .07 * s + lift, along * C.h); foxPivot.localToWorld(hand.g.position);
+  hand.g.rotation.set(tilt, fox.h + Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
   poseHand(hand, pose, dt, t, 18);
   if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
 }
@@ -902,6 +902,61 @@ function updateTrees(dt, t) {
   rootBall.position.copy(heldTree.pos); rootBall.rotation.copy(o.rotation); rootBall.scale.setScalar(heldTree.g);
 }
 
+/* ------------------------------------------------------------------ Kreismenü und Einblendung am Tiergeist */
+// Tippt die Hand auf den Tiergeist, öffnet sich um ihn ein Kreis aus Aktionen. Die Liste lässt sich erweitern;
+// icon = SVG-Pfade im 24er-Raster wie bei den Werkzeugen.
+const FOX_ACTIONS = [
+  { id: 'pet', label: () => 'Streicheln', icon: '<path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.6 4 4 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>', run: () => reinforce('pet') },
+  { id: 'slap', label: () => 'Klaps', icon: '<path d="M7 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0v5m0-2.5a1.5 1.5 0 0 1 3 0v5A6.5 6.5 0 0 1 12.5 21h-.6a6 6 0 0 1-4.7-2.3L4.4 15"/><path d="M3 6l2 1.5M2.5 10H5"/>', run: () => reinforce('slap') },
+  { id: 'follow', label: () => follow ? 'Nicht folgen' : 'Folgen', pressed: () => follow, icon: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>', run: () => { follow = !follow; renderFollow(); } },
+  { id: 'sheet', label: () => 'Charakter', icon: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3.5"/>', run: () => openSheet('sheetFox') },
+];
+let ringOpen = false, hoverFox = false;
+function openRing() {
+  const R = $('ring'), n = FOX_ACTIONS.length, rad = n > 4 ? 84 : 76; R.innerHTML = '';
+  FOX_ACTIONS.forEach((a, i) => {
+    const ang = -Math.PI / 2 + i * 2 * Math.PI / n, b = document.createElement('button');
+    b.className = a.id; b.style.setProperty('--x', `${Math.cos(ang) * rad}px`); b.style.setProperty('--y', `${Math.sin(ang) * rad}px`);
+    if (a.pressed) b.setAttribute('aria-pressed', a.pressed());
+    b.innerHTML = `<svg viewBox="0 0 24 24">${a.icon}</svg><span>${a.label()}</span>`;
+    b.addEventListener('click', e => { e.stopPropagation(); closeRing(); a.run(); });
+    R.appendChild(b);
+  });
+  R.hidden = false; ringOpen = true; void R.offsetWidth; R.classList.add('open'); placeFoxUI(0);
+}
+function closeRing() { ringOpen = false; $('ring').classList.remove('open'); $('ring').hidden = true; }
+addEventListener('keydown', e => { if (e.key === 'Escape' && ringOpen) closeRing(); });
+// Tier unter dem Finger: Abstand zur Strecke Füße–Kopfhöhe auf dem Bildschirm, Toleranz wächst mit der Größe
+function foxUnder(cx, cy) {
+  const y = foxPivot.position.y, C = CREATURES[fox.kind]; toScreen(fox.x, y + C.h * .1, fox.z, tA); toScreen(fox.x, y + C.h * .85, fox.z, tB);
+  const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
+  return Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u) < Math.max(36, Math.sqrt(L2) * .55);
+}
+// Kreismenü und Einblendung mitführen; die Einblendung zeigt Name, Tätigkeit und Neigungen,
+// wenn das Menü offen ist oder die Hand über dem Tier schwebt, sonst nur eine offene Frage nach Lob/Tadel
+let badgeT = 0;
+function placeFoxUI(dt) {
+  const C = CREATURES[fox.kind], r = canvas.getBoundingClientRect(), y = foxPivot.position.y;
+  toScreen(fox.x, y + C.h * .5, fox.z, tA); let cx = tA.x - r.left, cy = tA.y - r.top;
+  // Kreis vollständig im Bild halten (oben Statusleiste, unten Werkzeugleiste)
+  if (ringOpen) { const m = (FOX_ACTIONS.length > 4 ? 84 : 76) + 34; cx = clamp(cx, m, r.width - m); cy = clamp(cy, m + 60, r.height - m - 110); }
+  if (ringOpen) $('ring').style.transform = `translate(${cx}px, ${cy}px)`;
+  const ask = fox.last && clock.elapsedTime - fox.lastT < 25, full = ringOpen || hoverFox, B = $('foxBadge');
+  B.hidden = !(full || ask) || !$('sheetFox').hidden;
+  if (B.hidden) return;
+  if ((badgeT -= dt) <= 0 || !dt) {
+    badgeT = .25;
+    $('badgeName').textContent = full ? S.name : ''; $('badgeNow').textContent = full ? `${foxDoing()}.` : '';
+    $('badgeAsk').textContent = ask ? (full ? `Hat ${ACT_DESC[fox.last]}: Lob oder Tadel?` : 'Lob oder Tadel?') : '';
+    $('badgeBars').innerHTML = full ? ['help', 'play', 'mischief'].map(k => `<span>${ACT_LABEL[k]}</span><i><u style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></u></i>`).join('') : '';
+  }
+  // über dem Kopf, bei offenem Menü über dem oberen Knopf; am Bildschirmrand halten
+  toScreen(fox.x, y + C.h + .15, fox.z, tB);
+  const top = Math.min(tB.y - r.top, ringOpen ? cy - 118 : 1e9), bw = B.offsetWidth, bh = B.offsetHeight;
+  const bx = clamp(cx - bw / 2, 8, r.width - bw - 8), by = clamp(top - bh - 6, 60, r.height - bh - 8);
+  B.style.transform = `translate(${bx}px, ${by}px)`;
+}
+
 /* ------------------------------------------------------------------ input */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let tool = 'hand', primary = null, pressing = false, grabbed = null, handShown = false;
@@ -922,7 +977,7 @@ function screenDist(x, y, z, cx, cy) { const r = canvas.getBoundingClientRect();
 function onToolDown(cx, cy) {
   pick(cx, cy); handShown = hitOk;
   if (tool === 'hand') {
-    if (screenDist(fox.x, surfaceAt(fox.x, fox.z) + CREATURES[fox.kind].h * .45, fox.z, cx, cy) < 60) { openSheet('sheetFox'); pressing = false; return; }
+    if (foxUnder(cx, cy)) { openRing(); pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) { grabbed = best; if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
@@ -941,6 +996,7 @@ canvas.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, true);
   if (pointers.size > 1) { if (primary !== null) { onToolUp(); primary = null; } return; }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (ringOpen) { closeRing(); return; } // Tippen daneben schließt das Kreismenü
   if (tool === 'blick') return;
   closeSheets();
   primary = e.pointerId; pointerXY.x = e.clientX; pointerXY.y = e.clientY; onToolDown(e.clientX, e.clientY);
@@ -956,7 +1012,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
   blick: 'Ziehen dreht die Welt. Zwei Finger oder Mausrad: verschieben und zoomen.',
-  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen. ${S.name} antippen, um ihn zu erziehen.`; },
+  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen. ${S.name} antippen für Streicheln, Klaps und mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -980,8 +1036,6 @@ document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
 $('btnFox').addEventListener('click', () => openSheet('sheetFox'));
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
-$('btnPet').addEventListener('click', () => reinforce('pet'));
-$('btnSlap').addEventListener('click', () => reinforce('slap'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
 function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
@@ -1143,8 +1197,8 @@ function frame() {
 
   // hand
   if (handAnim.kind) updateHandAnim(dt, t);
-  const showHand = tool !== 'blick' && handShown && hitOk;
-  hand.g.visible = showHand;
+  const showHand = !handAnim.kind && tool !== 'blick' && handShown && hitOk;
+  if (!handAnim.kind) hand.g.visible = showHand;
   if (showHand) {
     const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : grabbed ? 1.0 : (pressing && tool === 'sculpt') ? .75 : 1.5;
     if (treeGrab) {
@@ -1157,7 +1211,7 @@ function frame() {
     const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
     const dx = controls.target.x - camera.position.x, dz = controls.target.z - camera.position.z;
     hand.g.rotation.y = Math.atan2(-dx, -dz);
-    const pose = grabbed || heldTree.on ? HAND_POSES.hold : treeGrab ? HAND_POSES.claw
+    const pose = grabbed || heldTree.on ? HAND_POSES.hold : treeGrab ? HAND_POSES.claw : hoverFox && !pressing ? HAND_POSES.flat
       : pressing ? (tool === 'sculpt' ? (sculptDir > 0 ? HAND_POSES.flat : HAND_POSES.fist) : HAND_POSES.grab) : HAND_POSES.relax;
     poseHand(hand, pose, dt, t);
   }
@@ -1181,6 +1235,10 @@ function frame() {
   if (tr > 18) { const k = 18 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
   controls.target.y = 1;
   controls.update();
+
+  // Tiergeist: Hand schwebt darüber (Maus) -> Einblendung; Kreismenü mitführen
+  hoverFox = tool === 'hand' && handShown && primary === null && !grabbed && !heldTree.on && foxUnder(pointerXY.x, pointerXY.y);
+  placeFoxUI(dt);
 
   // floating texts
   const rect = canvas.getBoundingClientRect();
