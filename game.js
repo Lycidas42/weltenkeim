@@ -2017,8 +2017,8 @@ function updateSharks(dt, t) {
     if (sh.hunt) for (let i = fish.length - 1; i >= 0; i--) { const f = fish[i]; if (!f.jump && (f.x - sh.x - Math.sin(sh.h) * .8) ** 2 + (f.z - sh.z - Math.cos(sh.h) * .8) ** 2 < .25) { fish.splice(i, 1); splash(f.x, f.z); sh.hunt = false; const p = sharkSpot(false); sh.tx = p.x; sh.tz = p.z; break; } }
     // Spur der Flosse an der Oberfläche
     if (sh.up > .75 && (sh.wakeT -= dt) <= 0) {
-      sh.wakeT = .12; const fx = sh.x + Math.sin(sh.h) * .05, fz = sh.z + Math.cos(sh.h) * .05;
-      for (const side of [-1, 1]) { if (spray.length >= SPRAY_N) spray.shift(); spray.push({ x: fx + Math.cos(sh.h) * side * .06, y: .01, z: fz - Math.sin(sh.h) * side * .06, vx: Math.cos(sh.h) * side * .35 - Math.sin(sh.h) * .2, vy: .25 + Math.random() * .25, vz: -Math.sin(sh.h) * side * .35 - Math.cos(sh.h) * .2, t: 0, life: .5 + Math.random() * .3, s: Math.random() * .5 }); }
+      sh.wakeT = .4 + Math.random() * .3; const fx = sh.x + Math.sin(sh.h) * .05, fz = sh.z + Math.cos(sh.h) * .05, side = Math.random() < .5 ? -1 : 1; // nur ab und zu ein Spritzer
+      if (spray.length >= SPRAY_N) spray.shift(); spray.push({ x: fx + Math.cos(sh.h) * side * .05, y: .01, z: fz - Math.sin(sh.h) * side * .05, vx: Math.cos(sh.h) * side * .2 - Math.sin(sh.h) * .1, vy: .12 + Math.random() * .12, vz: -Math.sin(sh.h) * side * .2 - Math.cos(sh.h) * .1, t: 0, life: .35 + Math.random() * .2, s: 0 });
     }
     const M = sh.m, sway = Math.sin(t * (sh.hunt ? 4 : 2.4) + sh.ph);
     M.tail.rotation.y = sway * .45; M.body.rotation.y = -sway * .06;
