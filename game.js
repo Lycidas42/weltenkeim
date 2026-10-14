@@ -3602,6 +3602,7 @@ $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data
 function save() { if (skipSave) return; savePaths(); S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); S.hutGoods = huts.map(h => h.goods); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('pagehide', save); addEventListener('wk-save', save); // vor dem Neuladen (Update) speichern
 
 /* ------------------------------------------------------------------ loop */
 const clock = new THREE.Clock();

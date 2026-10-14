@@ -114,6 +114,11 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 76px);transform:translateX(-50%);max-width:min(420px, calc(100% - 32px));
   background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:14px;text-align:center;opacity:0;transition:opacity .35s;pointer-events:none;text-wrap:balance}
 #toast.show{opacity:1}
+#update{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:60;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+  width:max-content;max-width:calc(100% - 32px);background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+#update[hidden]{display:none}
+#update button{font:inherit;font-weight:700;border-radius:9px;padding:7px 12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit}
+#update button.primary{background:#e7b54a;color:#2a1d08;border-color:#e7b54a}
 
 /* floating world text */
 #fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
@@ -294,6 +299,12 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
+  <!-- Hinweis auf eine neue Version (der Service Worker hat eine neue Fassung übernommen) -->
+  <div id="update" role="alert" hidden>
+    <span>Eine neue Version von Weltenkeim ist da.</span>
+    <button id="updReload" class="primary">Neu laden</button>
+    <button id="updLater" aria-label="Später">Später</button>
+  </div>
 
   <section class="sheet" id="sheetWork" hidden aria-label="Arbeit">
     <header><h2>Arbeit</h2><button class="x" data-close aria-label="Schließen">×</button></header>
@@ -374,7 +385,19 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 </script>
 <script type="module" src="game.js"></script>
 <script>
-if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+// Service Worker: offline spielen. Neue Versionen übernimmt er sofort; dann erscheint ein Hinweis mit „Neu laden“.
+// Läuft das Spiel lange offen (z. B. auf dem Handy), wird alle 15 Minuten und beim Zurückkehren nach Updates gesucht.
+if ('serviceWorker' in navigator) addEventListener('load', () => {
+  const had = !!navigator.serviceWorker.controller, box = document.getElementById('update');
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) box.hidden = false; });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const check = () => reg.update().catch(() => {});
+    setInterval(check, 15 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+  }).catch(() => {});
+  document.getElementById('updReload').addEventListener('click', () => { dispatchEvent(new Event('wk-save')); location.reload(); });
+  document.getElementById('updLater').addEventListener('click', () => { box.hidden = true; });
+});
 </script>
 </body>
 </html>
