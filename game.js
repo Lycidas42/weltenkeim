@@ -1104,7 +1104,7 @@ for (let i = 0; i < 18; i++) {
 // Bauernhöfe brauchen Platz: ebenes, offenes Land weiter draußen. Im Hofraum zeigt z zum Dorf: Wohnhaus vorn links,
 // Weide mit Hühnerstall vorn rechts, dahinter vier Felder nebeneinander. Die Plätze werden gleich zu Beginn
 // reserviert, damit dort keine Bäume, Felsen und Büsche stehen.
-const FARM = { house: [-1.6, 1.35], fw: 1.4, fd: 2.0, fz: -1.5, fx: [-2.4, -.8, .8, 2.4], pen: { x0: .3, x1: 3.35, z0: .4, z1: 2.85 }, coop: [2.75, .95], trough: [1.7, 2.62], lx0: -3.4, lx1: 3.6, lz0: -2.8, lz1: 3.15 };
+const FARM = { house: [-1.6, 1.35], fw: 1.4, fd: 2.0, fz: -1.5, fx: [-2.4, -.8, .8, 2.4], pen: { x0: .3, x1: 3.35, z0: .4, z1: 2.85, xm: 2.05 }, coop: [-2.85, 2.75], trough: [1.9, 2.62], troughs: [[1.17, .8], [2.7, .7]], hay: [[3.72, .95], [3.72, 1.42]], lx0: -3.4, lx1: 3.6, lz0: -2.8, lz1: 3.15 };
 const farmSites = [];
 {
   const cand = [];
@@ -1218,21 +1218,21 @@ function buildFarm(e, F) {
   const at = (lx, lz) => { const p = farmPt(F, lx, lz); return heightAt(p.x, p.z) - y0; };
   const B = (w, h, d, x, y, z, c, ry = 0) => parts.push(paint(new THREE.BoxGeometry(w, h, d).rotateY(ry).translate(x, y, z), (px, py, pz, ny, cc) => cc.set(c).multiplyScalar(ny > .5 ? 1 : .82)));
   // Zaun um die Weide: Pfosten, zwei Querlatten je Feld
-  const { x0, x1, z0, z1 } = FARM.pen, post = [];
+  const { x0, x1, z0, z1, xm } = FARM.pen, post = [];
   const side = (ax, az, bx, bz) => { const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / .55)); for (let k = 0; k <= n; k++) post.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n, k < n ? [ax + (bx - ax) * (k + 1) / n, az + (bz - az) * (k + 1) / n] : null]); };
-  side(x0, z0, x1, z0); side(x1, z0, x1, z1); side(x1, z1, x0, z1); side(x0, z1, x0, z0);
+  side(x0, z0, x1, z0); side(x1, z0, x1, z1); side(x1, z1, x0, z1); side(x0, z1, x0, z0); side(xm, z0, xm, z1); // Kuhweide links, Schweinekoppel rechts
   for (const [px, pz, nx] of post) {
     const y = at(px, pz); B(.05, .34, .05, px, y + .14, pz, dark);
     if (nx) { const [qx, qz] = nx, L = Math.hypot(qx - px, qz - pz), yy = (y + at(qx, qz)) / 2, ry = Math.atan2(qx - px, qz - pz); for (const h of [.13, .25]) B(.025, .035, L, (px + qx) / 2, yy + h, (pz + qz) / 2, wood, ry); }
   }
-  // Hühnerstall auf Stelzen mit Satteldach und Rampe
+  // Hühnerstall auf Stelzen mit Satteldach und Rampe (neben dem Haus, die Hühner laufen frei)
   { const [cx, cz] = FARM.coop, y = at(cx, cz); for (const [ox, oz] of [[-.25, -.18], [.25, -.18], [-.25, .18], [.25, .18]]) B(.05, .16, .05, cx + ox, y + .08, cz + oz, dark);
     B(.62, .32, .44, cx, y + .32, cz, 0xb5523b); B(.12, .14, .02, cx, y + .26, cz + .225, 0x3a2a20);
     for (const sx of [-1, 1]) { const r = new THREE.BoxGeometry(.72, .035, .3).rotateX(sx * .62).translate(cx, y + .56, cz + sx * .12); parts.push(paint(r, (px, py, pz, ny, cc) => cc.set(0x6e4526))); }
     parts.push(paint(new THREE.BoxGeometry(.12, .02, .32).rotateX(.5).translate(cx, y + .1, cz + .36), (px, py, pz, ny, cc) => cc.set(wood))); }
-  // Futtertrog an der Vorderseite der Weide, Heuballen, Wassertrog
-  { const [tx, tz] = FARM.trough, y = at(tx, tz); B(.9, .14, .22, tx, y + .07, tz - .1, wood); B(.82, .03, .16, tx, y + .13, tz - .1, 0xc9a24a);
-    for (const [hx, hz] of [[x0 + .45, z0 + .35], [x0 + .9, z0 + .3]]) parts.push(paint(new THREE.CylinderGeometry(.2, .2, .32, 10).rotateZ(Math.PI / 2).translate(hx, at(hx, hz) + .2, hz), (px, py, pz, ny, cc) => cc.set(0xd9b65a).multiplyScalar(.9 + .1 * Math.sin(py * 60)))); }
+  // je ein Futtertrog an der Vorderseite der beiden Koppeln, Heuballen draußen neben der Weide
+  { for (const [tx, w] of FARM.troughs) { const tz = FARM.trough[1], y = at(tx, tz); B(w, .14, .22, tx, y + .07, tz - .1, wood); B(w - .08, .03, .16, tx, y + .13, tz - .1, 0xc9a24a); }
+    for (const [hx, hz] of FARM.hay) parts.push(paint(new THREE.CylinderGeometry(.2, .2, .32, 10).rotateZ(Math.PI / 2).translate(hx, at(hx, hz) + .2, hz), (px, py, pz, ny, cc) => cc.set(0xd9b65a).multiplyScalar(.9 + .1 * Math.sin(py * 60)))); }
   const mesh = new THREE.Mesh(mergeGeometries(parts), plantMat); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
   g.rotation.y = F.ry; scene.add(g); statics.push({ o: g, x: F.x, z: F.z });
   { const p = farmPt(F, -2.95, .55); place(gWheelbarrow, p.x, p.z, F.ry + .6, 1.5); F.barrow = p; const q = farmPt(F, -.45, .5); place(gBucket, q.x, q.z, F.ry, 1.5); F.bucket = q; }
@@ -1254,9 +1254,20 @@ function buildFarm(e, F) {
   });
   // Vieh auf der Weide
   for (const [kind, n] of [['kuh', 2], ['schwein', 2], ['huhn', 5]]) for (let k = 0; k < n; k++) {
-    const a = { kind, F, lx: x0 + .4 + Math.random() * (x1 - x0 - .8), lz: z0 + .4 + Math.random() * (z1 - z0 - .8), h: Math.random() * 6.28, tx: 0, tz: 0, moving: false, timer: Math.random() * 3, ph: Math.random() * 6.28, m: makeStock(kind) };
-    stock.push(a);
+    let lx = 0, lz = 0;
+    if (kind === 'huhn') for (let t = 0; t < 40; t++) { lx = rnd(3) - .5; lz = 1.5 + rnd(1.5); if (yardOk(lx, lz)) break; }
+    else { const Z = stockZone(kind); lx = Z.x0 + Math.random() * (Z.x1 - Z.x0); lz = Z.z0 + Math.random() * (Z.z1 - Z.z0); }
+    stock.push({ kind, F, lx, lz, h: Math.random() * 6.28, tx: lx, tz: lz, moving: false, timer: Math.random() * 3, ph: Math.random() * 6.28, m: makeStock(kind) });
   }
+}
+// Bewegungsraum (Hofkoordinaten): Kühe links, Schweine rechts, jeweils mit Abstand zu Zaun und Trog
+function stockZone(kind) { const P = FARM.pen, zz = { z0: P.z0 + .3, z1: FARM.trough[1] - .55 }; return kind === 'kuh' ? { x0: P.x0 + .3, x1: P.xm - .3, ...zz } : { x0: P.xm + .25, x1: P.x1 - .25, ...zz }; }
+// frei laufende Hühner: Hof zwischen Feldern, Haus und Weide, nicht in Gebäuden, Weide, Stall oder auf den Feldern
+function yardOk(lx, lz) {
+  const P = FARM.pen, [hx, hz] = FARM.house, [cx, cz] = FARM.coop, inR = (x0, x1, z0, z1) => lx > x0 && lx < x1 && lz > z0 && lz < z1;
+  if (lx < -3.25 || lx > 3.5 || lz < -.3 || lz > 3.1) return false;
+  if (inR(P.x0 - .12, P.x1 + .12, P.z0 - .12, P.z1 + .12) || inR(hx - .78, hx + .78, hz - .95, hz + .95) || inR(cx - .42, cx + .42, cz - .32, cz + .5)) return false;
+  return Math.hypot(lx + 2.95, lz - .55) > .38 && Math.hypot(lx + .45, lz - .5) > .2 && FARM.hay.every(([x, z]) => Math.hypot(lx - x, lz - z) > .32);
 }
 const fieldAt = (x, z, m = .15) => fields.find(f => { const dx = x - f.x, dz = z - f.z, c = Math.cos(f.ry), sn = Math.sin(f.ry); return Math.abs(dx * c - dz * sn) < FARM.fw / 2 + m && Math.abs(dx * sn + dz * c) < FARM.fd / 2 + m; });
 const fieldFront = f => farmPt(f.F, f.lx + rnd(.45), f.lz + FARM.fd / 2 + .3);
@@ -1294,10 +1305,18 @@ function updateFarm(dt, t) {
     const F = a.F, P = FARM.pen, chick = a.kind === 'huhn', feed = F.feedT > 0;
     a.timer -= dt;
     if (!a.moving && a.timer <= 0) {
-      if (feed && !chick) { a.tx = FARM.trough[0] + rnd(.4); a.tz = FARM.trough[1] - .45 + rnd(.08); }
-      else if (feed) { a.tx = FARM.trough[0] + rnd(.9); a.tz = FARM.trough[1] - .55 + rnd(.3); }
-      else { const r = chick ? 1.2 : 2.2; a.tx = clamp(a.lx + rnd(r), P.x0 + .3, P.x1 - .3); a.tz = clamp(a.lz + rnd(r), P.z0 + .3, P.z1 - .3); }
-      a.moving = true;
+      if (chick) { // nachts in den Stall, sonst herumlaufen und picken (bei der Fütterung zum Bauern)
+        const night = sky.night > .55, [cx, cz] = FARM.coop;
+        let tx = a.lx, tz = a.lz, ok = false;
+        if (night) { tx = cx + rnd(.1); tz = cz + .45; ok = true; }
+        else for (let k = 0; k < 10 && !ok; k++) { tx = (feed ? FARM.trough[0] - 1.9 : a.lx) + rnd(1.2); tz = (feed ? FARM.pen.z1 + .1 : a.lz) + rnd(feed ? .2 : 1.2); ok = yardOk(tx, tz) && [.25, .5, .75].every(u => yardOk(a.lx + (tx - a.lx) * u, a.lz + (tz - a.lz) * u)); }
+        if (ok) { a.tx = tx; a.tz = tz; a.moving = true; } else a.timer = 1;
+      } else {
+        const Z = stockZone(a.kind), trough = FARM.troughs[a.kind === 'kuh' ? 0 : 1];
+        if (feed) { a.tx = clamp(trough[0] + rnd(trough[1] / 2 - .1), Z.x0, Z.x1); a.tz = Z.z1; }
+        else { a.tx = clamp(a.lx + rnd(1.6), Z.x0, Z.x1); a.tz = clamp(a.lz + rnd(1.6), Z.z0, Z.z1); }
+        a.moving = true;
+      }
     }
     const sp = a.kind === 'kuh' ? .3 : a.kind === 'schwein' ? .4 : .55;
     if (a.moving) {
@@ -1305,6 +1324,12 @@ function updateFarm(dt, t) {
       if (d < .05) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); }
       else { const st = Math.min(d, sp * dt); a.lx += dx / d * st; a.lz += dz / d * st; let dh = Math.atan2(dx, dz) - a.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); a.h += dh * Math.min(1, dt * 5); }
     }
+    if (!chick) { // Abstand zu den anderen Tieren der Koppel halten
+      const Z = stockZone(a.kind), R = a.kind === 'kuh' ? .5 : .36;
+      for (const b of stock) if (b !== a && b.F === F && b.kind === a.kind) { const dx = a.lx - b.lx, dz = a.lz - b.lz, d = Math.hypot(dx, dz); if (d < R && d > 1e-4) { const k = (R - d) * .5; a.lx += dx / d * k; a.lz += dz / d * k; } }
+      a.lx = clamp(a.lx, Z.x0, Z.x1); a.lz = clamp(a.lz, Z.z0, Z.z1);
+    }
+    const inCoop = chick && sky.night > .55 && !a.moving && Math.hypot(a.lx - FARM.coop[0], a.lz - FARM.coop[1] - .45) < .2; a.m.g.visible = !inCoop; // schläft im Stall
     const M = a.m, p = farmPt(F, a.lx, a.lz), y = heightAt(p.x, p.z), cyc = t * (chick ? 16 : 7) + a.ph, sw = a.moving ? Math.sin(cyc) * .5 : 0;
     M.legs.forEach((L, k) => { L.rotation.x = (k === 0 || k === 3 ? sw : -sw); });
     if (chick) M.body.rotation.x = a.moving ? 0 : Math.max(0, Math.sin(t * 3 + a.ph)) ** 6 * .9; // pickt
@@ -1522,6 +1547,7 @@ function buildingObstacles() {
     for (const f of F.fields) rects.push({ x: f.x, z: f.z, ry: f.ry, hx: FARM.fw / 2, hz: FARM.fd / 2 });
     const P = FARM.pen, fr = (lx, lz, hx, hz) => { const p = farmPt(F, lx, lz); rects.push({ x: p.x, z: p.z, ry: F.ry, hx, hz }); };
     fr((P.x0 + P.x1) / 2, P.z0, (P.x1 - P.x0) / 2 + .04, .04); fr((P.x0 + P.x1) / 2, P.z1, (P.x1 - P.x0) / 2 + .04, .04); fr(P.x0, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2); fr(P.x1, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2);
+    fr(FARM.coop[0], FARM.coop[1], .36, .26); for (const [hx, hz] of FARM.hay) { const p = farmPt(F, hx, hz); circles.push({ x: p.x, z: p.z, r: .22 }); }
     circles.push({ x: F.barrow.x, z: F.barrow.z, r: .3 }, { x: F.bucket.x, z: F.bucket.z, r: .14 });
   }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
