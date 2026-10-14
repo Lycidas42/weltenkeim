@@ -601,18 +601,40 @@ const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
 // Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
 const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
 const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: .55, slap: .42 };
-function playHand(kind, onHit) { Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0 }); }
+const BACK_Z = [-.3, -.15, 0, .15, .3]; // Messstellen entlang des Rückens (Anteile der Tierhöhe, + = Kopf)
+function playHand(kind, onHit) { Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile(portrait.rig) }); }
+// höchster Punkt nahe der Mittellinie an den Messstellen (relativ zum Porträt-Sockel), damit die Hand auf dem Rücken
+// aufliegt statt einzusinken
+function backProfile(rig) {
+  const h = rig ? CREATURES[rig.id].h : 1.45, out = BACK_Z.map(() => -1e9), v = new THREE.Vector3();
+  if (!rig) return out.map(() => h * .62);
+  rig.model.updateMatrixWorld(true);
+  rig.model.traverse(m => {
+    if (!m.isSkinnedMesh || m.userData.shell) return;
+    m.skeleton.update(); const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 2) {
+      m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); if (Math.abs(v.x) > .12 * h) continue;
+      BACK_Z.forEach((z, k) => { if (Math.abs(v.z - z * h) < .07 * h && v.y > out[k]) out[k] = v.y; });
+    }
+  });
+  const fur = rig.model.userData.fur ? FUR.len * 1.3 : 0, py = portrait.pivot.position.y;
+  return out.map(y => (y > -1e8 ? y - py : h * .62) + fur);
+}
+function backAt(A, z, h) { // Rückenhöhe an Längsposition z (linear zwischen den Messstellen)
+  const f = clamp((z / h - BACK_Z[0]) / (BACK_Z[1] - BACK_Z[0]), 0, BACK_Z.length - 1.001), i = Math.floor(f);
+  return A.back[i] + (A.back[i + 1] - A.back[i]) * (f - i);
+}
 function updateHandAnim(dt, t) {
   // im Porträt steht das Tier im Ursprung und schaut nach +Z
   const A = handAnim, C = CREATURES[fox.kind], hand = portrait.hand; A.t += dt;
-  const back = portrait.pivot.position.y + C.h * .62, s = clamp(C.h / 2.4, .5, 1);
+  const s = clamp(C.h / 2.4, .5, 1);
   const ease = x => x * x * (3 - 2 * x), seg = (a, b) => clamp((A.t - a) / (b - a), 0, 1);
   let along = 0, lift = 0, tilt = 0, pose = HAND_POSES.relax;
   if (A.kind === 'pet') {
     // herabsinken, drei Striche vom Nacken zum Rücken, wieder abheben
     const down = ease(seg(0, .45)), up = ease(seg(1.75, 2.1)), stroke = seg(.45, 1.75);
     along = .25 - (stroke * 3 % 1) * .5; lift = (1 - down) * 1.4 + up * 1.4 + Math.sin(stroke * 3 * Math.PI) ** 2 * .06;
-    tilt = -.15; pose = { curl: .25 + Math.sin(A.t * 9) * .08, thumb: .2, spread: .3, point: 0 };
+    tilt = -.32; pose = { curl: .25 + Math.sin(A.t * 9) * .08, thumb: .2, spread: .3, point: 0 };
     if (stroke > 0 && A.hearts < 3 && A.t > .55 + A.hearts * .43) { A.hearts++; floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, '♥', 'love'); }
   } else {
     // ausholen, schnell zuschlagen, zurückziehen
@@ -621,7 +643,9 @@ function updateHandAnim(dt, t) {
   }
   if (A.hit && A.t >= HAND_HIT[A.kind]) { A.hit(); A.hit = null; }
   hand.g.visible = true; hand.g.scale.setScalar(s);
-  hand.g.position.set(0, back + .12 * s + lift, along * C.h);
+  // Handfläche liegt etwa 0,07 (Handmaß) über ihrem Ursprung auf: so knapp über Rücken bzw. Fell
+  const back = portrait.pivot.position.y + backAt(A, along * C.h, C.h);
+  hand.g.position.set(0, back + .07 * s + lift, along * C.h);
   hand.g.rotation.set(tilt, Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
   poseHand(hand, pose, dt, t, 18);
   if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
@@ -824,11 +848,17 @@ const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THR
 const heldObjs = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
 rootBall.castShadow = true; rootBall.visible = false; scene.add(rootBall);
+// Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
+const TREE_H = new THREE.Box3().setFromObject(gTreeA.scene).getSize(new THREE.Vector3()).y, tA = new THREE.Vector2(), tB = new THREE.Vector2();
+function toScreen(x, y, z, out) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return out.set((tmpV.x + 1) / 2 * r.width + r.left, (1 - tmpV.y) / 2 * r.height + r.top); }
 function treeAt(cx, cy) {
-  let best = null, bd = 46;
+  let best = null, bd = 1e9;
   for (const t of trees) {
     if (!t.alive || t.gone || t.g < .6) continue;
-    const d = screenDist(t.x, heightAt(t.x, t.z) + .8 * t.g * ST, t.z, cx, cy); if (d < bd) { bd = d; best = t; }
+    const y = heightAt(t.x, t.z); toScreen(t.x, y, t.z, tA); toScreen(t.x, y + TREE_H * ST * t.g, t.z, tB);
+    const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
+    const d = Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u), tol = Math.max(26, Math.sqrt(L2) * .38);
+    if (d < tol && d / tol < bd) { bd = d / tol; best = t; }
   }
   return best;
 }
