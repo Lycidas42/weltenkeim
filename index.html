@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta name="wk-version" content="0.2.7"><!-- muss VERSION in sw.js entsprechen (der Workflow prüft das) -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14292b">
 <meta name="description" content="Idle-Gottspiel: Eine Insel, ein Dorf, deine Hand und ein Tiergeist, der von dir lernt.">
@@ -408,15 +409,21 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 </script>
 <script type="module" src="game.js"></script>
 <script>
-// Service Worker: offline spielen. Neue Versionen übernimmt er sofort; dann erscheint ein Hinweis mit „Neu laden“.
-// Läuft das Spiel lange offen (z. B. auf dem Handy), wird alle 15 Minuten und beim Zurückkehren nach Updates gesucht.
+// Service Worker: offline spielen. Neue Versionen übernimmt er sofort. Ob die laufende Seite älter ist als der
+// Service Worker, erfährt sie per Nachricht (Versionsnummer); nur dann erscheint der Hinweis mit „Neu laden“.
+// Läuft das Spiel lange offen (z. B. auf dem Handy), wird jede Minute und beim Zurückkehren nach Updates gesucht.
 if ('serviceWorker' in navigator) addEventListener('load', () => {
-  const had = !!navigator.serviceWorker.controller, box = document.getElementById('update');
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) box.hidden = false; });
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    const check = () => reg.update().catch(() => {});
-    setInterval(check, 15 * 60 * 1000);
+  const SW = navigator.serviceWorker, box = document.getElementById('update'), PAGE_V = document.querySelector('meta[name="wk-version"]').content;
+  const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+  const ask = () => { if (SW.controller) SW.controller.postMessage({ type: 'version' }); };
+  SW.addEventListener('message', e => { if (e.data && e.data.type === 'version' && newer(e.data.v, PAGE_V)) box.hidden = false; });
+  SW.addEventListener('controllerchange', ask);
+  SW.register('sw.js').then(reg => {
+    const check = () => reg.update().then(ask).catch(() => {});
+    setInterval(check, 60 * 1000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    addEventListener('focus', check); addEventListener('online', check);
+    ask();
   }).catch(() => {});
   document.getElementById('updReload').addEventListener('click', () => { dispatchEvent(new Event('wk-save')); location.reload(); });
   document.getElementById('updLater').addEventListener('click', () => { box.hidden = true; });

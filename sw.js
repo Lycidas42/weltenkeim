@@ -74,6 +74,9 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting()));
 });
 
+// Die Seite fragt nach der Version, um zu erkennen, ob sie veraltet ist (Hinweis „Neu laden“)
+self.addEventListener('message', e => { if (e.data && e.data.type === 'version' && e.source) e.source.postMessage({ type: 'version', v: VERSION }); });
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()

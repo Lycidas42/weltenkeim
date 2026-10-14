@@ -40,6 +40,13 @@ jobs:
           done
           exit $missing
 
+      - name: Version in index.html und sw.js gleich
+        # Der Update-Hinweis vergleicht die Version der Seite (meta wk-version) mit der des Service Workers.
+        run: |
+          sw=$(grep -oE "const VERSION = '[^']+'" sw.js | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          page=$(grep -oE 'name="wk-version" content="[^"]+"' index.html | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          if [ "$sw" != "$page" ]; then echo "::error::Version sw.js ($sw) und index.html ($page) unterschiedlich"; exit 1; fi
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
