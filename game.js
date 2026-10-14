@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}) });
@@ -303,13 +303,12 @@ const fox = { x: -6, z: 4, h: 0, state: 'idle', timer: 4, next: null, tx: 0, tz:
 const foxPivot = new THREE.Group(); scene.add(foxPivot);
 const creatureCache = { [S.creature]: gCreature };
 let foxModel = null, foxMixer = null, foxActs = {};
-function useCreature(id, gltf, hd = false) {
-  const C = CREATURES[id];
-  if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
-  const model = shadowify(gltf.scene);
+// Modell eines Tiers aufbereiten: skalieren, nach +Z ausrichten, Animationen (inkl. Posen) und ggf. Fell/Augen.
+// Liefert ein „Rig“ { model, mixer, acts, cur }; genutzt für die Welt und für das Porträt im Panel.
+function buildRig(id, gltf, fur = false) {
+  const C = CREATURES[id], model = shadowify(gltf.scene);
   model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
-  model.userData.hd = hd;
-  if (hd && !model.userData.fur) model.userData.fur = addFur(model);
+  if (fur && !model.userData.fur) model.userData.fur = addFur(model);
   model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0); model.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
@@ -318,15 +317,27 @@ function useCreature(id, gltf, hd = false) {
   const head = model.getObjectByName(C.head || 'Head'), box = new THREE.Box3().setFromObject(model), c = box.getCenter(new THREE.Vector3());
   if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
   model.position.y = -box.min.y;
-  foxModel = model; foxMixer = new THREE.AnimationMixer(model); foxActs = {};
-  for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) foxActs[k] = foxMixer.clipAction(clip); }
-  for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!foxActs[k] && foxActs[f]) { foxActs[k] = foxMixer.clipAction(foxActs[f].getClip().clone()); foxActs[k].timeScale = ts; }
-  if (foxActs.walk) foxActs.walk.timeScale = C.ws;
-  if (C.rest && foxActs.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, foxActs.idle.getClip(), C.rest))) foxActs[k] = foxMixer.clipAction(clip);
-  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast']) if (foxActs[k]) { foxActs[k].setLoop(THREE.LoopOnce); foxActs[k].clampWhenFinished = true; }
+  const mixer = new THREE.AnimationMixer(model), acts = {};
+  for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) acts[k] = mixer.clipAction(clip); }
+  for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!acts[k] && acts[f]) { acts[k] = mixer.clipAction(acts[f].getClip().clone()); acts[k].timeScale = ts; }
+  if (acts.walk) acts.walk.timeScale = C.ws;
+  if (C.rest && acts.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, acts.idle.getClip(), C.rest))) acts[k] = mixer.clipAction(clip);
+  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
-  if (C.eyes && head && foxActs.idle && !model.userData.eyes) { model.userData.eyes = true; foxActs.idle.reset().play(); foxMixer.update(0); addEyes(model, head, C.eyes); foxActs.idle.stop(); }
-  foxPivot.add(model);
+  if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
+  return { model, mixer, acts, cur: null, id };
+}
+// Animation auf einem Rig weich überblenden; restart spielt eine laufende Animation von vorn
+function rigPlay(rig, name, restart = false) {
+  if (!rig) return; const a = rig.acts[name]; if (!a) return;
+  if (rig.cur === name) { if (restart) a.reset().play(); return; }
+  a.reset().fadeIn(.25).play(); if (rig.cur && rig.acts[rig.cur]) rig.acts[rig.cur].fadeOut(.25); rig.cur = name;
+}
+function useCreature(id, gltf) {
+  if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
+  const rig = buildRig(id, gltf);
+  foxModel = rig.model; foxMixer = rig.mixer; foxActs = rig.acts;
+  foxPivot.add(foxModel);
   fox.kind = id; fox.cur = null; fox.once = 0;
   foxAnim('idle');
 }
@@ -473,67 +484,77 @@ function addEyes(model, head, e) {
 function foxAnim(name) {
   if (fox.cur === name) return; const a = foxActs[name]; if (!a) return;
   a.reset().fadeIn(.25).play(); if (fox.cur && foxActs[fox.cur]) foxActs[fox.cur].fadeOut(.25); fox.cur = name;
+  rigPlay(portrait.rig, name);
 }
 // einmalige Reaktion (Treffer, Freudensprung), danach übernimmt wieder der Zustand
-function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; }
+function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; rigPlay(portrait.rig, name, true); }
 let creatureLoading = null;
 async function setCreature(id) {
   if (!CREATURES[id] || id === fox.kind || creatureLoading) return;
   creatureLoading = id; renderForms();
   try {
-    const hd = closeUp && !!CREATURES[id].hd, g = await loadCreature(id, hd);
-    useCreature(id, g, hd); S.creature = id; save();
-    floatText(fox.x, CREATURES[id].h + .6, fox.z, `Ruun wird ${CREATURES[id].label}`, 's');
+    const g = await loadCreature(id);
+    useCreature(id, g); S.creature = id; save(); if (!$('sheetFox').hidden) showPortrait();
+    floatText(fox.x, CREATURES[id].h + .6, fox.z, `${S.name} wird ${CREATURES[id].label}`, 's');
   } catch (e) { toast('Diese Gestalt konnte nicht geladen werden. Bist du offline?'); }
   creatureLoading = null; renderForms(); renderFox();
 }
-useCreature(S.creature, gCreature);
-// Nahansicht: Ist das Ruun-Panel offen, fährt die Kamera vor Ruun. Hat die Gestalt ein Fell-Modell (hd),
-// wird es dafür eingewechselt; in der Weltansicht bleibt das schlanke Modell.
-let closeUp = false, camBack = 0, closeAz = 0, viewOff = 0;
-const camSaved = { pos: new THREE.Vector3(), target: new THREE.Vector3() }, camLook = new THREE.Vector3(), camWant = new THREE.Vector3(), lookWant = new THREE.Vector3();
-async function loadCreature(id, hd) {
-  const C = CREATURES[id], key = hd ? id + ':hd' : id;
-  return creatureCache[key] || (creatureCache[key] = await load(`animals/${hd ? C.hd : C.file}.glb`));
+async function loadCreature(id) {
+  return creatureCache[id] || (creatureCache[id] = await load(`animals/${CREATURES[id].file}.glb`));
 }
-async function swapCreatureModel() {
-  const id = fox.kind, hd = closeUp && !!CREATURES[id].hd;
-  if (!!foxModel.userData.hd === hd) return;
+// Porträt im Panel: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das Fell-Modell),
+// die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, damit die Weltkamera unberührt bleibt.
+const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, hand: null, look: new THREE.Vector3(), dist: 4 };
+{
+  const P = portrait;
+  P.scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x4d6b3c, 1.4));
+  const key = new THREE.DirectionalLight(0xfff0d6, 2.2); key.position.set(2.5, 4, 3); P.scene.add(key);
+  const rim = new THREE.DirectionalLight(0xbfe0ff, 1.1); rim.position.set(-3, 2.5, -3); P.scene.add(rim);
+  P.ground = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5b8a46, roughness: 1 }));
+  P.scene.add(P.ground, P.pivot);
+  P.hand = makeHand(); P.scene.add(P.hand.g);
+}
+async function showPortrait() {
+  const P = portrait, id = fox.kind, C = CREATURES[id];
+  if ((P.rig && P.rig.id === id) || P.loading === id) return;
+  if (!P.renderer) {
+    P.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    P.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('foxPortrait').appendChild(P.renderer.domElement);
+  }
+  P.loading = id;
   try {
-    const g = await loadCreature(id, hd);
-    if (id === fox.kind && (closeUp && !!CREATURES[id].hd) === hd) useCreature(id, g, hd);
-  } catch (e) { /* ohne Fell-Modell bleibt das schlanke Modell */ }
+    const g = P.cache[id] || (P.cache[id] = await load(`animals/${C.hd || C.file}.glb`));
+    if (P.loading !== id || fox.kind !== id) return;
+    if (P.rig) P.pivot.remove(P.rig.model);
+    P.rig = buildRig(id, g, !!C.hd); P.pivot.add(P.rig.model);
+    // Kamera schräg von vorn, Bildausschnitt an die Größe des Tiers anpassen
+    const size = new THREE.Box3().setFromObject(P.rig.model).getSize(new THREE.Vector3());
+    P.ground.scale.setScalar(Math.max(size.x, size.z) * .75);
+    P.look.set(0, size.y * .45, 0); P.dist = Math.max(size.y, size.z * .8) * 1.75;
+    rigPlay(P.rig, fox.cur || 'idle');
+  } catch (e) { /* ohne Porträt bleibt das Panel nutzbar */ }
+  finally { if (P.loading === id) P.loading = null; }
 }
-function setCloseUp(on) {
-  closeUp = on;
-  if (on) {
-    if (camBack <= 0) { camSaved.pos.copy(camera.position); camSaved.target.copy(controls.target); camLook.copy(controls.target); }
-    camBack = 0; controls.enabled = false; closeAz = fox.h + .55;
-    // Ruun hält inne und schaut her, sofern er nicht gerade Holz trägt, spielt oder arbeitet
-    if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) { if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null; foxIdle(1e9); }
-  } else { camBack = 1; if (fox.state === 'idle' && fox.timer > 1e8) foxIdle(1.5); }
-  swapCreatureModel();
+function renderPortrait(dt, t) {
+  const P = portrait; if (!P.rig || !P.renderer) return;
+  const el = $('foxPortrait'), w = el.clientWidth, h = el.clientHeight; if (!w || !h) return;
+  const sz = P.renderer.getSize(tmpV2); if (sz.x !== w || sz.y !== h) P.renderer.setSize(w, h);
+  P.cam.aspect = w / h; P.cam.updateProjectionMatrix();
+  const az = .55 + Math.sin(t * .15) * .12; // ganz langsames Schwenken
+  P.cam.position.set(Math.sin(az) * P.dist, P.look.y + P.dist * .25, Math.cos(az) * P.dist); P.cam.lookAt(P.look);
+  P.pivot.position.y = Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .3 * CREATURES[P.rig.id].h / 1.45;
+  P.rig.mixer.update(dt);
+  if (P.rig.model.userData.fur) updateFur(P.rig.model.userData.fur, t);
+  P.renderer.render(P.scene, P.cam);
 }
-function closeUpCamera(dt) {
-  const C = CREATURES[fox.kind], gy = surfaceAt(fox.x, fox.z), k = 1 - Math.exp(-dt * (closeUp ? 3.5 : 5));
-  // Bild um die halbe Panelhöhe nach oben schieben, damit Ruun nicht verdeckt wird
-  viewOff += ((closeUp ? $('sheetFox').getBoundingClientRect().height * .5 : 0) - viewOff) * k;
-  if (closeUp) {
-    const d = 2.2 + C.h * 1.6;
-    camWant.set(fox.x + Math.sin(closeAz) * d, gy + C.h * .75 + .3, fox.z + Math.cos(closeAz) * d);
-    lookWant.set(fox.x, gy + C.h * .45, fox.z);
-  } else { camWant.copy(camSaved.pos); lookWant.copy(camSaved.target); camBack -= dt; }
-  camera.position.lerp(camWant, k); camLook.lerp(lookWant, k); camera.lookAt(camLook);
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (viewOff > .5) camera.setViewOffset(w, h, 0, viewOff, w, h); else camera.clearViewOffset();
-  if (!closeUp && camBack <= 0) { camera.position.copy(camSaved.pos); controls.target.copy(camSaved.target); camera.clearViewOffset(); viewOff = 0; controls.enabled = true; controls.update(); }
-}
+const tmpV2 = new THREE.Vector2();
+useCreature(S.creature, gCreature);
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
 const ACT_DESC = { help: 'Holz zum Brunnen gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 
 /* ------------------------------------------------------------------ hand */
-const hand = (() => {
+function makeHand() {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
   const mat = new THREE.MeshStandardMaterial({ color: 0xebb88f, roughness: .55, flatShading: true, emissive: 0x4a2208, emissiveIntensity: .22 });
   const add = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
@@ -549,9 +570,41 @@ const hand = (() => {
   const th = new THREE.Group(); th.position.set(.34, -.02, .08); th.rotation.y = -.7; inner.add(th);
   add(new THREE.BoxGeometry(.14, .14, .34), th, 0, 0, -.17);
   inner.rotation.x = .18;
-  g.visible = false; scene.add(g);
+  g.visible = false;
   return { g, fingers, th, curl: .1, pos: new THREE.Vector3(0, 3, 0), prev: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(0, 2, 0) };
-})();
+}
+const hand = makeHand(); scene.add(hand.g);
+
+// Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
+const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
+const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: .55, slap: .42 };
+function playHand(kind, onHit) { Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0 }); }
+function updateHandAnim(dt, t) {
+  // im Porträt steht das Tier im Ursprung und schaut nach +Z
+  const A = handAnim, C = CREATURES[fox.kind], hand = portrait.hand; A.t += dt;
+  const back = portrait.pivot.position.y + C.h * .62, s = clamp(C.h / 2.4, .5, 1);
+  const ease = x => x * x * (3 - 2 * x), seg = (a, b) => clamp((A.t - a) / (b - a), 0, 1);
+  let along = 0, lift = 0, curl = .15, tilt = 0;
+  if (A.kind === 'pet') {
+    // herabsinken, drei Striche vom Nacken zum Rücken, wieder abheben
+    const down = ease(seg(0, .45)), up = ease(seg(1.75, 2.1)), stroke = seg(.45, 1.75);
+    along = .25 - (stroke * 3 % 1) * .5; lift = (1 - down) * 1.4 + up * 1.4 + Math.sin(stroke * 3 * Math.PI) ** 2 * .06;
+    curl = .22; tilt = -.15;
+    if (stroke > 0 && A.hearts < 3 && A.t > .55 + A.hearts * .43) { A.hearts++; floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, '♥', 'love'); }
+  } else {
+    // ausholen, schnell zuschlagen, zurückziehen
+    const raise = ease(seg(0, .3)), swat = seg(.3, .42), away = ease(seg(.55, .95));
+    lift = raise * .7 - swat * swat * .62 + away * 1.2; along = -.1; curl = .05; tilt = raise * .5 - swat * .7;
+  }
+  if (A.hit && A.t >= HAND_HIT[A.kind]) { A.hit(); A.hit = null; }
+  hand.g.visible = true; hand.g.scale.setScalar(s);
+  hand.g.position.set(0, back + .12 * s + lift, along * C.h);
+  hand.g.rotation.set(tilt, Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
+  hand.curl += (curl - hand.curl) * (1 - Math.exp(-dt * 14));
+  hand.fingers.forEach(([a, b], i) => { a.rotation.x = -hand.curl * 1.1 - Math.sin(t * 6 + i) * .04; b.rotation.x = -hand.curl * 1.3; });
+  hand.th.rotation.x = -hand.curl * .8;
+  if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
+}
 
 /* ------------------------------------------------------------------ UI helpers */
 const fxLayer = $('fx'); const floats = [];
@@ -627,7 +680,7 @@ function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'i
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.tx = x; fox.tz = z; fox.next = next; }
 function foxFinish(a) {
   fox.last = a; fox.lastT = clock.elapsedTime; foxIdle(5 + Math.random() * 4); fox.act = null;
-  toast(`Ruun hat ${ACT_DESC[a]}. Lob oder Tadel?`, 4.5);
+  toast(`${S.name} hat ${ACT_DESC[a]}. Lob oder Tadel?`, 4.5);
   $('btnFox').classList.add('pulse');
   renderFox();
 }
@@ -650,9 +703,7 @@ function updateFox(dt, t) {
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
   if (fox.once > 0) fox.once -= dt;
   switch (fox.state) {
-    case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose();
-      if (closeUp) { let dh = closeAz - .25 - fox.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); fox.h += dh * Math.min(1, dt * 2.5); }
-      break;
+    case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.6); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
@@ -689,7 +740,6 @@ function updateFox(dt, t) {
   foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
   foxPivot.rotation.y = fox.h;
   foxMixer.update(dt);
-  if (foxModel.userData.fur) updateFur(foxModel.userData.fur, t);
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)
 const GLOW_T = 2.3; let glowT = 0;
@@ -704,15 +754,19 @@ function foxCast(x, z) {
 }
 function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
-  if (fox.state === 'rest') foxIdle(2); // aus dem Liegen aufspringen
-  const top = CREATURES[fox.kind].h + .5;
-  if (kind === 'pet') { foxOnce('jump'); floatText(fox.x, top, fox.z, '♥', 'love'); } else { foxOnce('hit'); fox.hop = .5; floatText(fox.x, top, fox.z, '!', 'w'); }
+  if (handAnim.kind) return; // eine Geste nach der anderen
+  // die Hand führt die Geste aus, das Tier reagiert bei der Berührung
+  playHand(kind, () => {
+    if (fox.state === 'rest') foxIdle(2); // aus dem Liegen aufspringen
+    const top = foxPivot.position.y + CREATURES[fox.kind].h + .5;
+    if (kind === 'pet') { foxOnce('idle2'); floatText(fox.x, top, fox.z, '♥', 'love'); } else { foxOnce('hit'); fox.hop = .5; floatText(fox.x, top, fox.z, '!', 'w'); }
+  });
   if (a && t - fox.lastT < 25) {
     S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
     const sum = S.w.help + S.w.play + S.w.mischief; for (const k in S.w) S.w[k] /= sum;
-    toast(kind === 'pet' ? `Ruun lernt: mehr ${ACT_LABEL[a]}.` : `Ruun lernt: weniger ${ACT_LABEL[a]}.`);
+    toast(kind === 'pet' ? `${S.name} lernt: mehr ${ACT_LABEL[a]}.` : `${S.name} lernt: weniger ${ACT_LABEL[a]}.`);
     fox.last = null; $('btnFox').classList.remove('pulse');
-  } else toast(kind === 'pet' ? 'Ruun schmiegt sich an deine Hand.' : 'Ruun duckt sich und weiß nicht, wofür.');
+  } else toast(kind === 'pet' ? `${S.name} schmiegt sich an deine Hand.` : `${S.name} duckt sich und weiß nicht, wofür.`);
   renderFox(); save();
 }
 
@@ -791,7 +845,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
   blick: 'Ziehen dreht die Welt. Zwei Finger oder Mausrad: verschieben und zoomen.',
-  hand: 'Bewohner packen und werfen. Ruun antippen, um ihn zu erziehen.',
+  get hand() { return `Bewohner packen und werfen. ${S.name} antippen, um ihn zu erziehen.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -810,14 +864,18 @@ document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener(
 
 /* ------------------------------------------------------------------ sheets */
 function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidden = true); $('app').classList.remove('sheet-open'); }
-function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetFox') renderFox(); } }
+function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
 $('btnFox').addEventListener('click', () => openSheet('sheetFox'));
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 $('btnPet').addEventListener('click', () => reinforce('pet'));
 $('btnSlap').addEventListener('click', () => reinforce('slap'));
-let focusT = 0; $('btnFocus').addEventListener('click', () => { focusT = 1.2; closeSheets(); });
+// Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
+let follow = false;
+function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
+$('btnFocus').addEventListener('click', () => { follow = !follow; renderFollow(); if (follow) closeSheets(); });
+$('btnFollow').addEventListener('click', () => { follow = false; renderFollow(); });
 let resetArmed = false;
 $('btnReset').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Wirklich zurücksetzen?'; return; }
@@ -839,13 +897,36 @@ function renderShrine() {
 function renderFox() {
   $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
   const t = clock.elapsedTime;
-  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat Ruun ${ACT_DESC[fox.last]}. Deine Reaktion prägt ihn.` : 'Ruun streift umher. Warte auf seine nächste Tat, dann lobe oder tadle ihn.';
-  $('foxKind').textContent = `Dein ${CREATURES[fox.kind].spirit}`;
+  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${ACT_DESC[fox.last]}. Deine Reaktion prägt ihn.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ihn.`;
+  $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
   renderForms();
 }
 // Buttons nur einmal anlegen und danach aktualisieren: renderFox läuft alle 0,25 s,
 // ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
 $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}">${c.label}</button>`).join('');
+// kurze Beschreibung des aktuellen Zustands für das Panel
+function foxDoing() {
+  switch (fox.state) {
+    case 'walk':
+      if (fox.next === 'store') return 'trägt Holz zum Brunnen';
+      if (fox.next === 'play') return 'läuft zum Dorfplatz, um zu spielen';
+      return fox.act === 'help' ? 'läuft zu einem Baum, um Holz zu holen' : 'schleicht zu einem Baum und führt etwas im Schilde';
+    case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
+    case 'play': return 'tollt über den Dorfplatz';
+    case 'rest': return 'hat sich hingelegt und döst';
+    case 'cast': return 'wirkt mit dir ein Wunder';
+    default: return fox.idleA === 'eat' ? 'schnuppert am Boden' : 'schaut sich um';
+  }
+}
+// Name an allen Stellen der Oberfläche setzen
+function renderName() {
+  $('btnFox').textContent = S.name; $('sheetFox').setAttribute('aria-label', S.name);
+  if (document.activeElement !== $('foxName')) $('foxName').value = S.name;
+  $('btnFollow').textContent = `Folgt ${S.name} ✕`;
+  if (tool === 'hand') $('hint').textContent = HINTS.hand;
+}
+$('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim().slice(0, 16) || 'Ruun'; renderName(); renderFox(); save(); });
+$('foxName').addEventListener('keydown', e => { if (e.key === 'Enter') $('foxName').blur(); });
 function renderForms() {
   for (const b of $('foxForms').children) {
     const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : CREATURES[id].label;
@@ -876,7 +957,7 @@ const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.M
 let uiT = 0, secT = 0, birthT = 0;
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-setTool('hand');
+setTool('hand'); renderName();
 
 function frame() {
   const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
@@ -948,6 +1029,7 @@ function frame() {
   updateFox(dt, t);
 
   // hand
+  if (handAnim.kind) updateHandAnim(dt, t);
   const showHand = tool !== 'blick' && handShown && hitOk;
   hand.g.visible = showHand;
   if (showHand) {
@@ -977,16 +1059,12 @@ function frame() {
   { const p = wGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = wBase[i * 3], z = wBase[i * 3 + 2]; p.setY(i, Math.sin(x * .45 + t * 1.1) * .05 + Math.cos(z * .5 + t * .9) * .05 - .02); } p.needsUpdate = true; }
 
   // camera
-  if (!$('sheetFox').hidden !== closeUp) setCloseUp(!closeUp);
-  if (closeUp || camBack > 0) closeUpCamera(dt);
-  else {
-  if (focusT > 0) { focusT -= dt; const k = 1 - Math.exp(-dt * 4); const nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
+  if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
     camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
   const tr = Math.hypot(controls.target.x, controls.target.z);
   if (tr > 18) { const k = 18 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
   controls.target.y = 1;
   controls.update();
-  }
 
   // floating texts
   const rect = canvas.getBoundingClientRect();
@@ -1014,6 +1092,7 @@ function frame() {
   }
 
   renderer.render(scene, camera);
+  if (!$('sheetFox').hidden) renderPortrait(dt, t);
   requestAnimationFrame(frame);
 }
 $('loading').classList.add('gone');

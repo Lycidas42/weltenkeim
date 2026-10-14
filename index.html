@@ -108,6 +108,14 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .forms button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px}
 .forms button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
 .forms button:disabled{opacity:.6}
+/* Name des Tiergeists direkt im Titel umbenennen */
+.title-in{font:inherit;color:inherit;background:none;border:0;border-bottom:1px dashed rgba(243,192,77,.45);padding:0 2px 2px;margin:0;width:min(11ch,60vw);user-select:text;-webkit-user-select:text}
+.title-in:focus{outline:none;border-bottom:1px solid var(--glaube)}
+.portrait{height:clamp(130px,23vh,210px);margin:8px -16px 10px;background:radial-gradient(ellipse at 50% 35%,#3d6a74 0%,#1d3638 75%);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.portrait canvas{display:block;width:100%;height:100%}
+.now{display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 10px;color:var(--ink)}
+.now .dot{width:8px;height:8px;border-radius:50%;background:var(--soul);flex:none;animation:pulse 1.6s ease-out infinite;box-shadow:0 0 0 0 rgba(165,216,201,.7)}
+.act[aria-pressed="true"]{background:var(--soul);color:#10302a;border-color:var(--soul)}
 .bar{display:grid;grid-template-columns:7.5em 1fr 3em;gap:8px;align-items:center;font-size:13.5px}
 .bar .track{height:9px;background:rgba(244,239,225,.12);border-radius:9px;overflow:hidden}
 .bar .fill{height:100%;border-radius:9px;transition:width .5s}
@@ -142,6 +150,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     </div>
     <div class="top-actions">
       <button class="chip" id="btnShrine">Schrein</button>
+      <button class="chip" id="btnFollow" hidden aria-pressed="true">Folgen ✕</button>
       <button class="chip" id="btnFox">Ruun</button>
       <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
     </div>
@@ -156,17 +165,18 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   </section>
 
   <section class="sheet" id="sheetFox" hidden aria-label="Ruun">
-    <header><h2>Ruun</h2><button class="x" data-close aria-label="Schließen">×</button></header>
-    <p class="sub"><span id="foxKind">Dein Fuchsgeist</span> handelt selbstständig. Was du nach einer Tat lobst, tut er öfter. Was du tadelst, seltener.</p>
+    <header><h2><input class="title-in" id="foxName" maxlength="16" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Name des Tiergeists"></h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <div class="portrait" id="foxPortrait" aria-hidden="true"></div>
+    <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
     <div class="bars" id="foxBars"></div>
     <div class="last" id="foxLast"></div>
     <div class="row">
       <button class="act pet" id="btnPet">Streicheln</button>
       <button class="act" id="btnSlap">Klaps</button>
-      <button class="act" id="btnFocus">Zu Ruun</button>
+      <button class="act" id="btnFocus" aria-pressed="false">Folgen</button>
     </div>
     <p class="formsLbl">Gestalt</p>
-    <div class="forms" id="foxForms" role="group" aria-label="Gestalt von Ruun"></div>
+    <div class="forms" id="foxForms" role="group" aria-label="Gestalt"></div>
   </section>
 
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">
@@ -174,7 +184,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="credits">
       <p>Prototyp: Idle-Dorf trifft Gottspiel. Bewohner fällen Holz, beten am Tempel und erzeugen so Glauben, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
       <ul>
-        <li><b>Hand</b>: Bewohner packen und werfen. Ruun antippen, um ihn zu erziehen.</li>
+        <li><b>Hand</b>: Bewohner packen und werfen. Deinen Tiergeist antippen, um ihn zu erziehen.</li>
+        <li><b>Tiergeist</b>: handelt selbstständig. Was du nach einer Tat streichelst, tut er öfter, was du mit einem Klaps tadelst, seltener. Im Panel kannst du ihn umbenennen, seine Gestalt wählen und ihm folgen.</li>
         <li><b>Formen</b>: Land heben oder senken.</li>
         <li><b>Wunder</b>: Regen lässt Wälder wachsen, Eile beschleunigt Bewohner.</li>
         <li><b>Blick</b>: Drehen. Zwei Finger verschieben und zoomen.</li>
@@ -182,7 +193,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <p><b>Assets</b></p>
       <ul>
         <li>Gebäude, Bäume, Felsen, Wolken: KayKit Medieval Hexagon Pack von Kay Lousberg (kaylousberg.com), CC0.</li>
-        <li>Ruun (Fuchs, Wolf, Hirsch, Stier, Alpaka, Katze): Animated Animal Pack und Animal Pack Vol.2 von Quaternius (quaternius.com), CC0. Der Fell-Fuchs der Nahansicht ist daraus in Blender abgeleitet.</li>
+        <li>Tiergeist (Fuchs, Wolf, Hirsch, Stier, Alpaka, Katze): Animated Animal Pack und Animal Pack Vol.2 von Quaternius (quaternius.com), CC0. Der Fell-Fuchs der Nahansicht ist daraus in Blender abgeleitet.</li>
         <li>Terrain, Wasser, Bewohner und Hand sind im Code erzeugt.</li>
       </ul>
       <div class="row"><button class="act" id="btnReset">Spielstand zurücksetzen</button></div>
