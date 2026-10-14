@@ -17,6 +17,11 @@ Fuchs, Wolf, Hirsch, Stier und Alpaka (`Fox.glb`, `Wolf.glb`, `Stag.glb`, `Bull.
 - Quelle: https://poly.pizza/bundle/Animated-Animal-Pack-ILAPXeUYiS
 - Bearbeitung: doppelte und ungenutzte Animationen entfernt (gltf-transform), um die Dateigröße zu halbieren.
 
+Fell-Prototyp (`Fox_HD.glb`, Quelle `../source/Fox_HD.blend`):
+
+- Abgeleitet aus dem Quaternius-Fuchs (CC0): Vertices verschmolzen, einmal unterteilt, glatt schattiert, UV-Koordinaten und Fellmaske (`_FUR`) ergänzt, in Blender 5.2.
+- Nur für die Vorschau `dev/fur.html`, noch nicht im Spiel.
+
 Katze (`Cat.glb`):
 
 - Animal Pack Vol.2 von Quaternius, https://quaternius.com

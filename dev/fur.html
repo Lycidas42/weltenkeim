@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fell-Prototyp</title>
+<style>
+  :root{--panel:rgba(18,38,40,.86);--ink:#f4efe1;--dim:#c4c9bd;--gold:#f3c04d}
+  html,body{margin:0;height:100%;background:#a8d3e2;color:var(--ink);font:14px/1.3 system-ui,sans-serif;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .ui{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));background:var(--panel);border-radius:12px;padding:10px 12px;display:grid;gap:6px;width:min(260px,calc(100vw - 24px))}
+  .ui h1{margin:0 0 2px;font-size:15px;color:var(--gold)}
+  .ui label{display:grid;grid-template-columns:72px 1fr 38px;gap:6px;align-items:center;color:var(--dim)}
+  .ui input[type=range]{width:100%}
+  .ui .row{display:flex;gap:6px;flex-wrap:wrap}
+  .ui button{background:transparent;color:var(--ink);border:1px solid rgba(244,239,225,.25);border-radius:999px;padding:5px 10px;font:inherit}
+  .ui button[aria-pressed=true]{background:var(--gold);color:#2a1d05;border-color:var(--gold)}
+  .ui small{color:var(--dim)}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three-0.170.0/build/three.module.js","three/addons/":"../vendor/three-0.170.0/examples/jsm/"}}</script>
+</head><body>
+<div class="ui">
+  <h1>Fell-Prototyp (Fuchs)</h1>
+  <label>Schichten <input id="n" type="range" min="0" max="40" step="1" value="24"><span></span></label>
+  <label>Länge <input id="len" type="range" min="0" max="0.12" step="0.002" value="0.045"><span></span></label>
+  <label>Dichte <input id="den" type="range" min="50" max="1500" step="10" value="520"><span></span></label>
+  <label>Schwere <input id="grav" type="range" min="0" max="1" step="0.02" value="0.35"><span></span></label>
+  <div class="row" id="anims"></div>
+  <div class="row"><button id="cmp" aria-pressed="false">Low-Poly daneben</button><button id="wind" aria-pressed="true">Wind</button></div>
+  <small id="info"></small>
+</div>
+<script type="module">
+// Prototyp: Shell-Fur auf dem geglätteten Fuchs (Fox_HD.glb, in Blender aus Fox.glb erzeugt).
+// Jede Schicht ist dieselbe Skinned-Geometrie, im Vertex-Shader entlang der Normalen nach außen geschoben;
+// der Fragment-Shader lässt nur Haarquerschnitte stehen, die nach außen dünner werden.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa8d3e2);
+const camera = new THREE.PerspectiveCamera(35, 1, .05, 100); camera.position.set(2.2, 1.3, 2.8);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, .7, 0); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x6b8a4a, 1.3));
+const sun = new THREE.DirectionalLight(0xfff2dc, 2.4); sun.position.set(3, 5, 2.5); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2 }); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(4, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7fae5a, roughness: 1 }));
+ground.receiveShadow = true; scene.add(ground);
+
+const loader = new GLTFLoader(), clock = new THREE.Clock();
+const P = { n: 24, len: .045, den: 520, grav: .35, wind: true };
+const uni = { uLen: { value: 0 }, uDen: { value: P.den }, uGrav: { value: new THREE.Vector3() }, uTime: { value: 0 }, uWind: { value: 1 } };
+
+function fitModel(model, h) {
+  model.updateMatrixWorld(true);
+  const s = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  model.scale.setScalar(h / s.y); model.updateMatrixWorld(true);
+  const head = model.getObjectByName('Head'), box = new THREE.Box3().setFromObject(model), c = box.getCenter(new THREE.Vector3());
+  if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
+  model.position.y = -box.min.y;
+}
+
+// Shader-Bausteine für die Schichten
+function shellMaterial(h) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uni, { uH: { value: h } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float _fur;\nuniform float uLen, uH, uTime, uWind;\nuniform vec3 uGrav;\nvarying float vFur;\nvarying vec2 vUv2;')
+      .replace('#include <skinning_vertex>', `#include <skinning_vertex>
+        vFur = _fur; vUv2 = uv;
+        float L = uLen * _fur * 2.0 * uH;
+        vec3 sway = vec3(sin(uTime * 1.7 + position.x * 9.0), 0.0, cos(uTime * 1.3 + position.z * 7.0)) * 0.12 * uWind;
+        transformed += normalize(objectNormal) * L + (uGrav + sway) * uH * uH * uLen * 2.0 * _fur;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uDen, uH;\nvarying float vFur;\nvarying vec2 vUv2;\nfloat h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vFur < 0.02) discard;
+        vec2 g = vUv2 * uDen, id = floor(g), f = fract(g) - 0.5;
+        float r = h21(id), len = mix(0.55, 1.0, r);                 // unterschiedlich lange Haare
+        if (uH > len) discard;
+        float rad = (1.0 - uH / len) * 0.62;                        // Haar wird nach außen dünner
+        if (length(f + (vec2(h21(id + 7.1), h21(id + 3.7)) - 0.5) * 0.3) > rad) discard;
+        diffuseColor.rgb *= mix(0.72, 1.06, uH) * mix(0.92, 1.08, r); // Selbstverschattung innen, Glanz an den Spitzen`);
+  };
+  m.customProgramCacheKey = () => 'shell';
+  return m;
+}
+
+let fur = null, low = null, mixers = [], anims = {}, cur = 'Idle';
+function buildFur(gltf) {
+  const model = gltf.scene; fitModel(model, 1.45);
+  let sk = null; const parts = [];
+  model.traverse(o => { if (o.isSkinnedMesh) { sk = sk || o; parts.push(o); } });
+  // Materialfarben als Vertex-Farbe in eine Geometrie mergen -> eine Draw-Call-Gruppe pro Schicht
+  const tint = { Main_Light: new THREE.Color(0xf1ebde) }; // Brust und Schnauze cremeweiß statt grau
+  const geos = parts.map(o => {
+    const g = o.geometry.clone(), c = tint[o.material.name] || o.material.color, n = g.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+  });
+  const geo = mergeGeometries(geos);
+  for (const o of parts) o.visible = false;
+  const skinned = mat => { const m = new THREE.SkinnedMesh(geo, mat); m.position.copy(sk.position); m.quaternion.copy(sk.quaternion); m.scale.copy(sk.scale); m.bind(sk.skeleton, sk.bindMatrix); m.frustumCulled = false; sk.parent.add(m); return m; };
+  // Grundkörper: wo kein Fell ist (Augen, Nase), glänzt die Oberfläche
+  const baseMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9 });
+  baseMat.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _fur;\nvarying float vFur;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFur = _fur;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vFur;').replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.18, roughnessFactor, smoothstep(0.0, 0.03, vFur));');
+  };
+  const base = skinned(baseMat);
+  base.castShadow = base.receiveShadow = true;
+  return { model, base, shells: [], skinned, tris: geo.index.count / 3 };
+}
+function applyShells() {
+  if (!fur) return;
+  if (fur.shells.length !== P.n) {
+    for (const s of fur.shells) { s.removeFromParent(); s.material.dispose(); }
+    fur.shells = []; for (let i = 1; i <= P.n; i++) fur.shells.push(fur.skinned(shellMaterial(i / P.n)));
+  }
+  document.getElementById('info').textContent = `${P.n} Schichten · ${(fur.tris * (P.n + 1) / 1000).toFixed(0)} k Dreiecke`;
+}
+
+const [gHD, gLow] = await Promise.all(['Fox_HD.glb', 'Fox.glb'].map(f => loader.loadAsync('../assets/models/animals/' + f)));
+fur = buildFur(gHD); scene.add(fur.model);
+low = gLow.scene; fitModel(low, 1.45); low.position.x = -1.4; low.visible = false; low.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(low);
+for (const [root, g] of [[fur.model, gHD], [low, gLow]]) {
+  const mx = new THREE.AnimationMixer(root); mixers.push(mx);
+  for (const c of g.animations) (anims[c.name] ||= []).push(mx.clipAction(c));
+}
+const play = n => { for (const a of Object.values(anims).flat()) a.fadeOut(.3); for (const a of anims[n]) a.reset().fadeIn(.3).play(); cur = n;
+  document.querySelectorAll('#anims button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === n)); };
+document.getElementById('anims').innerHTML = ['Idle', 'Idle_2', 'Walk', 'Gallop', 'Eating'].map(n => `<button data-a="${n}">${{ Idle: 'Stehen', Idle_2: 'Umschauen', Walk: 'Gehen', Gallop: 'Rennen', Eating: 'Fressen' }[n]}</button>`).join('');
+document.getElementById('anims').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) play(b.dataset.a); });
+play('Idle');
+
+for (const id of ['n', 'len', 'den', 'grav']) {
+  const el = document.getElementById(id), out = el.nextElementSibling;
+  const upd = () => { P[id] = +el.value; out.textContent = id === 'len' ? el.value : (+el.value).toFixed(id === 'grav' ? 2 : 0); applyShells(); };
+  el.addEventListener('input', upd); upd();
+}
+document.getElementById('cmp').addEventListener('click', e => { low.visible = !low.visible; e.target.setAttribute('aria-pressed', low.visible); controls.target.x = low.visible ? -.7 : 0; });
+document.getElementById('wind').addEventListener('click', e => { P.wind = !P.wind; e.target.setAttribute('aria-pressed', P.wind); });
+
+window.__fur = { camera, controls, P, applyShells, play }; // zum Ausprobieren in der Konsole
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+const inv = new THREE.Matrix4(), gv = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05); mixers.forEach(m => m.update(dt)); controls.update();
+  // Länge und Schwerkraft in die Objektkoordinaten der Mesh umrechnen (das Modell ist skaliert)
+  const ws = fur.base.matrixWorld.getMaxScaleOnAxis();
+  uni.uLen.value = P.len / ws; uni.uDen.value = P.den; uni.uTime.value = clock.elapsedTime; uni.uWind.value = P.wind ? 1 : 0;
+  inv.copy(fur.base.matrixWorld).invert(); gv.set(0, -1, 0).transformDirection(inv).multiplyScalar(P.grav * 1.5); uni.uGrav.value.copy(gv);
+  renderer.render(scene, camera);
+});
+</script>
+</body></html>
