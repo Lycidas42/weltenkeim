@@ -428,7 +428,7 @@ function terrainColor(h, jit, k = -1) {
 // Vom Spieler geformtes Gelände: gespeichert als Abweichung von der erzeugten Insel (Punkt, Höhe in cm), hier wieder aufgetragen
 const BASE_H = H.slice();
 if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d)) H[k] = clamp(H[k] + d, -3, 8.5); }
-function saveTerrain() { const out = []; for (let k = 0; k < N * N; k++) { const d = Math.round((H[k] - BASE_H[k]) * 100); if (Math.abs(d) >= 2) out.push(k, d); } S.terrain = out; S.terrainN = N; }
+function saveTerrain() { if (terrainReset) return; const out = []; for (let k = 0; k < N * N; k++) { const d = Math.round((H[k] - BASE_H[k]) * 100); if (Math.abs(d) >= 2) out.push(k, d); } S.terrain = out; S.terrainN = N; }
 const tGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG).rotateX(-Math.PI / 2);
 const tPos = tGeo.attributes.position;
 const tCol = new THREE.BufferAttribute(new Float32Array(N * N * 3), 3);
@@ -3998,7 +3998,7 @@ function setTool(t) {
   if (t === 'blick') handShown = false;
 }
 document.querySelectorAll('.tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
-document.querySelectorAll('#ctxSculpt button').forEach(b => b.addEventListener('click', () => { sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(b => b.addEventListener('click', () => { sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
 function chooseMiracle(m) { miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); }
 document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener('click', () => chooseMiracle(b.dataset.m)));
 $('forestAlert').addEventListener('click', () => {
@@ -4118,6 +4118,17 @@ $('btnReset').addEventListener('click', e => {
   try { localStorage.removeItem(SAVE_KEY); } catch (err) {} skipSave = true; location.reload();
 });
 let skipSave = false;
+// Gelände auf den Auslieferungszustand zurücksetzen (alles andere bleibt): zweimal tippen, dann neu laden.
+// Gebäude ebnen ihren Platz beim Laden wieder selbst ein.
+var terrainReset = false; // var: save() kann es schon vor dieser Zeile prüfen
+for (const id of ['btnTerrainReset', 'btnTerrainReset2']) {
+  let armed = 0;
+  $(id).addEventListener('click', e => {
+    const b = e.currentTarget;
+    if (!armed) { armed = setTimeout(() => { armed = 0; b.classList.remove('armed'); b.textContent = id === 'btnTerrainReset' ? 'Insel zurücksetzen' : 'Gelände zurücksetzen'; }, 4000); b.classList.add('armed'); b.textContent = 'Wirklich? Alles Geformte geht verloren'; return; }
+    clearTimeout(armed); terrainReset = true; S.terrain = []; S.terrainN = N; save(); skipSave = true; location.reload();
+  });
+}
 
 const SHRINE = [
   { id: 'temple', title: () => `Schrein weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Schrein strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },

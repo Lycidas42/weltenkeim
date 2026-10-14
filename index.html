@@ -177,6 +177,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .ctx{display:flex;gap:6px}
 .ctx button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;display:flex;gap:6px;align-items:center}
 .ctx button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
+.ctx button.reset{font-weight:600;font-size:13px;opacity:.9}
+.ctx button.reset.armed{background:#c9533d;border-color:#c9533d;color:#fff;opacity:1}
 .ctx button .cost{font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
 .ctx button.poor .cost{color:var(--warn)}
 .ctx button[aria-pressed="true"].poor .cost{color:#7a1d0c}
@@ -375,7 +377,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
         <li>Gotteshand: selbst gebaut in Blender.</li>
         <li>Terrain, Wasser, Strand, Wolken, Bäume, Büsche, Gras, Blumen, Felsen, Bewohner, Schrein und Lagerhalle sind im Code erzeugt.</li>
       </ul>
-      <div class="row"><button class="act" id="btnReset">Spielstand zurücksetzen</button></div>
+      <div class="row"><button class="act" id="btnTerrainReset2">Gelände zurücksetzen</button><button class="act" id="btnReset">Spielstand zurücksetzen</button></div>
     </div>
   </section>
 
@@ -384,6 +386,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="ctx" id="ctxSculpt" hidden>
       <button data-dir="1" aria-pressed="true">Heben</button>
       <button data-dir="-1" aria-pressed="false">Senken</button>
+      <button id="btnTerrainReset" class="reset" title="Gelände wie bei der Auslieferung">Insel zurücksetzen</button>
     </div>
     <div class="ctx" id="ctxMiracle" hidden>
       <button data-m="rain" aria-pressed="true">Regen <span class="cost">20 ✦</span></button>
