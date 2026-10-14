@@ -1076,8 +1076,26 @@ function onToolUp() {
     v.vx = hand.vel.x * k; v.vz = hand.vel.z * k; v.vy = hand.vel.y * .4 * k + 2.5; }
   pressing = false;
 }
+// Karte mit der Maus verschieben: im Blick-Werkzeug mit links ziehen, in jedem Werkzeug mit Leertaste oder Strg + links.
+// OrbitControls tauscht bei gedrückter Strg-Taste Drehen und Verschieben, daher bei Strg die Belegung „Drehen“.
+let spaceDown = false, ctrlDown = false;
+function applyMouseButtons() {
+  const left = spaceDown || tool === 'blick' ? THREE.MOUSE.PAN : ctrlDown ? THREE.MOUSE.ROTATE : -1;
+  controls.mouseButtons = { LEFT: left, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+  canvas.style.cursor = spaceDown || ctrlDown ? 'grab' : '';
+}
+function panKeys(e, down) {
+  if (e.target.closest && e.target.closest('input, textarea')) return; // Leerzeichen im Namensfeld bleiben Leerzeichen
+  if (e.code === 'Space') { e.preventDefault(); spaceDown = down; } // sonst scrollt die Seite oder ein Knopf wird ausgelöst
+  if (e.key === 'Control') ctrlDown = down;
+  applyMouseButtons();
+}
+addEventListener('keydown', e => panKeys(e, true));
+addEventListener('keyup', e => panKeys(e, false));
+addEventListener('blur', () => { spaceDown = ctrlDown = false; applyMouseButtons(); });
 canvas.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, true);
+  if (e.pointerType === 'mouse' && (spaceDown || e.ctrlKey)) return; // verschiebt nur die Karte, die Hand bleibt untätig
   if (pointers.size > 1) { if (primary !== null) { onToolUp(); primary = null; } return; }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (ringOpen) { closeRing(); return; } // Tippen daneben schließt das Kreismenü
@@ -1095,7 +1113,7 @@ canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && 
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
-  blick: 'Ziehen dreht die Welt. Zwei Finger oder Mausrad: verschieben und zoomen.',
+  get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
   get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen. ${S.name} antippen für Streicheln, Klaps und mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
@@ -1105,7 +1123,7 @@ function setTool(t) {
   document.querySelectorAll('.tools button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   $('ctxSculpt').hidden = t !== 'sculpt'; $('ctxMiracle').hidden = t !== 'miracle';
   $('hint').textContent = HINTS[t];
-  controls.mouseButtons = { LEFT: t === 'blick' ? THREE.MOUSE.ROTATE : -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+  applyMouseButtons();
   controls.touches = { ONE: t === 'blick' ? THREE.TOUCH.ROTATE : -1, TWO: THREE.TOUCH.DOLLY_PAN };
   if (t === 'blick') handShown = false;
 }
