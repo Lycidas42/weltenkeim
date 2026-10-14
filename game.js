@@ -609,7 +609,7 @@ const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 // (negativ = zur Handfläche), gespreizt um die lokale Z-Achse.
 function makeHand(gltf) {
   const g = new THREE.Group(), model = gltf.scene, bones = {}, rest = {}, mats = {};
-  model.rotation.x = .18; g.add(model);
+  model.rotation.x = .08; g.add(model); // Handfläche fast waagerecht
   model.traverse(o => {
     if (o.isBone) { bones[o.name] = o; rest[o.name] = o.quaternion.clone(); }
     if (o.isMesh) {
@@ -626,7 +626,7 @@ function makeHand(gltf) {
 }
 // Handhaltungen: curl = Finger beugen (0 offen … 1 Faust), thumb = Daumen, spread = spreizen, point = Zeigefinger gestreckt
 const HAND_POSES = {
-  relax: { curl: .2, thumb: .2, spread: .35, point: 0 },
+  relax: { curl: .06, thumb: .12, spread: .3, point: 0 }, // offen, Finger fast gestreckt
   grab: { curl: .55, thumb: .55, spread: .1, point: 0 },
   hold: { curl: .82, thumb: .85, spread: 0, point: 0 },
   fist: { curl: 1, thumb: 1, spread: 0, point: 0 },
@@ -920,6 +920,12 @@ function tryMiracle(p) {
 // liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
 // wächst später ein neuer Baum.
 let treeGrab = null;
+const holdOff = new THREE.Vector3(); // Abstand Gehaltenes – Fingerpunkt am Boden beim Zupacken
+// Am Handy verdeckt der Finger, was darunter liegt: Hand und Gehaltenes schweben dort ein Stück über dem Finger.
+// Was angetippt wird (Bewohner, Baum, Tiergeist), zählt weiterhin genau unter dem Finger.
+let ptrType = 'mouse';
+const touchLift = () => ptrType === 'touch' ? 90 : 0;
+const setHoldOff = (x, z) => { if (ptrType === 'touch') holdOff.set(0, 0, 0); else holdOff.set(x - hit.x, 0, z - hit.z); }
 const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, tilt: 0 };
 const heldObjs = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
@@ -943,6 +949,7 @@ function uprootTree(tr) {
   else if (tr.reserved) tr.reserved.tree = null;
   tr.reserved = null; tr.alive = false; tr.stumpT = 0; tr.regrow = 50 + Math.random() * 30;
   Object.assign(heldTree, { on: true, flying: false, type: tr.type, g: tr.g, rot: tr.rot, tilt: 0 });
+  setHoldOff(tr.x, tr.z);
   floatText(tr.x, heightAt(tr.x, tr.z) + 2.2, tr.z, 'Ausgerissen!', 'w');
   for (const v of villagers) { const dx = v.x - tr.x, dz = v.z - tr.z, d = Math.hypot(dx, dz); if (d < 2.5 && ['idle', 'walk', 'chop'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 1.5; v.tx = v.x + dx / (d || 1) * 2.5; v.tz = v.z + dz / (d || 1) * 2.5; } }
 }
@@ -1057,7 +1064,7 @@ function onToolDown(cx, cy) {
     if (foxUnder(cx, cy)) { openRing(); pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
-    if (best) { grabbed = best; if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
+    if (best) { grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
     else if (!heldTree.on) { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
   } else if (tool === 'miracle' && hitOk) { tryMiracle(hit); pressing = false; return; }
   pressing = true;
@@ -1076,7 +1083,7 @@ canvas.addEventListener('pointerdown', e => {
   if (ringOpen) { closeRing(); return; } // Tippen daneben schließt das Kreismenü
   if (tool === 'blick') return;
   closeSheets();
-  primary = e.pointerId; pointerXY.x = e.clientX; pointerXY.y = e.clientY; onToolDown(e.clientX, e.clientY);
+  primary = e.pointerId; ptrType = e.pointerType; pointerXY.x = e.clientX; pointerXY.y = e.clientY; onToolDown(e.clientX, e.clientY);
 });
 canvas.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse' && tool !== 'blick') { pointerXY.x = e.clientX; pointerXY.y = e.clientY; handShown = true; }
@@ -1209,7 +1216,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
 
   // tool action
-  if (primary !== null || (handShown && tool !== 'blick')) pick(pointerXY.x, pointerXY.y);
+  if (primary !== null || (handShown && tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
   if (pressing && tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, sculptDir, dt);
 
   // economy ticks
@@ -1281,16 +1288,25 @@ function frame() {
   const showHand = !handAnim.kind && tool !== 'blick' && handShown && hitOk;
   if (!handAnim.kind) hand.g.visible = showHand;
   if (showHand) {
-    const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : grabbed ? 1.0 : (pressing && tool === 'sculpt') ? .75 : 1.5;
+    // auf dem Bildschirm etwa gleich groß, egal wie weit gezoomt ist
+    const hs = clamp(camera.position.distanceTo(hand.g.position) / 25, .42, 1.25); hand.g.scale.setScalar(hs);
+    const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : grabbed ? 1.0 : ((pressing && tool === 'sculpt') ? .75 : 1.5) * hs;
     if (treeGrab) {
       // am Stamm festhalten und zittern, je weiter der Baum nachgibt
       const tr = treeGrab.tr, j = treeGrab.prog * .05;
       hand.target.set(tr.x + rnd(j), heightAt(tr.x, tr.z) + .95 * tr.g * ST + treeGrab.prog * .25, tr.z + rnd(j));
+    } else if (grabbed || heldTree.on) {
+      // Gehaltenes (Bewohner, Baum) bleibt beim Zupacken, wo es war, und folgt dann der Fingerbewegung;
+      // die Hand hängt senkrecht darüber
+      const x = hit.x + holdOff.x, z = hit.z + holdOff.z;
+      hand.target.set(x, Math.max(heightAt(x, z), 0) + lift, z);
     } else {
-      // um 'lift' über dem Boden, aber auf der Sichtlinie durch den Zeiger, damit die Hand genau unter ihm liegt
+      // leere Hand: um 'lift' über dem Boden, aber auf der Sichtlinie durch den Zeiger, damit sie genau unter ihm liegt
       const d = ray.ray.direction, k = lift / Math.max(.2, -d.y);
       hand.target.set(hit.x, Math.max(hit.y, 0), hit.z).addScaledVector(d, -k);
     }
+    // war die Hand unsichtbar (z. B. zwischen zwei Tipps am Handy), erscheint sie direkt am Ziel statt heranzufliegen
+    if (!hand.shown) { hand.g.position.copy(hand.target); hand.vel.set(0, 0, 0); }
     hand.prev.copy(hand.g.position);
     hand.g.position.lerp(hand.target, 1 - Math.exp(-dt * 16));
     const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
@@ -1300,6 +1316,7 @@ function frame() {
       : pressing ? (tool === 'sculpt' ? (sculptDir > 0 ? HAND_POSES.flat : HAND_POSES.fist) : HAND_POSES.grab) : HAND_POSES.relax;
     poseHand(hand, pose, dt, t);
   }
+  hand.shown = showHand;
 
   // effects
   if (rain.t > 0) {
