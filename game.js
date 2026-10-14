@@ -202,10 +202,10 @@ function updateWeather(dt, t) {
   }
   const W = WEATHER[S.weather], k = Math.min(1, dt * .06);                            // Übergang über einige Sekunden
   weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
-  weather.snow += ((W.snow || 0) - weather.snow) * k * 1.5;
-  // Schneedecke: wächst bei Schneefall in gut einer halben Minute, taut bei Sonne langsam, bei Regen schneller
+  weather.snow += ((W.snow || 0) - weather.snow) * Math.min(1, dt * .35);          // Schneefall setzt schnell ein und hört schnell auf
+  // Schneedecke: wächst bei Schneefall in gut einer halben Minute, taut bei Sonne in etwa einer halben Minute, bei Wolken und nachts in einigen Minuten
   if (weather.snow > .3) weather.snowCover = Math.min(1, weather.snowCover + dt * weather.snow / 40);
-  else weather.snowCover = Math.max(0, weather.snowCover - dt * ((1 - weather.cover) * (1 - sky.night) / 90 + weather.rain / 25 + 1 / 600));
+  else weather.snowCover = Math.max(0, weather.snowCover - dt * ((1 - weather.cover) * (1 - sky.night) / 30 + weather.rain / 15 + 1 / 200));
   snowU.uSnow.value = weather.snowCover;
   weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
   // Nässe: in etwa einer halben Minute Regen voll, bei Sonne in gut einer Minute trocken
@@ -322,6 +322,52 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     H[k] += hill(x, z); H[k] += (top - H[k]) * smooth(3.2, 2.5, d); // Kuppe eben
   }
 }
+// Bach: entspringt am höchsten Punkt der Insel und folgt der natürlichen Abflussrinne ins Meer.
+// Die Rinne liefert ein Priority Flood vom Meer aus (jeder Punkt kennt seinen Abfluss). Dann wird der Lauf geglättet,
+// das Bett ins Gelände gegraben (stets bergab) und STREAM für Wasserband, Abstände und Darstellung gefüllt.
+const STREAM = (() => {
+  const par = new Int32Array(N * N).fill(-1), done = new Uint8Array(N * N), lv = new Float32Array(N * N), heap = [], hv = [];
+  const push = (k, v) => { let i = heap.length; heap.push(k); hv.push(v); while (i > 0) { const q = (i - 1) >> 1; if (hv[q] <= v) break; heap[i] = heap[q]; hv[i] = hv[q]; i = q; } heap[i] = k; hv[i] = v; };
+  const pop = () => { const top = heap[0], lk = heap.pop(), l = hv.pop(); if (heap.length) { let i = 0; while (true) { let c = 2 * i + 1; if (c >= heap.length) break; if (c + 1 < heap.length && hv[c + 1] < hv[c]) c++; if (hv[c] >= l) break; heap[i] = heap[c]; hv[i] = hv[c]; i = c; } heap[i] = lk; hv[i] = l; } return top; };
+  // für die Wegsuche des Wassers sind Dorf und Schreinhügel künstlich erhöht: der Bach fließt außen herum
+  const Hr = new Float32Array(N * N); for (let k = 0; k < N * N; k++) { const x = -HALF + (k % N) * CELL, z = -HALF + ((k / N) | 0) * CELL; Hr[k] = H[k] + 6 * smooth(11, 7.5, Math.hypot(x, z)) + 4 * smooth(5.5, 3, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z)); }
+  for (let k = 0; k < N * N; k++) if (H[k] < -.05) { done[k] = 1; lv[k] = H[k]; push(k, H[k]); }
+  while (heap.length) {
+    const k = pop(), i = k % N, j = (k / N) | 0;
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+      const n = jj * N + ii; if (done[n]) continue; done[n] = 1; par[n] = k; lv[n] = Math.max(Hr[n], lv[k]); push(n, lv[n]);
+    }
+  }
+  let src = 0; for (let k = 0; k < N * N; k++) if (H[k] > H[src]) src = k;
+  const raw = []; for (let k = src; k >= 0 && raw.length < 600; k = par[k]) { raw.push({ x: -HALF + (k % N) * CELL, z: -HALF + ((k / N) | 0) * CELL }); if (H[k] < -.05) break; }
+  // glätten (gleitender Mittelwert) und gleichmäßig neu abtasten
+  let pts = raw;
+  for (let it = 0; it < 4; it++) pts = pts.map((p, i) => { if (i === 0 || i === pts.length - 1) return p; const a = pts[i - 1], b = pts[i + 1]; return { x: (a.x + 2 * p.x + b.x) / 4, z: (a.z + 2 * p.z + b.z) / 4 }; });
+  const out = [pts[0]]; let acc = 0;
+  for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], d = Math.hypot(b.x - a.x, b.z - a.z); acc += d; if (acc >= .3) { out.push(b); acc = 0; } }
+  if (out[out.length - 1] !== pts[pts.length - 1]) out.push(pts[pts.length - 1]);
+  const hAt = (x, z) => { const fx = clamp((x + HALF) / CELL, 0, SEG - .001), fz = clamp((z + HALF) / CELL, 0, SEG - .001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * N + i; return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + N] * (1 - u) + H[k + N + 1] * u) * v; };
+  let len = 0; out.forEach((p, i) => { if (i) len += Math.hypot(p.x - out[i - 1].x, p.z - out[i - 1].z); p.s = len; });
+  let bed = 1e9;
+  for (const p of out) { const f = p.s / (len || 1); p.w = .22 + .4 * f; const depth = .14 + .1 * f; bed = Math.min(bed - .004, hAt(p.x, p.z) - depth); p.bed = bed; } // Bett immer bergab
+  // Bett graben: Geländepunkte nahe am Lauf auf Bett-Höhe senken, Ufer weich auslaufen lassen
+  const dist = new Float32Array(N * N).fill(99);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = -HALF + i * CELL, z = -HALF + j * CELL, k = j * N + i; let bd = 99, bp = null;
+    for (let q = 1; q < out.length; q++) {
+      const a = out[q - 1], b = out[q]; if (Math.abs(x - a.x) > 2.5 && Math.abs(x - b.x) > 2.5) continue; if (Math.abs(z - a.z) > 2.5 && Math.abs(z - b.z) > 2.5) continue;
+      const ex = b.x - a.x, ez = b.z - a.z, l2 = ex * ex + ez * ez || 1, t = clamp(((x - a.x) * ex + (z - a.z) * ez) / l2, 0, 1), d = Math.hypot(x - a.x - ex * t, z - a.z - ez * t);
+      if (d < bd) { bd = d; bp = { w: a.w + (b.w - a.w) * t, bed: a.bed + (b.bed - a.bed) * t }; }
+    }
+    dist[k] = bd;
+    if (bp && bd < bp.w + 1) H[k] = Math.min(H[k], bp.bed + (H[k] - bp.bed) * smooth(bp.w * .55, bp.w + 1, bd));
+  }
+  for (const p of out) p.y = p.bed + .055; // Wasserspiegel knapp über dem Bett
+  return { pts: out, dist, len };
+})();
+// Abstand zum Bach (über die Geländepunkte), für Bäume, Häuser und Bewuchs
+function streamDist(x, z) { const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL); return i < 0 || j < 0 || i >= N || j >= N ? 99 : STREAM.dist[j * N + i]; }
 function heightAt(x, z) {
   const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
   if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -3;
@@ -341,6 +387,7 @@ function terrainColor(h, jit, k = -1) {
     const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL;
     tc.lerp(C.bare, Math.max(smooth(.95, .5, sacredDist(x, z)), smooth(3.3, 2.9, Math.hypot(x, z)), smooth(2.6, 2.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z)), smooth(.75, .4, laneDist(x, z)) * .8) * .85);
   }
+  if (k >= 0 && typeof STREAM !== 'undefined') { const d = STREAM.dist[k]; if (d < 1.2) { tc.lerp(tg.set(0x8d8270), smooth(.55, .25, d) * .9); tc.lerp(tg.set(0x4f8a3a), smooth(1.2, .6, d) * (1 - smooth(.5, .25, d)) * .45); tg.copy(C.g1).lerp(C.g2, jit); } }
   if (k >= 0) { // Wiese: trockene Flecken und kahle Erdstellen
     const gw = smooth(.45, .6, h) * (1 - smooth(2.5, 2.9, h));
     tc.lerp(C.dry, smooth(.05, .35, DRY[k]) * .55 * gw);
@@ -386,6 +433,32 @@ const terrain = new THREE.Mesh(tGeo, terrainMat);
 terrain.receiveShadow = true; terrain.castShadow = true; terrain.frustumCulled = false;
 scene.add(terrain);
 
+// Wasserband des Bachs: fließt sichtbar bergab, schäumt an steilen Stellen, wird zur Mündung breiter
+const streamU = { uT: { value: 0 } };
+const streamMesh = (() => {
+  const P = STREAM.pts, pos = [], uv = [], foam = [], idx = [];
+  P.forEach((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1, nx = -tz / l, nz = tx / l, w = p.w * .78;
+    const slope = clamp((a.y - b.y) / (Math.hypot(b.x - a.x, b.z - a.z) || 1), 0, 2);
+    pos.push(p.x + nx * w, p.y, p.z + nz * w, p.x - nx * w, p.y, p.z - nz * w); uv.push(0, p.s, 1, p.s); foam.push(slope, slope);
+    if (i) { const q = i * 2; idx.push(q - 2, q, q - 1, q - 1, q, q + 1); } // Umlaufsinn: Oberseite zeigt nach oben
+  });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('suv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('foam', new THREE.Float32BufferAttribute(foam, 1)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, roughness: .15, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uT = streamU.uT;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float foam; attribute vec2 suv; varying float vFoam; varying vec2 vSU;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFoam = foam; vSU = suv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT; varying float vFoam; varying vec2 vSU;\n' + NOISE_GLSL)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float edge = smoothstep(.0, .2, vSU.x) * smoothstep(1., .8, vSU.x);
+        vec2 q = vec2(vSU.x * 3., vSU.y * 1.6 - uT * (1.2 + vFoam * 3.));
+        float n = vns(q * 2.) * .6 + vns(q * 5.) * .4;
+        float fm = clamp(smoothstep(.55, .85, n) * (.25 + vFoam * 1.4) + (1. - edge) * .35, 0., 1.);
+        diffuseColor.rgb = mix(mix(vec3(.2, .55, .62), vec3(.32, .7, .74), n), vec3(.92, .96, 1.), fm);
+        diffuseColor.a = (.55 + .35 * edge) * smoothstep(0., .08, vSU.x) * smoothstep(1., .92, vSU.x) + fm * .2;`);
+  };
+  const o = new THREE.Mesh(g, m); o.receiveShadow = true; o.renderOrder = 2; o.userData.noSnow = true; o.frustumCulled = false; scene.add(o); return o;
+})();
 // Höhen als Textur für das Wasser (Tiefe: Farbe, Brandung, flache Wellen am Ufer)
 const hTexData = new Uint8Array(N * N), hTex = new THREE.DataTexture(hTexData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
 hTex.magFilter = hTex.minFilter = THREE.LinearFilter;
@@ -878,7 +951,7 @@ const sites = [];
 // aus abwechselnd nach beiden Seiten, so wächst das Dorf gleichmäßig um den Platz.
 for (let k = 0; k < 20; k++) {
   const a = (k + .5) / 20 * Math.PI * 2, x = Math.cos(a) * HOUSE_R, z = Math.sin(a) * HOUSE_R, h = heightAt(x, z);
-  if (h < .3 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 3 || onSacred(x, z, 1.1)) continue;
+  if (h < .3 || streamDist(x, z) < 2 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 3 || onSacred(x, z, 1.1)) continue;
   sites.push({ x, z, ry: Math.atan2(-x, -z), a, used: false }); // Tür (+z des Modells) zum Platz
 }
 const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -982,7 +1055,7 @@ const hutSites = [];
 for (let i = 0; i < 18; i++) {
   const a = .15 + i / 18 * Math.PI * 2, r = 11, x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
   const slope = Math.max(...[[.8, 0], [-.8, 0], [0, .8], [0, -.8]].map(([dx, dz]) => Math.abs(heightAt(x + dx, z + dz) - h)));
-  if (h > .3 && h < 2.8 && slope < .55 && Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) > 5 && Math.hypot(x - MILL_POS.x, z - MILL_POS.z) > 3) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
+  if (h > .3 && h < 2.8 && slope < .55 && streamDist(x, z) > 2.2 && Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) > 5 && Math.hypot(x - MILL_POS.x, z - MILL_POS.z) > 3) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
 }
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
@@ -1014,14 +1087,14 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
+  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
 worldReady = true;
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 // Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
-const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
+const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || streamDist(x, z) < 1 + r || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
@@ -1146,7 +1219,7 @@ function refreshCover(budget) {
     for (let i = i0; i < i1; i++) {
       const it = K.items[i], h = heightAt(it.x, it.z);
       const wi = Math.round((it.x + HALF) / CELL), wj = Math.round((it.z + HALF) / CELL), w = wi >= 0 && wj >= 0 && wi < N && wj < N ? WEAR[wj * N + wi] : 0;
-      let vis = h > K.hmin && h < K.hmax && w < 7 && !onSacred(it.x, it.z, .15) && laneDist(it.x, it.z) > .45 && Math.hypot(it.x - SHRINE_POS.x, it.z - SHRINE_POS.z) > 2.35 && Math.hypot(it.x - PLAZA.x, it.z - PLAZA.z) > PLAZA.r;
+      let vis = h > K.hmin && h < K.hmax && w < 7 && streamDist(it.x, it.z) > .45 && !onSacred(it.x, it.z, .15) && laneDist(it.x, it.z) > .45 && Math.hypot(it.x - SHRINE_POS.x, it.z - SHRINE_POS.z) > 2.35 && Math.hypot(it.x - PLAZA.x, it.z - PLAZA.z) > PLAZA.r;
       if (vis && navReady) { const c = navCell(it.x, it.z); vis = c >= 0 && !navV.g[c] || (K.hmin < 0 && navWater[c] === 1 && h > K.hmin); }
       if (!vis) { m.setMatrixAt(i, zero); continue; }
       dummy.position.set(it.x, h - K.sink * it.s, it.z); dummy.rotation.set(0, it.r, 0); dummy.scale.setScalar(it.s); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix);
@@ -1336,7 +1409,8 @@ function updateClouds(dt) {
     const near = smooth(sc * 1.2, sc * 3.2, cloudDummy.distanceTo(camera.position));
     const ab = segB.clone().sub(segA), u = clamp(cloudDummy.clone().sub(segA).dot(ab) / ab.lengthSq(), 0, 1), dLine = cloudDummy.distanceTo(segA.clone().addScaledVector(ab, u));
     const block = .22 + .78 * smooth(sc * .9, sc * 2.2, dLine);
-    c.m.material.opacity = c.vis * Math.min(near, block) * (.9 - .1 * weather.rain);
+    const above = .15 + .85 * smooth(c.y - 1, c.y - 6, camera.position.y); // Kamera auf Wolkenhöhe oder darüber: Wolken fast durchsichtig
+    c.m.material.opacity = c.vis * Math.min(near, block, above) * (.9 - .1 * weather.rain);
     c.m.material.color.copy(cloudCol); c.m.visible = c.m.material.opacity > .01;
     c.m.castShadow = c.vis > .5;
   });
@@ -1457,7 +1531,10 @@ const splash = (x, z) => { if (ripples.length >= RIPPLE_N) ripples.shift(); ripp
 let fishJumpT = 3;
 function updateFish(dt, t) {
   fishJumpT -= dt;
-  if (fishJumpT <= 0) { fishJumpT = 2.5 + Math.random() * 5; const f = fish[Math.floor(Math.random() * fish.length)]; if (f && !f.jump) { f.jump = .001; splash(f.x, f.z); } }
+  if (fishJumpT <= 0) { // springen nur, wo Absprung und Landestelle tief genug sind (nicht am Ufer)
+    fishJumpT = 2.5 + Math.random() * 5; const f = fish[Math.floor(Math.random() * fish.length)];
+    if (f && !f.jump && waterDepthAt(f.x, f.z) > .8 && waterDepthAt(f.x + Math.sin(f.h) * 1.3, f.z + Math.cos(f.h) * 1.3) > .8) { f.jump = .001; splash(f.x, f.z); }
+  }
   fish.forEach((f, i) => {
     if (f.jump > 0) { // Sprung: Bogen aus dem Wasser, Kopf voran
       f.jump += dt / .9; f.x += Math.sin(f.h) * dt * 1.4; f.z += Math.cos(f.h) * dt * 1.4;
@@ -1465,7 +1542,11 @@ function updateFish(dt, t) {
     } else {
       f.h += Math.sin(t * .7 + f.ph) * dt * .6;
       const nx = f.x + Math.sin(f.h) * f.sp * dt, nz = f.z + Math.cos(f.h) * f.sp * dt, d = waterDepthAt(nx, nz);
-      if (d < .3 || d > 1.8) f.h += dt * 2.5; else { f.x = nx; f.z = nz; }        // im flachen Wasser bleiben
+      if (d < .35 || d > 1.8) { // zu flach: von der Insel weg drehen, zu tief: zur Insel hin; dabei weiterschwimmen
+        const r = Math.hypot(f.x, f.z) || 1, want = d < .35 ? Math.atan2(f.x / r, f.z / r) : Math.atan2(-f.x / r, -f.z / r);
+        const dh = Math.atan2(Math.sin(want - f.h), Math.cos(want - f.h)); f.h += clamp(dh, -dt * 3, dt * 3);
+        if (waterDepthAt(f.x + Math.sin(f.h) * f.sp * dt, f.z + Math.cos(f.h) * f.sp * dt) >= .2) { f.x += Math.sin(f.h) * f.sp * dt * .6; f.z += Math.cos(f.h) * f.sp * dt * .6; }
+      } else { f.x = nx; f.z = nz; }
     }
     const j = f.jump, y = j > 0 ? -.05 + Math.sin(j * Math.PI) * .55 : -.2 - .04 * Math.sin(t * 2 + f.ph);
     dummy.position.set(f.x, y, f.z); dummy.rotation.set(j > 0 ? -Math.cos(j * Math.PI) * 1.1 : 0, f.h, Math.sin(t * 9 + f.ph) * .15, 'YXZ'); dummy.scale.setScalar(f.s * 1.3); dummy.updateMatrix(); fishMesh.setMatrixAt(i, dummy.matrix);
@@ -1483,12 +1564,13 @@ function updateWild(dt, t) {
     if (a.threatT <= 0) { // Gefahr prüfen
       a.threatT = .3; let tx = 0, tz = 0, n = 0;
       const near = (x, z, r) => { const d = Math.hypot(a.x - x, a.z - z); if (d < r) { tx += (a.x - x) / (d || 1); tz += (a.z - z) / (d || 1); n++; } };
-      for (const v of villagers) if (v.state !== 'sleep') near(v.x, v.z, deer ? 3 : 2.2);
-      near(fox.x, fox.z, deer ? 5 : 4);
-      if (hand.g.visible) near(hand.g.position.x, hand.g.position.z, 3);
+      // eher gelassen, damit man sie beobachten kann: nur wer sehr nahe kommt, scheucht sie auf
+      for (const v of villagers) if (v.state !== 'sleep') near(v.x, v.z, deer ? 1.6 : 1.1);
+      near(fox.x, fox.z, deer ? 2.8 : 2.2);
+      if (hand.g.visible && (pressing || hand.vel.length() > 6)) near(hand.g.position.x, hand.g.position.z, 1.6); // die Hand nur beim Zugreifen oder schnellen Bewegen
       if (n && a.state !== 'flee') {
-        const l = Math.hypot(tx, tz) || 1, run = deer ? 6 : 4, px = a.x + tx / l * run + rnd(1.5), pz = a.z + tz / l * run + rnd(1.5);
-        a.state = 'flee'; setGoal(a, px, pz, navV); a.sp = deer ? 3.2 : 3.6; a.timer = 4;
+        const l = Math.hypot(tx, tz) || 1, run = deer ? 3.5 : 2.5, px = a.x + tx / l * run + rnd(1), pz = a.z + tz / l * run + rnd(1);
+        a.state = 'flee'; setGoal(a, px, pz, navV); a.sp = deer ? 2.6 : 3; a.timer = 2;
       }
     }
     if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; } }
@@ -3250,7 +3332,7 @@ function frame() {
   updateClouds(dt); updateWeatherRain(dt); updateSnowfall(dt, t); updatePuddles(dt, t);
   if ((snowScanT -= dt) <= 0) { snowScanT = 2; scanSnow(); } // neue Gebäude und Bäume bekommen auch Schnee
   // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
-  waterU.uT.value = t; waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
+  streamU.uT.value = t; waterU.uT.value = t; waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
   updateTerrain(dt);
 
   // camera
@@ -3312,7 +3394,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
