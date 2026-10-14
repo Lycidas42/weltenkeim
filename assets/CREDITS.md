@@ -8,15 +8,21 @@ Gebäude, Bäume, Baumstumpf, Felsen und Wolken in `models/` (alle Dateien auße
 - Lizenz: Creative Commons Zero (CC0 1.0)
 - Quelle: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
 
-## Fox (`models/Fox.glb`)
+## Tiere für Ruun (`models/animals/`)
 
-Aus den Khronos glTF Sample Assets, https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox
+Fuchs, Wolf, Hirsch, Stier und Alpaka (`Fox.glb`, `Wolf.glb`, `Stag.glb`, `Bull.glb`, `Alpaca.glb`):
 
-- Modell: PixelMannen, CC0 1.0
-- Rigging und Animation: tomkranis, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
-- glTF-Konvertierung: @AsoboStudio und @scurest, CC BY 4.0
+- Animated Animal Pack von Quaternius, https://quaternius.com
+- Lizenz: Creative Commons Zero (CC0 1.0)
+- Quelle: https://poly.pizza/bundle/Animated-Animal-Pack-ILAPXeUYiS
+- Bearbeitung: doppelte und ungenutzte Animationen entfernt (gltf-transform), um die Dateigröße zu halbieren.
 
-Die CC-BY-Teile verlangen Namensnennung. Sie steht hier und im Info-Panel des Spiels.
+Katze (`Cat.glb`):
+
+- Animal Pack Vol.2 von Quaternius, https://quaternius.com
+- Lizenz: Creative Commons Zero (CC0 1.0)
+- Quelle: https://opengameart.org/content/animated-animales-low-poly
+- Bearbeitung: von FBX nach glTF konvertiert (FBX2glTF), Materialfarben neu gesetzt, Animationen umbenannt. Augen werden im Spielcode ergänzt.
 
 ## Three.js
 

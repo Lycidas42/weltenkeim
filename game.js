@@ -1,5 +1,5 @@
 // Weltenkeim – Gottspiel-Prototyp (Three.js)
-// Aufbau: Terrain (prozedural, formbar), Dorf (KayKit-Modelle), Bewohner (instanziert), Ruun (Fuchs, lernt aus Lob/Tadel),
+// Aufbau: Terrain (prozedural, formbar), Dorf (KayKit-Modelle), Bewohner (instanziert), Ruun (Tiergeist in wählbarer Gestalt, lernt aus Lob/Tadel),
 // Hand-Werkzeuge, Wunder, Idle-Ökonomie mit Offline-Fortschritt. Spielstand lokal (localStorage, Schlüssel SAVE_KEY).
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}) });
@@ -140,9 +140,21 @@ function sculpt(px, pz, dir, dt) {
 const loader = new GLTFLoader();
 const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, res, undefined, e => rej(new Error(f + ' konnte nicht geladen werden'))));
 $('loadSt').textContent = 'Lade Modelle …';
+// Ruun kann verschiedene Gestalten annehmen (S.creature). Modelle: Quaternius Animated Animal Pack (CC0).
+// h = Zielhöhe in Welteinheiten, walk/run = Geschwindigkeit, ws = Zeitfaktor der Lauf-Animation.
+const CREATURES = {
+  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1 },
+  wolf: { label: 'Wolf', spirit: 'Wolfsgeist', file: 'Wolf', h: 1.75, walk: 2, run: 3.8, ws: 1 },
+  stag: { label: 'Hirsch', spirit: 'Hirschgeist', file: 'Stag', h: 3.1, walk: 2, run: 3.8, ws: .9 },
+  bull: { label: 'Stier', spirit: 'Stiergeist', file: 'Bull', h: 1.95, walk: 1.7, run: 3.4, ws: .9 },
+  alpaca: { label: 'Alpaka', spirit: 'Alpakageist', file: 'Alpaca', h: 2.5, walk: 1.8, run: 3.4, ws: 1 },
+  // Katze aus Quaternius Animal Pack Vol.2: nur Idle/Walk, keine Augen – Augen werden am Kopfknochen ergänzt
+  cat: { label: 'Katze', spirit: 'Katzengeist', file: 'Cat', h: 1.35, walk: 1.9, run: 3.6, ws: 1.2, head: 'Bone003', eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },
+};
+if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_church_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', 'Fox.glb'];
-const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gFox] = await Promise.all(files.map(load));
+  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`];
+const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 class Swarm {
@@ -282,22 +294,69 @@ function spawnVillager(x, z) {
 const homeSpot = () => { const h = houses[Math.floor(Math.random() * houses.length)] || { x: 0, z: 0 }; return { x: h.x + rnd(1), z: h.z + rnd(1) }; };
 for (let i = 0; i < Math.min(S.pop, cap()); i++) { const p = homeSpot(); spawnVillager(p.x, p.z); }
 
-/* ------------------------------------------------------------------ fox (Ruun) */
-const fox = { x: -6, z: 4, h: 0, state: 'idle', timer: 4, next: null, tx: 0, tz: 0, tree: null, carry: false, act: null, last: null, lastT: -999, playT: 0, hop: 0, cur: null };
+/* ------------------------------------------------------------------ creature (Ruun) */
+const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^Walk$/, run: /^Gallop$/, attack: /^Attack/, hit: /^Idle_HitReact/, jump: /^Jump/ };
+// fehlt eine Animation, wird eine vorhandene mit anderem Tempo genutzt
+const ANIM_FALLBACK = { idle2: ['idle', .7], eat: ['idle', .5], run: ['walk', 2.1], attack: ['walk', 2.8] };
+const fox = { x: -6, z: 4, h: 0, state: 'idle', timer: 4, next: null, tx: 0, tz: 0, tree: null, carry: false, act: null, last: null, lastT: -999, playT: 0, hop: 0, cur: null, idleA: 'idle', once: 0, kind: null };
 const foxPivot = new THREE.Group(); scene.add(foxPivot);
-const foxModel = shadowify(gFox.scene);
-{
-  const box = new THREE.Box3().setFromObject(foxModel), size = box.getSize(new THREE.Vector3());
-  foxModel.scale.setScalar(1.7 / size.y);
-  foxModel.updateMatrixWorld(true);
-  const head = foxModel.getObjectByName('b_Head_05'), c = new THREE.Box3().setFromObject(foxModel).getCenter(new THREE.Vector3());
-  if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); foxModel.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
-  foxPivot.add(foxModel);
+const creatureCache = { [S.creature]: gCreature };
+let foxModel = null, foxMixer = null, foxActs = {};
+function useCreature(id, gltf) {
+  const C = CREATURES[id];
+  if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
+  const model = shadowify(gltf.scene);
+  model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
+  model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0); model.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  model.scale.setScalar(C.h / size.y); model.updateMatrixWorld(true);
+  // Blickrichtung aus der Kopfposition ableiten, damit +Z vorne ist
+  const head = model.getObjectByName(C.head || 'Head'), box = new THREE.Box3().setFromObject(model), c = box.getCenter(new THREE.Vector3());
+  if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
+  model.position.y = -box.min.y;
+  foxModel = model; foxMixer = new THREE.AnimationMixer(model); foxActs = {};
+  for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) foxActs[k] = foxMixer.clipAction(clip); }
+  for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!foxActs[k] && foxActs[f]) { foxActs[k] = foxMixer.clipAction(foxActs[f].getClip().clone()); foxActs[k].timeScale = ts; }
+  if (foxActs.walk) foxActs.walk.timeScale = C.ws;
+  for (const k of ['hit', 'jump']) if (foxActs[k]) { foxActs[k].setLoop(THREE.LoopOnce); foxActs[k].clampWhenFinished = true; }
+  // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
+  if (C.eyes && head && foxActs.idle && !model.userData.eyes) { model.userData.eyes = true; foxActs.idle.reset().play(); foxMixer.update(0); addEyes(model, head, C.eyes); foxActs.idle.stop(); }
+  foxPivot.add(model);
+  fox.kind = id; fox.cur = null; fox.once = 0;
+  foxAnim('idle');
 }
-const foxMixer = new THREE.AnimationMixer(foxModel);
-const foxActs = {}; for (const clip of gFox.animations) foxActs[clip.name] = foxMixer.clipAction(clip);
-function foxAnim(name) { if (fox.cur === name) return; const a = foxActs[name]; if (!a) return; a.reset().fadeIn(.3).play(); if (fox.cur) foxActs[fox.cur].fadeOut(.3); fox.cur = name; }
-foxAnim('Survey');
+// Augen (Lederhaut, Iris, Pupille) in Modellkoordinaten setzen und an den Kopfknochen hängen
+function addEyes(model, head, e) {
+  model.updateMatrixWorld(true);
+  const hp = head.getWorldPosition(new THREE.Vector3()), white = new THREE.MeshStandardMaterial({ color: 0xf4f1e6, roughness: .4 });
+  const iris = new THREE.MeshStandardMaterial({ color: e.iris, roughness: .3, emissive: e.iris, emissiveIntensity: .25 }), pupil = new THREE.MeshBasicMaterial({ color: 0x0b0b0b });
+  for (const sx of [-1, 1]) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(e.r, 12, 8), white));
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(e.r * .86, 12, 8).translate(0, 0, e.r * .24), iris));
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(e.r * .62, 10, 6).scale(.4, 1, 1).translate(0, 0, e.r * .5), pupil));
+    g.position.set(hp.x + sx * e.side, hp.y + e.up, hp.z + e.fwd); g.rotation.y = sx * .35;
+    g.updateMatrixWorld(true); head.attach(g); // ohne Elternteil ist g.matrixWorld = Modellraum
+  }
+}
+function foxAnim(name) {
+  if (fox.cur === name) return; const a = foxActs[name]; if (!a) return;
+  a.reset().fadeIn(.25).play(); if (fox.cur && foxActs[fox.cur]) foxActs[fox.cur].fadeOut(.25); fox.cur = name;
+}
+// einmalige Reaktion (Treffer, Freudensprung), danach übernimmt wieder der Zustand
+function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; }
+let creatureLoading = null;
+async function setCreature(id) {
+  if (!CREATURES[id] || id === fox.kind || creatureLoading) return;
+  creatureLoading = id; renderForms();
+  try {
+    const g = creatureCache[id] || (creatureCache[id] = await load(`animals/${CREATURES[id].file}.glb`));
+    useCreature(id, g); S.creature = id; save();
+    floatText(fox.x, CREATURES[id].h + .6, fox.z, `Ruun wird ${CREATURES[id].label}`, 's');
+  } catch (e) { toast('Diese Gestalt konnte nicht geladen werden. Bist du offline?'); }
+  creatureLoading = null; renderForms(); renderFox();
+}
+useCreature(S.creature, gCreature);
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
 const ACT_DESC = { help: 'Holz zum Brunnen gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
@@ -393,9 +452,10 @@ function updateVillager(v, dt, t) {
 }
 
 /* ------------------------------------------------------------------ fox AI */
+function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.tx = x; fox.tz = z; fox.next = next; }
 function foxFinish(a) {
-  fox.last = a; fox.lastT = clock.elapsedTime; fox.state = 'idle'; fox.timer = 5 + Math.random() * 4; fox.act = null;
+  fox.last = a; fox.lastT = clock.elapsedTime; foxIdle(5 + Math.random() * 4); fox.act = null;
   toast(`Ruun hat ${ACT_DESC[a]}. Lob oder Tadel?`, 4.5);
   $('btnFox').classList.add('pulse');
   renderFox();
@@ -412,15 +472,18 @@ function foxChoose() {
   if (a === 'play') foxWalk(CENTER.x - 1.8, CENTER.z, 'play');
 }
 function updateFox(dt, t) {
-  const spd = fox.state === 'play' ? 3.4 : 1.9;
+  const C = CREATURES[fox.kind], spd = C.walk;
+  // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
+  const anim = n => { if (fox.once <= 0) foxAnim(n); };
+  if (fox.once > 0) fox.once -= dt;
   switch (fox.state) {
-    case 'idle': foxAnim('Survey'); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
-    case 'walk': foxAnim('Walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
-      if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; fox.state = 'idle'; fox.timer = 1; } }
+    case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
+    case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
+      if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') { addHolz(6, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help'); }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; }
     } break;
-    case 'work': foxAnim('Survey'); fox.timer -= dt; if (fox.timer <= 0) {
+    case 'work': anim('attack'); fox.timer -= dt; if (fox.timer <= 0) {
       const tr = fox.tree; fox.tree = null;
       if (tr && tr.alive) {
         chopTree(tr);
@@ -430,12 +493,12 @@ function updateFox(dt, t) {
           for (const v of villagers) { const dx = v.x - fox.x, dz = v.z - fox.z, d = Math.hypot(dx, dz); if (d < 4.5 && ['idle', 'walk', 'pray', 'chop'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 2; v.tx = v.x + dx / (d || 1) * 3; v.tz = v.z + dz / (d || 1) * 3; } }
           foxFinish('mischief');
         }
-      } else { fox.state = 'idle'; fox.timer = 1; }
+      } else foxIdle(1);
     } break;
     case 'play': {
-      foxAnim('Run'); fox.playT += dt;
+      anim('run'); fox.playT += dt;
       const a = fox.playT * 1.9, px = CENTER.x + Math.cos(a) * 1.8, pz = CENTER.z + Math.sin(a) * 1.8;
-      stepTo(fox, px, pz, 6 * dt);
+      stepTo(fox, px, pz, C.run * 1.6 * dt);
       if (Math.floor(fox.playT) !== Math.floor(fox.playT - dt)) addGlaube(1.5, fox.x, 1.4, fox.z);
       if (fox.playT > 5) foxFinish('play');
     } break;
@@ -447,7 +510,8 @@ function updateFox(dt, t) {
 }
 function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
-  if (kind === 'pet') floatText(fox.x, 2.2, fox.z, '♥', 'love'); else { fox.hop = .5; floatText(fox.x, 2.2, fox.z, '!', 'w'); }
+  const top = CREATURES[fox.kind].h + .5;
+  if (kind === 'pet') { foxOnce('jump'); floatText(fox.x, top, fox.z, '♥', 'love'); } else { foxOnce('hit'); fox.hop = .5; floatText(fox.x, top, fox.z, '!', 'w'); }
   if (a && t - fox.lastT < 25) {
     S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
     const sum = S.w.help + S.w.play + S.w.mischief; for (const k in S.w) S.w[k] /= sum;
@@ -500,7 +564,7 @@ function screenDist(x, y, z, cx, cy) { const r = canvas.getBoundingClientRect();
 function onToolDown(cx, cy) {
   pick(cx, cy); handShown = hitOk;
   if (tool === 'hand') {
-    if (screenDist(fox.x, surfaceAt(fox.x, fox.z) + .8, fox.z, cx, cy) < 60) { openSheet('sheetFox'); pressing = false; return; }
+    if (screenDist(fox.x, surfaceAt(fox.x, fox.z) + CREATURES[fox.kind].h * .45, fox.z, cx, cy) < 60) { openSheet('sheetFox'); pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) { grabbed = best; if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
@@ -580,7 +644,13 @@ function renderFox() {
   $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
   const t = clock.elapsedTime;
   $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat Ruun ${ACT_DESC[fox.last]}. Deine Reaktion prägt ihn.` : 'Ruun streift umher. Warte auf seine nächste Tat, dann lobe oder tadle ihn.';
+  $('foxKind').textContent = `Dein ${CREATURES[fox.kind].spirit}`;
+  renderForms();
 }
+function renderForms() {
+  $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}" aria-pressed="${id === fox.kind}"${creatureLoading ? ' disabled' : ''}>${creatureLoading === id ? 'Lädt …' : c.label}</button>`).join('');
+}
+$('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
 
 /* ------------------------------------------------------------------ offline progress */
 {
