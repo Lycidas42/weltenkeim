@@ -139,6 +139,24 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .item h3{margin:0;font-size:16px}
 .item p{margin:2px 0 0;font-size:13px;color:var(--ink-dim);line-height:1.3}
 .buy{background:var(--glaube);color:#2a1d05;border:0;border-radius:10px;padding:8px 12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.wfree{margin:0 0 8px;font-size:14px}
+.wfree b{color:var(--soul)}
+.work{border-top:1px solid var(--line);padding-top:9px}
+.work.off .roles,.work.off .wdesc{opacity:.55}
+.whead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.whead h3{margin:0;font-size:17px}
+.whead .min{margin:1px 0 0;font-size:12px;color:var(--ink-dim)}
+.step{display:flex;align-items:center;gap:4px}
+.step button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:rgba(244,239,225,.08);font-size:20px;font-weight:800;line-height:1}
+.step button:disabled{opacity:.35;cursor:default}
+.step .n{min-width:30px;text-align:center;font-size:20px;color:var(--soul);font-variant-numeric:tabular-nums}
+.wdesc{margin:5px 0 4px;font-size:13px;color:var(--ink-dim);line-height:1.3}
+.roles{list-style:none;margin:0;padding:0;font-size:14px;display:grid;gap:2px}
+.roles b{color:var(--soul);font-variant-numeric:tabular-nums}
+.roles span{color:var(--ink-dim);font-size:12.5px}
+.wnote{margin:4px 0 0;font-size:12.5px;color:var(--holz);line-height:1.3}
+.wnote:empty{display:none}
+.later{margin:10px 0 0;font-size:12.5px;color:var(--ink-dim)}
 .buy:disabled{background:rgba(244,239,225,.12);color:var(--ink-dim);cursor:default}
 .bars{display:grid;gap:7px;margin:4px 0 12px}
 .formsLbl{margin:14px 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
@@ -187,7 +205,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <header class="top">
     <div class="res">
       <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
-      <div class="stat holz"><span class="lbl">Holz</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
+      <div class="stat holz"><span class="lbl">Bretter</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
       <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
       <button class="stat zeit" id="btnTime" aria-label="Uhrzeit, tippen für Zeitmenü" aria-haspopup="menu" aria-expanded="false">
         <span class="lbl">Uhrzeit</span>
@@ -197,6 +215,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       </button>
     </div>
     <div class="top-actions">
+      <button class="chip" id="btnWork">Arbeit</button>
       <button class="chip" id="btnShrine">Schrein</button>
       <button class="chip" id="btnFollow" hidden aria-pressed="true">Folgen ✕</button>
       <button class="chip" id="btnFox">Ruun</button>
@@ -209,6 +228,14 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
+
+  <section class="sheet" id="sheetWork" hidden aria-label="Arbeit">
+    <header><h2>Arbeit</h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <p class="sub">Weise einer Arbeitsstätte Bewohner zu, sie werden dort zu Spezialisten und ziehen in die passende Hütte. Wer frei bleibt, trägt Stämme und Bretter zwischen Lager und Sägemühle und betet sonst am Schrein.</p>
+    <p class="wfree" id="workFree"></p>
+    <div class="items" id="workItems"></div>
+    <p class="later">Später kommen weitere Rohstoffe dazu, etwa Stein und Erz.</p>
+  </section>
 
   <section class="sheet" id="sheetShrine" hidden aria-label="Schrein">
     <header><h2>Schrein</h2><button class="x" data-close aria-label="Schließen">×</button></header>
@@ -235,9 +262,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">
     <header><h2>Weltenkeim</h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <div class="credits">
-      <p>Prototyp: Idle-Dorf trifft Gottspiel. Bewohner fällen Holz, beten am Schrein und erzeugen so Glauben. Mittags machen sie Pause am Brunnen, abends holen sie ihre Laternen hervor und nachts schlafen sie in ihren Hütten, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
+      <p>Prototyp: Idle-Dorf trifft Gottspiel. Freie Bewohner beten am Schrein und erzeugen so Glauben. Unter „Arbeit“ machst du sie zu Spezialisten: Holzfäller bringen Stämme ins Lager, Förster pflanzen Bäume nach, Säger machen in der Sägemühle aus Stämmen Bretter für neue Gebäude, freie Bewohner tragen als Träger hin und her. Mittags machen sie Pause am Brunnen, abends holen sie ihre Laternen hervor und nachts schlafen sie in ihren Hütten, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
       <ul>
-        <li><b>Hand</b>: Bewohner packen und werfen. Bäume packen und halten oder nach oben ziehen, um sie auszureißen, dann werfen: Bei der Landung werden sie zu Holz. Deinen Tiergeist antippen, um ihn zu erziehen.</li>
+        <li><b>Hand</b>: Bewohner packen und werfen. Bäume packen und halten oder nach oben ziehen, um sie auszureißen, dann werfen: Bei der Landung werden sie zu Stämmen. Deinen Tiergeist antippen, um ihn zu erziehen.</li>
         <li><b>Tiergeist</b>: handelt selbstständig. Was du nach einer Tat streichelst, tut er öfter, was du mit einem Klaps tadelst, seltener. Im Panel kannst du ihn umbenennen, seine Gestalt wählen und ihm folgen.</li>
         <li><b>Formen</b>: Land heben oder senken.</li>
         <li><b>Wunder</b>: Regen lässt Wälder wachsen, Eile beschleunigt Bewohner.</li>
@@ -245,10 +272,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       </ul>
       <p><b>Assets</b></p>
       <ul>
-        <li>Gebäude, Bäume, Felsen, Wolken: KayKit Medieval Hexagon Pack von Kay Lousberg (kaylousberg.com), CC0.</li>
+        <li>Gebäude, Bäume, Felsen, Wolken, Kisten, Säcke und Fässer: KayKit Medieval Hexagon Pack von Kay Lousberg (kaylousberg.com), CC0.</li>
         <li>Tiergeist (Fuchs, Wolf, Hirsch, Stier, Alpaka, Katze): Animated Animal Pack und Animal Pack Vol.2 von Quaternius (quaternius.com), CC0. Der Fell-Fuchs der Nahansicht ist daraus in Blender abgeleitet.</li>
         <li>Gotteshand: selbst gebaut in Blender.</li>
-        <li>Terrain, Wasser und Bewohner sind im Code erzeugt.</li>
+        <li>Terrain, Wasser, Bewohner, Schrein und Lagerhalle sind im Code erzeugt.</li>
       </ul>
       <div class="row"><button class="act" id="btnReset">Spielstand zurücksetzen</button></div>
     </div>

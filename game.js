@@ -16,13 +16,14 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
   // Version 0.2.0 hat das Aussehen der Hand versehentlich in S.hand (die Ausbaustufe) geschrieben: hier reparieren
   const oldStyle = loaded.hand && typeof loaded.hand === 'object' ? loaded.hand : {};
-  Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), handStyle: Object.assign({}, S.handStyle, oldStyle, loaded.handStyle || {}) });
+  Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), handStyle: Object.assign({}, S.handStyle, oldStyle, loaded.handStyle || {}),
+    jobs: Object.assign({}, S.jobs, loaded.jobs || {}), huts: Object.assign({}, S.huts, loaded.huts || {}) });
   if (typeof S.hand !== 'number' || !isFinite(S.hand) || S.hand < 1) S.hand = 1;
   if (typeof S.hour !== 'number' || !isFinite(S.hour)) S.hour = 8;
 }
@@ -33,6 +34,20 @@ const houseCost = () => 12 + 6 * Math.max(0, S.houses - 2);
 const templeCost = () => Math.round(30 * Math.pow(1.7, S.temple - 1));
 const handCost = () => Math.round(40 * Math.pow(1.8, S.hand - 1));
 const SOUL_COST = 15;
+// Berufe: Spezialisten arbeiten von ihrer Hütte aus, jede Hütte hat Platz für `per` von ihnen. Hütten kosten Holz.
+const ROLES = {
+  lumber: { label: 'Holzfäller', hut: 'Holzfällerhütte', per: 4, cost: n => 14 + 8 * n },
+  forester: { label: 'Förster', hut: 'Försterhütte', per: 3, cost: n => 12 + 6 * n },
+  sawyer: { label: 'Säger', hut: 'Sägemühle', per: 2, cost: n => 24 + 12 * n },
+};
+// Arbeitsstätten: der Spieler weist ihnen Bewohner zu (0 oder mindestens `min`), sie verteilen sich auf die Berufe
+const WORKS = {
+  wood: { label: 'Wald', min: 3, desc: 'Holzfäller fällen Bäume und bringen die Stämme ins Lager. Förster pflanzen neue Bäume.', split: k => { const f = Math.max(1, Math.round(k / 3)); return { lumber: k - f, forester: f }; } },
+  saw: { label: 'Sägemühle', min: 1, desc: 'Säger sägen aus Stämmen Bretter, das Baumaterial für Hütten und Häuser. Freie Bewohner tragen die Stämme aus dem Lager zur Säge und die Bretter zurück.', split: k => ({ sawyer: k }) },
+};
+for (const id in WORKS) if (typeof S.jobs[id] !== 'number' || !isFinite(S.jobs[id]) || S.jobs[id] < 0) S.jobs[id] = 0;
+for (const r in ROLES) if (typeof S.huts[r] !== 'number' || !isFinite(S.huts[r]) || S.huts[r] < 1) S.huts[r] = 1;
+if (typeof S.logs !== 'number' || !isFinite(S.logs) || S.logs < 0) S.logs = 0;
 const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' } };
 
 /* ------------------------------------------------------------------ noise */
@@ -245,6 +260,37 @@ const water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x3aa
 water.receiveShadow = true;
 scene.add(water);
 
+// Trampelpfade: jeder Geländepunkt zählt, wie lange dort gelaufen wurde (Sekunden, gedeckelt).
+// Ab etwa 6 s färbt sich das Gras zu Erde, bei 30 s ist der Pfad voll ausgetreten. Ungenutzte Pfade wachsen langsam zu.
+// Später lassen sich ausgetretene Pfade mit Stein zu Straßen ausbauen (dafür ist WEAR die Grundlage).
+const WEAR = new Float32Array(N * N), WEAR_MAX = 40, wearDirty = new Set();
+const PATH_C = new THREE.Color(0xa88a5c), PATH_C2 = new THREE.Color(0x957548);
+if (Array.isArray(S.paths)) for (let i = 0; i + 1 < S.paths.length; i += 2) { const k = S.paths[i] | 0; if (k >= 0 && k < N * N) WEAR[k] = Math.min(WEAR_MAX, +S.paths[i + 1] || 0); }
+function vertexColor(k) {
+  const c = terrainColor(H[k], J[k]), w = WEAR[k];
+  if (w > 6 && H[k] > .15 && H[k] < 3.4) c.lerp(tg.copy(PATH_C).lerp(PATH_C2, J[k]), smooth(6, 30, w) * .92);
+  return c;
+}
+function addWear(x, z, dt) { // auf die vier umliegenden Punkte verteilt, so wird der Pfad breiter und weich
+  const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+  if (i < 1 || j < 1 || i >= SEG - 1 || j >= SEG - 1) return;
+  for (const [di, dj, wgt] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]]) {
+    const k = (j + dj) * N + i + di; WEAR[k] = Math.min(WEAR_MAX, WEAR[k] + dt * (.6 + wgt)); if (WEAR[k] > 5) wearDirty.add(k);
+  }
+}
+let wearT = 0;
+function updateWear(dt) {
+  wearT += dt; if (wearT < .5) return;
+  // alle halbe Sekunde: Pfade langsam zuwachsen lassen (Halbwertszeit etwa 10 Minuten) und geänderte Punkte neu färben
+  const decay = Math.pow(.5, wearT / 600); wearT = 0;
+  for (let k = 0; k < WEAR.length; k++) if (WEAR[k] > 0) { WEAR[k] *= decay; if (WEAR[k] < 6.5 && WEAR[k] > 4) wearDirty.add(k); if (WEAR[k] < .05) WEAR[k] = 0; }
+  if (!wearDirty.size) return;
+  for (const k of wearDirty) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
+  wearDirty.clear(); tCol.needsUpdate = true;
+}
+function savePaths() { const out = []; for (let k = 0; k < WEAR.length; k++) if (WEAR[k] > 3) out.push(k, Math.round(WEAR[k])); S.paths = out; }
+for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
+tCol.needsUpdate = true;
 function sculpt(px, pz, dir, dt) {
   const pw = 1 + 0.35 * (S.hand - 1), R = 2.6 * pw, str = 2.6 * pw * dt * dir;
   const i0 = Math.max(1, Math.floor((px - R + HALF) / CELL)), i1 = Math.min(SEG - 1, Math.ceil((px + R + HALF) / CELL));
@@ -253,7 +299,20 @@ function sculpt(px, pz, dir, dt) {
     const x = -HALF + i * CELL, z = -HALF + j * CELL, d = Math.hypot(x - px, z - pz) / R;
     if (d >= 1) continue;
     const k = j * N + i, h = clamp(H[k] + str * (1 + Math.cos(Math.PI * d)) / 2, -3, 8.5);
-    H[k] = h; tPos.setY(k, h); const c = terrainColor(h, J[k]); tCol.setXYZ(k, c.r, c.g, c.b);
+    H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
+  }
+  tPos.needsUpdate = true; tCol.needsUpdate = true;
+}
+// Bauplatz einebnen: innen ganz auf die Höhe der Mitte, zum Rand hin weich auslaufend
+function flattenAt(px, pz, R) {
+  const target = heightAt(px, pz);
+  const i0 = Math.max(1, Math.floor((px - R + HALF) / CELL)), i1 = Math.min(SEG - 1, Math.ceil((px + R + HALF) / CELL));
+  const j0 = Math.max(1, Math.floor((pz - R + HALF) / CELL)), j1 = Math.min(SEG - 1, Math.ceil((pz + R + HALF) / CELL));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const x = -HALF + i * CELL, z = -HALF + j * CELL, d = Math.hypot(x - px, z - pz) / R;
+    if (d >= 1) continue;
+    const k = j * N + i, h = H[k] + (target - H[k]) * smooth(1, .55, d);
+    H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
   tPos.needsUpdate = true; tCol.needsUpdate = true;
 }
@@ -277,8 +336,9 @@ const CREATURES = {
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb'];
-const [gHomeA, gHomeB, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand] = await Promise.all(files.map(load));
+  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
+  'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf'];
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 class Swarm {
@@ -291,7 +351,7 @@ class Swarm {
 const SB = 1.5, ST = 1.25;
 const statics = [];
 function place(gltf, x, z, ry = 0, s = SB) { const o = shadowify(gltf.scene.clone(true)); o.scale.setScalar(s); o.rotation.y = ry; scene.add(o); const e = { o, x, z }; statics.push(e); return e; }
-const SHRINE_POS = { x: 0, z: -2.4 }, WELL = { x: 1.4, z: 1.1 }, PRAY = { x: 0, z: -.7 }, CENTER = { x: 0, z: 0.4 };
+const SHRINE_POS = { x: 0, z: -2.4 }, LAGER = { x: 2.9, z: -2.3 }, WELL = { x: 1.4, z: 1.1 }, PRAY = { x: 0, z: -.7 }, CENTER = { x: 0, z: 0.4 };
 // Schrein des Weltenkeims: sechseckiger Steinsockel, sechs Runensteine, darüber schwebt leuchtend der Keim.
 // Jede Weihestufe (S.temple) lässt eine weitere Rune aufleuchten.
 const shrine = (() => {
@@ -344,6 +404,7 @@ function updateLights(t) {
       dummy.position.set(l.x, l.y, l.z); dummy.quaternion.copy(camera.quaternion); dummy.scale.setScalar(.42 * fl); dummy.updateMatrix(); haloMesh.setMatrixAt(n++, dummy.matrix);
       dummy.position.set(l.x, surfaceAt(l.x, l.z) + .02, l.z); dummy.quaternion.identity(); dummy.scale.setScalar(1.5); dummy.updateMatrix(); poolMesh.setMatrixAt(p++, dummy.matrix);
     }
+    for (const hs of huts) { const d = hutDoor(hs, .45); dummy.position.set(d.x, heightAt(d.x, d.z) + .02, d.z); dummy.quaternion.identity(); dummy.scale.setScalar(2.2 * fl); dummy.updateMatrix(); poolMesh.setMatrixAt(p++, dummy.matrix); }
     for (const hs of houses) {
       houseDoor(hs, .45, doorP); dummy.position.set(doorP.x, heightAt(doorP.x, doorP.z) + .02, doorP.z); dummy.quaternion.identity(); dummy.scale.setScalar(2.4 * fl); dummy.updateMatrix(); poolMesh.setMatrixAt(p++, dummy.matrix);
     }
@@ -385,7 +446,7 @@ let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o;
 const sites = [];
 for (const [r, n, off] of [[4.4, 8, .3], [6.2, 10, 0], [7.9, 12, .2]]) for (let i = 0; i < n; i++) {
   const a = off + i / n * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 2.6 || Math.hypot(x + 3.8, z + 1.2) < 2.2 || Math.hypot(x - WELL.x, z - WELL.z) < 1.6) continue;
+  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 2.6 || Math.hypot(x + 3.8, z + 1.2) < 2.2 || Math.hypot(x - WELL.x, z - WELL.z) < 1.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.4) continue;
   sites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false });
 }
 const houses = [];
@@ -400,6 +461,12 @@ function houseDoor(hs, d = .25, out = {}) {
   out.x = hs.x + lx * Math.cos(ry) + lz * Math.sin(ry); out.z = hs.z - lx * Math.sin(ry) + lz * Math.cos(ry); return out;
 }
 function freeSite() { return sites.find(s => !s.used && heightAt(s.x, s.z) > 0.25); }
+// Was als Nächstes gebaut wird: zuerst Hütten für zugewiesene Spezialisten ohne Platz, dann Wohnhäuser
+function nextBuild() {
+  const want = wantRoles();
+  for (const r in ROLES) if (want[r] > hutCap(r)) { const site = hutSite(r); if (site) return { role: r, label: ROLES[r].hut, cost: ROLES[r].cost(S.huts[r]), site }; }
+  const site = freeSite(); return site ? { role: null, label: 'Haus', cost: houseCost(), site } : null;
+}
 function addHouse(site) {
   site.used = true; const b = houses.length % 2, h = place(b ? gHomeB : gHomeA, site.x, site.z, site.ry, SB); h.b = b;
   h.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
@@ -410,6 +477,81 @@ S.houses = houses.length;
 let construction = null;
 const scaff = place(gScaff, 0, 0, 0, 0.95); scaff.o.visible = false;
 
+/* ------------------------------------------------------------------ Lager und Werkstätten */
+// Punkt im Modellraum (Einheiten des Modells) eines platzierten Gebäudes in Weltkoordinaten
+function localPt(e, lx, lz, out = {}) { const k = e.o.scale.x, ry = e.o.rotation.y, x = lx * k, z = lz * k; out.x = e.x + x * Math.cos(ry) + z * Math.sin(ry); out.z = e.z - x * Math.sin(ry) + z * Math.cos(ry); return out; }
+// Großes zentrales Lager: offene Halle; draußen wachsen Stammstapel und Bretterstapel mit dem Bestand
+const lager = (() => {
+  const g = new THREE.Group(), mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: .9, flatShading: true });
+  const stone = mat(0xa29c90), wood = mat(0x8a5a33), wood2 = mat(0x6e4526), roof = mat(0x3f6db3), plank = mat(0xd2a46c);
+  const box = (w, h, d, m, x, y, z, rx = 0) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.x = rx; g.add(o); return o; };
+  const W = 2.3, D = 1.4, H = .95, B = .14;
+  box(W + .2, B, D + .2, stone, 0, B / 2, 0);
+  for (const x of [-W / 2, 0, W / 2]) for (const z of [-D / 2, D / 2]) box(.1, H, .1, wood, x, B + H / 2, z);
+  box(W, H * .9, .05, wood2, 0, B + H * .45, -D / 2 + .02);                              // Rückwand
+  for (const sx of [-1, 1]) box(.05, H * .9, D, wood2, sx * (W / 2 - .02), B + H * .45, 0); // Seitenwände
+  for (const z of [-D / 2, D / 2]) box(W + .12, .08, .08, wood, 0, B + H, z);
+  const run = D / 2 + .22, ang = .62, len = run / Math.cos(ang), top = B + H + .04;
+  for (const sz of [-1, 1]) box(W + .44, .07, len, roof, 0, top + Math.tan(ang) * run / 2, sz * run / 2, sz * ang);
+  box(W + .48, .09, .09, wood, 0, top + Math.tan(ang) * run + .02, 0);                   // First
+  const gable = new THREE.Shape([new THREE.Vector2(-D / 2, 0), new THREE.Vector2(D / 2, 0), new THREE.Vector2(0, Math.tan(ang) * D / 2)]);
+  for (const sx of [-1, 1]) { const o = new THREE.Mesh(new THREE.ExtrudeGeometry(gable, { depth: .05, bevelEnabled: false }), wood2); o.rotation.y = Math.PI / 2; o.position.set(sx * (W / 2) - .025, top - .02, 0); g.add(o); }
+  // Vorräte in der Halle
+  const prop = (gl, x, z, ry, k) => { const o = gl.scene.clone(true); o.position.set(x, B, z); o.rotation.y = ry; o.scale.setScalar(k); g.add(o); return o; };
+  prop(gCrate, -.8, -.38, .2, 1.6); prop(gCrate, -.42, -.42, -.1, 1.6); prop(gCrate, -.62, -.4, .4, 1.3).position.y = B + .32;
+  prop(gSack, .1, -.4, .5, 1.8); prop(gSack, .3, -.35, -.3, 1.8); prop(gBarrel, .65, -.38, 0, 1.6); prop(gBarrel, .88, -.2, 0, 1.6); prop(gBarrel, .85, -.48, 0, 1.6);
+  // Stammstapel (rechts außen) und Bretterstapel (links außen)
+  const logs = [], planks = [];
+  for (let k = 0; k < 5; k++) { const o = gLogs.scene.clone(true); o.position.set(W / 2 + .45 + (k % 2) * .05, (k >> 1) * .19, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; o.scale.setScalar(1.3); g.add(o); logs.push(o); }
+  const pg = mergeGeometries([0, 1, 2, 3].map(k => new THREE.BoxGeometry(.62, .035, .13).translate((k % 2) * .02, .02 + k * .037, (k % 2 ? .07 : -.07))));
+  for (let k = 0; k < 5; k++) { const o = new THREE.Mesh(pg, plank); o.position.set(-W / 2 - .45, (k >> 1) * .15, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; g.add(o); planks.push(o); }
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.rotation.y = Math.atan2(-LAGER.x, -LAGER.z + .4); // Front zum Dorfplatz
+  scene.add(g); const e = { o: g, x: LAGER.x, z: LAGER.z, logs, planks };
+  statics.push(e); return e;
+})();
+const lagerDrop = () => localPt(lager, rnd(.6), 1.05); // abladen vor der offenen Front
+function updateLagerStock() {
+  lager.logs.forEach((o, k) => { o.visible = S.logs > k * 6; });
+  lager.planks.forEach((o, k) => { o.visible = S.holz > k * 12; });
+}
+// Hütten der Spezialisten; Tür und Arbeitsplatz im Modellraum
+const HUT = {
+  lumber: { gl: gHutRed, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .45 } },
+  forester: { gl: gHutGreen, k: SB, door: { x: 0, z: .32 }, work: { x: .28, z: .6 } },
+  sawyer: { gl: gSawmill, k: 1.2, door: { x: -.32, z: .62 }, work: { x: .3, z: .55 } },
+};
+const huts = [];
+let worldReady = false; // erst wenn die Bäume stehen, können Hütten eine Lichtung schlagen
+// Werkstätten haben eigene Bauplätze am Waldrand, so nehmen sie den Wohnhäusern keinen Platz weg
+const hutSites = [];
+for (let i = 0; i < 18; i++) {
+  const a = .15 + i / 18 * Math.PI * 2, r = 11, x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
+  const slope = Math.max(...[[.8, 0], [-.8, 0], [0, .8], [0, -.8]].map(([dx, dz]) => Math.abs(heightAt(x + dx, z + dz) - h)));
+  if (h > .3 && h < 2.8 && slope < .55) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
+}
+// die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
+function hutSite(role) {
+  const free = hutSites.filter(st => !st.used); if (!free.length) return null;
+  if (role !== 'sawyer') return free[0];
+  return free.reduce((b, st) => (Math.hypot(st.x - LAGER.x, st.z - LAGER.z) < Math.hypot(b.x - LAGER.x, b.z - LAGER.z) ? st : b));
+}
+// Lichtung: Bäume auf dem Bauplatz verschwinden
+function clearAround(x, z, r) { if (!worldReady) return; for (const t of trees) if (!t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r) { if (t.reserved && t.reserved !== 'fox') t.reserved.tree = null; t.reserved = null; t.gone = true; } }
+function addHut(role, site) {
+  site.used = true; clearAround(site.x, site.z, 1.5); flattenAt(site.x, site.z, 1.9); const H = HUT[role], e = place(H.gl, site.x, site.z, site.ry, H.k);
+  e.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
+  e.role = role; e.H = H; e.saw = role === 'sawyer' ? e.o.getObjectByName('building_lumbermill_saw_blue') : null; e.sawing = 0;
+  e.logs = 0; e.planks = 0; // Vorrat an der Säge: Träger bringen Stämme und holen Bretter
+  if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); }
+  if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(gTreeA, p.x, p.z, Math.random() * 6, ST * .2); }
+  huts.push(e); return e;
+}
+const hutDoor = (e, d = .25) => localPt(e, e.H.door.x, e.H.door.z + d / e.o.scale.x);
+const hutWork = e => localPt(e, e.H.work.x, e.H.work.z);
+for (const r in ROLES) for (let i = 0; i < S.huts[r]; i++) { const st = hutSite(r); if (st) addHut(r, st); }
+for (const r in ROLES) S.huts[r] = Math.max(1, huts.filter(h => h.role === r).length);
+
 /* ------------------------------------------------------------------ trees & rocks */
 const treeSwarms = [new Swarm(parts(gTreeA), 500), new Swarm(parts(gTreeB), 500)];
 const stumpSwarm = new Swarm(parts(gStump), 500);
@@ -418,15 +560,17 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: Math.random() < .5 ? 0 : 1, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || treeNear(x, z, 1.0)) continue;
+  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
-function chopTree(t) { t.alive = false; t.stumpT = 45; if (t.reserved) t.reserved = null; }
+worldReady = true;
+function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
+const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 const rockSwarms = [new Swarm(parts(gRockA), 40), new Swarm(parts(gRockC), 40)];
 const rocks = [];
 for (let tries = 0; tries < 2000 && rocks.length < 34; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .2 || Math.hypot(x, z) < 7) continue;
+  if (h < .2 || Math.hypot(x, z) < 7 || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2)) continue; // Werkstatt-Bauplätze frei halten
   rocks.push({ x, z, type: rocks.length % 2, s: 1.6 + Math.random() * 2.2, r: Math.random() * 6.28 });
 }
 
@@ -510,7 +654,24 @@ const LANTERN_C = -.059;
 const vLanternGlass = new THREE.InstancedMesh(new THREE.CylinderGeometry(.022, .022, .046, 6).translate(0, LANTERN_C, 0), new THREE.MeshBasicMaterial({ color: 0xffd27a, toneMapped: false }), VCAP);
 vLanternGlass.frustumCulled = false; vLanternGlass.count = 0; scene.add(vLanternGlass);
 const vBread = vMesh(new THREE.CapsuleGeometry(.018, .03, 3, 6).rotateZ(Math.PI / 2).translate(0, -.14, .012), 0xc98b4c, .9);
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood, ...vAxe, vLantern, vLanternGlass, vBread];
+// Spaten des Försters: wie die Axt im Schulterraum, Blatt unten
+const vShovel = [
+  vMesh(new THREE.CylinderGeometry(.01, .011, .27, 6).translate(0, -.175, 0), 0x7a5230, .9),
+  vMesh(mergeGeometries([new THREE.BoxGeometry(.055, .075, .01).translate(0, -.34, 0), new THREE.BoxGeometry(.04, .012, .012).translate(0, -.04, 0)]), 0x8e979e, .4),
+];
+// Setzling mit Erdballen, hängt aufrecht an der Hand
+const vSapling = [
+  vMesh(mergeGeometries([new THREE.SphereGeometry(.026, 6, 4).translate(0, -.02, 0), new THREE.CylinderGeometry(.005, .007, .07, 5).translate(0, .03, 0)]), 0x6b4a2e, .95),
+  vMesh(new THREE.ConeGeometry(.04, .09, 6).translate(0, .1, 0), 0x4f9a3c, .8),
+];
+const vPlanks = vMesh(mergeGeometries([0, 1, 2].map(k => new THREE.BoxGeometry(.3, .016, .065).translate(0, .19 + k * .018, .13 + (k - 1) * .012))), 0xd8aa70, .85);
+// Hüte zeigen den Beruf: rote Mütze (Holzfäller), grüner Filzhut (Förster), braune Schiebermütze (Säger)
+const vHats = {
+  lumber: vMesh(mergeGeometries([new THREE.SphereGeometry(.084, 10, 6, 0, Math.PI * 2, 0, Math.PI * .52).translate(0, HEAD_Y + .006, 0), new THREE.CylinderGeometry(.086, .086, .025, 10).translate(0, HEAD_Y + .006, 0), new THREE.SphereGeometry(.022, 6, 4).translate(0, HEAD_Y + .09, 0)]), 0xb8392c, .95),
+  forester: vMesh(mergeGeometries([new THREE.CylinderGeometry(.125, .125, .012, 12).translate(0, HEAD_Y + .035, 0), new THREE.CylinderGeometry(.06, .078, .075, 10).translate(0, HEAD_Y + .075, 0)]), 0x3f6b2a, .95),
+  sawyer: vMesh(mergeGeometries([new THREE.SphereGeometry(.083, 10, 6, 0, Math.PI * 2, 0, Math.PI * .45).scale(1, .8, 1).translate(0, HEAD_Y + .02, -.004), new THREE.BoxGeometry(.1, .01, .05).translate(0, HEAD_Y + .03, .085)]), 0x6b4a2e, .95),
+};
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats)];
 // Lichtschein nachts: Lichthöfe um Laternen (zur Kamera gedreht) und warme Lichtflecken am Boden vor Türen und unter Laternen
 const glowMat = c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
 const haloMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(0xffb85c), VCAP);
@@ -540,6 +701,14 @@ function updateChips(dt) {
   }
   chips.forEach((c, i) => { dummy.position.set(c.x, c.y, c.z); dummy.rotation.set(c.r, c.r * .7, 0); dummy.scale.setScalar(Math.min(1, c.life / .2)); dummy.updateMatrix(); chipMesh.setMatrixAt(i, dummy.matrix); });
   chipMesh.count = chips.length; chipMesh.instanceMatrix.needsUpdate = true;
+}
+// Spatenstich: anheben, mit Gewicht hineinstechen, Erde herauswerfen
+const DIG_T = .9;
+function digPose(p) {
+  const sm = x => x * x * (3 - 2 * x);
+  if (p < .4) { const e = sm(p / .4); return { arm: -.75 - .55 * e, tilt: .1 }; }
+  if (p < .55) { const e = (p - .4) / .15; return { arm: -1.3 + .75 * e * e, tilt: .1 + .25 * e }; }
+  const e = sm((p - .55) / .45); return { arm: -.55 - .2 * e, tilt: .35 - .25 * e };
 }
 // Ein Axthieb dauert CHOP_T Sekunden: ausholen, zuschlagen (Treffer bei CHOP_HIT), zurücknehmen
 const CHOP_T = .8, CHOP_HIT = .72;
@@ -573,6 +742,7 @@ function spawnVillager(x, z) {
 }
 const homeSpot = () => { const h = houses[Math.floor(Math.random() * houses.length)] || { x: 0, z: 0 }; return { x: h.x + rnd(1), z: h.z + rnd(1) }; };
 for (let i = 0; i < Math.min(S.pop, cap()); i++) { const p = homeSpot(); spawnVillager(p.x, p.z); }
+reconcileJobs();
 
 /* ------------------------------------------------------------------ creature (Ruun) */
 const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^Walk$/, run: /^Gallop$/, attack: /^Attack/, hit: /^Idle_HitReact/, jump: /^Jump/ };
@@ -873,7 +1043,7 @@ function renderPortrait(dt, t) {
 const tmpV2 = new THREE.Vector2();
 useCreature(S.creature, gCreature);
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
-const ACT_DESC = { help: 'Holz zum Brunnen gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
+const ACT_DESC = { help: 'einen Baum ins Lager gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 
 /* ------------------------------------------------------------------ hand */
@@ -1003,9 +1173,49 @@ function floatText(x, y, z, text, cls = 'w') {
 }
 let toastTimer = 0;
 function toast(msg, dur = 3.2) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); toastTimer = dur; }
-let incomeAcc = 0, rate = 0, holzAcc = 0;
+let incomeAcc = 0, rate = 0;
 function addGlaube(n, x, y, z) { S.glaube += n; incomeAcc += n; if (x !== undefined) floatText(x, y + .7, z, '+' + fmt1(n) + ' ✦', 'g'); }
-function addHolz(n, x, y, z) { S.holz += n; if (x !== undefined) floatText(x, y + .7, z, '+' + n + ' Holz', 'h'); }
+function addHolz(n, x, y, z) { S.holz += n; if (x !== undefined) floatText(x, y + .7, z, '+' + n + ' Bretter', 'h'); }
+function addLogs(n, x, y, z) { S.logs += n; if (x !== undefined) floatText(x, y + .7, z, `+${n} ${n === 1 ? 'Stamm' : 'Stämme'}`, 'h'); }
+
+/* ------------------------------------------------------------------ Berufe */
+// Zugewiesene Bewohner je Arbeitsstätte (0 oder mindestens min, höchstens so viele, wie es Bewohner gibt)
+function effJobs() {
+  const out = {}; let free = villagers.length;
+  for (const id in WORKS) { let k = Math.min(S.jobs[id] | 0, free); if (k < WORKS[id].min) k = 0; out[id] = k; free -= k; }
+  return out;
+}
+// gewünschte Spezialisten je Beruf (ohne Rücksicht auf Hüttenplätze)
+function wantRoles() { const e = effJobs(), w = {}; for (const r in ROLES) w[r] = 0; for (const id in WORKS) { const sp = WORKS[id].split(e[id]); if (e[id]) for (const r in sp) w[r] += sp[r]; } return w; }
+function hutCap(r) { return huts.filter(h => h.role === r).length * ROLES[r].per; }
+function leaveJob(v) {
+  if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
+  // Last abgeben: ein Stamm geht zurück ins Lager, fertige Bretter zählen als Holz (außer er ist schon auf dem Weg dorthin)
+  if (v.state === 'saw' && v.hut) v.hut.logs++; // angefangener Stamm bleibt an der Säge
+  const keep = v.state === 'walk' && v.next === 'store';
+  if (v.carry && !keep) { if (v.carry === 1) S.logs++; v.carry = 0; }
+  if (['chop', 'plant', 'saw'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
+  v.role = null; v.hut = null; v.saplings = 0;
+}
+// Bewohner auf Berufe verteilen: so viele wie gewünscht und Hüttenplätze frei sind, der Rest betet als Dorfbewohner
+function reconcileJobs() {
+  const want = wantRoles();
+  for (const r in ROLES) {
+    const n = Math.min(want[r], hutCap(r)), cur = villagers.filter(v => v.role === r);
+    // Überzählige gehen zurück ins Dorf (zuerst die, die gerade nichts tragen)
+    cur.sort((a, b) => (a.carry ? 1 : 0) - (b.carry ? 1 : 0));
+    for (let k = n; k < cur.length; k++) leaveJob(cur[k]);
+    let need = n - Math.min(n, cur.length);
+    for (const v of villagers) {
+      if (need <= 0) break;
+      if (v.role || v.haul || v.state === 'grabbed' || v.state === 'falling') continue;
+      const hs = huts.filter(h => h.role === r).sort((a, b) => villagers.filter(x => x.hut === a).length - villagers.filter(x => x.hut === b).length)[0];
+      v.role = r; v.hut = hs; v.saplings = 0; need--;
+      if (v.state === 'pray' || v.state === 'idle') idle(v, .2 + Math.random() * .6);
+    }
+  }
+}
+function roleCount(r) { return villagers.filter(v => v.role === r).length; }
 
 /* ------------------------------------------------------------------ villager AI */
 function walk(v, x, z, next) { v.state = 'walk'; v.tx = x; v.tz = z; v.next = next; }
@@ -1018,15 +1228,71 @@ function goHome(v) {
 function goPray(v) { const a = Math.random() * Math.PI * 2, r = 1.35 + Math.random() * .6; walk(v, SHRINE_POS.x + Math.cos(a) * r, SHRINE_POS.z + Math.sin(a) * r, 'pray'); }
 function findTree(x, z) {
   let best = null, bd = 1e9;
-  for (let i = 0; i < 10; i++) { const t = trees[Math.floor(Math.random() * trees.length)]; if (!t || !t.alive || t.gone || t.reserved || t.g < .7) continue; const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd) { bd = d; best = t; } }
+  for (let i = 0; i < 24; i++) { const t = trees[Math.floor(Math.random() * trees.length)]; if (!t || !t.alive || t.gone || t.reserved || t.g < .7) continue; const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd) { bd = d; best = t; } }
   return best;
 }
 function chooseJob(v) {
   if (S.hour >= BED || S.hour < WAKE) { goHome(v); return; }           // Feierabend: heim in die Hütte
   if (S.hour >= LUNCH[0] && S.hour < LUNCH[1]) { goLunch(v); return; } // Mittagspause am Brunnen
-  const r = Math.random();
-  if (r < .55) { const t = findTree(v.x, v.z); if (t) { t.reserved = v; v.tree = t; const a = Math.random() * 6.28; walk(v, t.x + Math.cos(a) * .4, t.z + Math.sin(a) * .4, 'tree'); return; } }
-  if (r < .92) goPray(v); else { const p = homeSpot(); walk(v, p.x, p.z, 'rest'); }
+  if (v.role && v.hut) { JOB[v.role](v); return; }
+  if (haulJob(v)) return;
+  // Dorfbewohner beten am Schrein, ab und zu ruhen sie sich aus
+  if (Math.random() < .88) goPray(v); else { const p = homeSpot(); walk(v, p.x, p.z, 'rest'); }
+}
+// Träger: freie Dorfbewohner bringen Stämme aus dem Lager zur Sägemühle und Bretter zurück ins Lager.
+// Was unterwegs ist, wird pro Mühle mitgezählt, so tragen immer nur so viele, wie gebraucht werden.
+const MILL_BUF = 4;
+function hauling(hs, kind) { let n = 0; for (const v of villagers) if (v.haul && v.haul.hut === hs && v.haul.kind === kind) n += v.haul.n; return n; }
+function haulJob(v) {
+  if (v.haul) { // angefangenen Auftrag fortsetzen (z. B. nach Mittagspause, Flucht oder Wurf)
+    const H = v.haul;
+    if (v.carry === 1) { const p = hutWork(H.hut); walk(v, p.x + rnd(.2), p.z + .2, 'dropLogs'); return true; }
+    if (v.carry === 2) { const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); return true; }
+    v.haul = null;
+  }
+  for (const hs of huts) {
+    if (hs.role !== 'sawyer') continue;
+    const out = hs.planks - hauling(hs, 'out');
+    if (out >= 2) { v.haul = { hut: hs, kind: 'out', n: Math.min(4, out) }; const p = hutWork(hs); walk(v, p.x + rnd(.2), p.z + .25, 'pickPlanks'); return true; }
+    const room = MILL_BUF - hs.logs - hauling(hs, 'in'), have = Math.floor(S.logs) - villagers.reduce((a, x) => a + (x.haul && x.haul.kind === 'in' && !x.carry ? x.haul.n : 0), 0);
+    if (room >= 1 && have >= 1) { v.haul = { hut: hs, kind: 'in', n: Math.min(2, room, have) }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickLogs'); return true; }
+  }
+  return false;
+}
+function atHut(v, next = 'rest') { const p = hutWork(v.hut); walk(v, p.x + rnd(.25), p.z + rnd(.25), next); }
+// freier Platz für einen Setzling: leerer Baumplatz oder Stumpf nahe der Hütte, sonst ein neuer Platz am Waldrand
+function plantSpot(x, z) {
+  let best = null, bd = 1e9;
+  for (const t of trees) if (freeSlot(t)) { const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd) { bd = d; best = t; } }
+  if (best && bd < 14 * 14) return { tree: best };
+  const alive = trees.filter(t => t.alive && !t.gone);
+  for (let i = 0; i < 30 && alive.length; i++) {
+    const o = alive[Math.floor(Math.random() * alive.length)], a = Math.random() * 6.28, r = 1.2 + Math.random() * 1.3, px = o.x + Math.cos(a) * r, pz = o.z + Math.sin(a) * r, h = heightAt(px, pz);
+    if (h > .45 && h < 3 && Math.hypot(px, pz) > 8.5 && !treeNear(px, pz, 1) && !hutSites.some(st => st.used && Math.hypot(st.x - px, st.z - pz) < 1.5) && trees.length < 480) return { x: px, z: pz };
+  }
+  return best ? { tree: best } : null;
+}
+const JOB = {
+  lumber(v) { // Baum suchen (nahe der eigenen Hütte), fällen, Stamm ins Lager
+    const t = findTree(v.hut.x, v.hut.z);
+    if (t) { t.reserved = v; v.tree = t; const a = Math.random() * 6.28; walk(v, t.x + Math.cos(a) * .4, t.z + Math.sin(a) * .4, 'tree'); } else atHut(v);
+  },
+  forester(v) { // Setzlinge an der Hütte holen, dann einen nach dem anderen pflanzen
+    if (!(v.saplings > 0)) { atHut(v, 'fetchSap'); return; }
+    const sp = plantSpot(v.hut.x, v.hut.z); if (!sp) { atHut(v); return; }
+    v.plant = sp; const tx = sp.tree ? sp.tree.x : sp.x, tz = sp.tree ? sp.tree.z : sp.z, a = Math.random() * 6.28;
+    if (sp.tree) { sp.tree.reserved = v; v.tree = sp.tree; }
+    walk(v, tx + Math.cos(a) * .3, tz + Math.sin(a) * .3, 'plant');
+  },
+  sawyer(v) { // bleibt an der Säge und sägt, was die Träger bringen
+    const p = hutWork(v.hut);
+    if (Math.hypot(v.x - p.x, v.z - p.z) > .3) { walk(v, p.x, p.z, 'saw'); return; }
+    startSaw(v);
+  },
+};
+function startSaw(v) {
+  const hs = v.hut, sw = localPt(hs, .28, .12); v.h = Math.atan2(sw.x - v.x, sw.z - v.z);
+  if (hs.logs >= 1) { hs.logs--; v.carry = 1; v.state = 'saw'; v.timer = 2.4; } else idle(v, 1); // wartet auf Stämme
 }
 function stepTo(o, tx, tz, d) {
   const dx = tx - o.x, dz = tz - o.z, dist = Math.hypot(dx, dz);
@@ -1038,7 +1304,25 @@ function stepTo(o, tx, tz, d) {
 function arrive(v) {
   switch (v.next) {
     case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
-    case 'store': v.carry = 0; addHolz(1); holzAcc++; if (Math.random() < .6 && workTime()) goPray(v); else idle(v, 1); break;
+    case 'store': v.carry = 0; addLogs(1, v.x, v.y + .2, v.z); idle(v, .4); break;
+    case 'saw': if (v.role === 'sawyer' && v.hut) startSaw(v); else idle(v, .4); break;
+    case 'pickLogs': { // Träger nimmt Stämme im Lager
+      const H = v.haul, n = H ? Math.min(H.n, Math.floor(S.logs)) : 0;
+      if (!n) { v.haul = null; idle(v, .5); break; }
+      S.logs -= n; H.n = n; v.carry = 1; const p = hutWork(H.hut); walk(v, p.x + rnd(.2), p.z + .2, 'dropLogs'); break;
+    }
+    case 'dropLogs': if (v.haul) { v.haul.hut.logs += v.haul.n; floatText(v.x, v.y + .6, v.z, `${v.haul.n} ${v.haul.n === 1 ? 'Stamm' : 'Stämme'} abgeladen`, 'h'); } v.carry = 0; v.haul = null; idle(v, .3); break;
+    case 'pickPlanks': { // Träger holt Bretter an der Säge
+      const H = v.haul, n = H ? Math.min(H.n, H.hut.planks) : 0;
+      if (!n) { v.haul = null; idle(v, .5); break; }
+      H.hut.planks -= n; H.n = n; v.carry = 2; const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); break;
+    }
+    case 'deliver': { const n = v.haul ? v.haul.n : 2; v.carry = 0; v.haul = null; addHolz(n, v.x, v.y + .2, v.z); idle(v, .4); break; }
+    case 'fetchSap': v.saplings = 3; idle(v, .9); break;
+    case 'plant':
+      if (v.plant && (!v.plant.tree || v.plant.tree.reserved === v)) { v.state = 'plant'; v.timer = 3 * DIG_T; v.cp = 0; const pt = v.plant.tree || v.plant; v.h = Math.atan2(pt.x - v.x, pt.z - v.z); }
+      else { v.plant = null; idle(v, .3); }
+      break;
     case 'pray': v.state = 'pray'; v.timer = 2 * PRAY_T; v.h = Math.atan2(SHRINE_POS.x - v.x, SHRINE_POS.z - v.z); break;
     case 'lunch': v.state = 'lunch'; v.until = LUNCH[1] + Math.random() * .4; v.h = Math.atan2(WELL.x - v.x, WELL.z - v.z); break;
     case 'sleep': // verschwindet in der Hütte, wacht morgens zu einer eigenen Zeit auf
@@ -1053,7 +1337,7 @@ function updateVillager(v, dt, t) {
   const sp = .95 * (v.haste > 0 ? 2.3 : 1);
   switch (v.state) {
     case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
-    case 'walk': if (stepTo(v, v.tx, v.tz, sp * dt)) arrive(v); break;
+    case 'walk': addWear(v.x, v.z, dt); if (stepTo(v, v.tx, v.tz, sp * dt)) arrive(v); break;
     case 'chop': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
       const tr = v.tree, now = v.cp % 1;
@@ -1061,7 +1345,7 @@ function updateVillager(v, dt, t) {
         tr.shake = 1; spawnChips(tr.x - Math.sin(v.h) * .08, surfaceAt(tr.x, tr.z) + .22, tr.z - Math.cos(v.h) * .08, v.h);
       }
     }
-      if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
+      if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; const p = lagerDrop(); walk(v, p.x, p.z, 'store'); } else idle(v, .4); } break;
     case 'pray': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = ((2 * PRAY_T - v.timer) / PRAY_T) % 1; v.timer -= k;
       const now = ((2 * PRAY_T - v.timer) / PRAY_T) % 1;
@@ -1069,6 +1353,26 @@ function updateVillager(v, dt, t) {
     }
       if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'lunch': if (S.hour >= v.until || S.hour < LUNCH[0]) idle(v, Math.random() * 1.5); break;
+    case 'saw': { // Stamm an der Kreissäge entlangschieben, Sägemehl fliegt
+      const k = dt * (v.haste > 0 ? 2 : 1); v.timer -= k; if (v.hut) v.hut.sawing = .3;
+      if (Math.random() < dt * 6 && v.hut) { const sw = localPt(v.hut, .28, .12); spawnChips(sw.x, heightAt(sw.x, sw.z) + .45, sw.z, v.h + Math.PI); }
+      if (v.timer <= 0) { v.carry = 0; if (v.hut) { v.hut.planks += 2; floatText(v.x, v.y + .7, v.z, '+2 Bretter', 'h'); } idle(v, .2); }
+      break;
+    }
+    case 'plant': {
+      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
+      const now = v.cp % 1; if ((before < .55 && now >= .55) || now < before) spawnChips(v.x + Math.sin(v.h) * .2, v.y + .03, v.z + Math.cos(v.h) * .2, v.h + Math.PI);
+      if (v.timer <= 0) {
+        const sp = v.plant; v.plant = null; v.saplings = Math.max(0, (v.saplings || 0) - 1);
+        let t = null;
+        if (sp && sp.tree && sp.tree.reserved === v) { t = sp.tree; t.reserved = null; Object.assign(t, { alive: true, g: .12, stumpT: 0, regrow: 0, type: Math.random() < .5 ? 0 : 1 }); }
+        else if (sp && !sp.tree && !treeNear(sp.x, sp.z, .9)) t = addTree(sp.x, sp.z, .12);
+        if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
+        if (t) floatText(t.x, heightAt(t.x, t.z) + .5, t.z, 'Gepflanzt', 's');
+        idle(v, .4);
+      }
+      break;
+    }
     case 'sleep': if (S.hour >= v.wake && S.hour < BED) idle(v, .2 + Math.random()); break;
     case 'flee': v.timer -= dt; if (stepTo(v, v.tx, v.tz, 2.2 * dt) || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
@@ -1121,13 +1425,13 @@ function updateFox(dt, t) {
     case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
-    case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; foxWalk(WELL.x - .9, WELL.z + .6, 'store'); } break;
+    case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); } break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') {
-        // Baum ablegen: er liegt kurz am Brunnen und wird zu Holz
+        // Baum ablegen: er liegt kurz vor dem Lager und wird zu Stämmen
         const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
-        addHolz(6, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
+        addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
       }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; }
     } break;
@@ -1141,7 +1445,7 @@ function updateFox(dt, t) {
         } else {
           fallTree(tr, fox.x, fox.z, 4.5);
           floatText(tr.x, surfaceAt(tr.x, tr.z) + 1.4, tr.z, 'Krach!', 'w');
-          for (const v of villagers) { const dx = v.x - fox.x, dz = v.z - fox.z, d = Math.hypot(dx, dz); if (d < 4.5 && ['idle', 'walk', 'pray', 'chop', 'lunch'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 2; v.tx = v.x + dx / (d || 1) * 3; v.tz = v.z + dz / (d || 1) * 3; } }
+          for (const v of villagers) { const dx = v.x - fox.x, dz = v.z - fox.z, d = Math.hypot(dx, dz); if (d < 4.5 && ['idle', 'walk', 'pray', 'chop', 'lunch', 'plant'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 2; v.tx = v.x + dx / (d || 1) * 3; v.tz = v.z + dz / (d || 1) * 3; } }
           foxFinish('mischief');
         }
       } else foxIdle(1);
@@ -1255,11 +1559,11 @@ function treeAt(cx, cy) {
 function uprootTree(tr) {
   if (tr.reserved === 'fox') { fox.tree = null; if (fox.state === 'walk' || fox.state === 'work') foxIdle(1); }
   else if (tr.reserved) tr.reserved.tree = null;
-  tr.reserved = null; tr.alive = false; tr.stumpT = 0; tr.regrow = 50 + Math.random() * 30;
+  tr.reserved = null; tr.alive = false; tr.stumpT = 0; tr.regrow = 0;
   Object.assign(heldTree, { on: true, flying: false, type: tr.type, g: tr.g, rot: tr.rot, tilt: 0 });
   setHoldOff(tr.x, tr.z);
   floatText(tr.x, heightAt(tr.x, tr.z) + 2.2, tr.z, 'Ausgerissen!', 'w');
-  for (const v of villagers) { const dx = v.x - tr.x, dz = v.z - tr.z, d = Math.hypot(dx, dz); if (d < 2.5 && ['idle', 'walk', 'chop'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 1.5; v.tx = v.x + dx / (d || 1) * 2.5; v.tz = v.z + dz / (d || 1) * 2.5; } }
+  for (const v of villagers) { const dx = v.x - tr.x, dz = v.z - tr.z, d = Math.hypot(dx, dz); if (d < 2.5 && ['idle', 'walk', 'chop', 'plant'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 1.5; v.tx = v.x + dx / (d || 1) * 2.5; v.tz = v.z + dz / (d || 1) * 2.5; } }
 }
 function throwTree() {
   const k = clamp(hand.vel.length(), 0, 12) / (hand.vel.length() || 1);
@@ -1320,7 +1624,7 @@ function updateTrees(dt, t) {
     if (heldTree.pos.y < Math.max(gy, 0) && heldTree.vel.y < 0) {
       heldTree.on = false; heldTree.flying = false;
       if (gy < -.1) floatText(heldTree.pos.x, .6, heldTree.pos.z, 'Platsch!', 'w');
-      else { const n = Math.max(1, Math.round(3 * heldTree.g)); addHolz(n, heldTree.pos.x, gy + .4, heldTree.pos.z); }
+      else { const n = Math.max(1, Math.round(3 * heldTree.g)); addLogs(n, heldTree.pos.x, gy + .4, heldTree.pos.z); }
       return;
     }
   } else heldTree.pos.set(hand.g.position.x, hand.g.position.y - .95 * s, hand.g.position.z);
@@ -1477,9 +1781,46 @@ document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener(
 
 /* ------------------------------------------------------------------ sheets */
 function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidden = true); $('app').classList.remove('sheet-open'); }
-function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
+function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetWork') renderWork(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
+$('btnWork').addEventListener('click', () => openSheet('sheetWork'));
+// Arbeits-Panel: Aufbau einmal, danach nur Texte aktualisieren (sonst gehen Klicks verloren)
+$('workItems').innerHTML = Object.entries(WORKS).map(([id, W]) => `<div class="work" data-work="${id}">
+  <div class="whead"><div><h3>${W.label}</h3><p class="min">mindestens ${W.min} Bewohner</p></div>
+    <div class="step" role="group" aria-label="Bewohner für ${W.label}"><button data-d="-1" aria-label="Weniger">−</button><b class="n">0</b><button data-d="1" aria-label="Mehr">+</button></div></div>
+  <p class="wdesc">${W.desc}</p><ul class="roles"></ul><p class="wnote"></p></div>`).join('');
+$('workItems').addEventListener('click', e => {
+  const b = e.target.closest('[data-d]'); if (!b) return;
+  const id = b.closest('[data-work]').dataset.work, W = WORKS[id], d = +b.dataset.d, eff = effJobs();
+  let k = eff[id], used = 0; for (const x in eff) if (x !== id) used += eff[x];
+  const free = villagers.length - used - k;
+  if (d > 0) { const step = k === 0 ? W.min : 1; if (step > free) { toast(k === 0 ? `${W.label} braucht mindestens ${W.min} freie Bewohner.` : 'Keine freien Bewohner mehr.', 2.4); return; } k += step; }
+  else k = k - 1 < W.min ? 0 : k - 1;
+  S.jobs[id] = k; reconcileJobs(); renderWork(); save();
+});
+function renderWork() {
+  const eff = effJobs(); let used = 0; for (const id in eff) used += eff[id];
+  const free = villagers.length - used, carriers = villagers.filter(v => !v.role && v.haul).length;
+  $('workFree').innerHTML = `<b>${free}</b> von ${villagers.length} Bewohnern sind frei${carriers ? ` · ${carriers} ${carriers === 1 ? 'trägt' : 'tragen'} gerade` : ''}`;
+  const alive = trees.filter(t => t.alive && !t.gone), young = alive.filter(t => t.g < .7).length;
+  for (const el of $('workItems').children) {
+    const id = el.dataset.work, W = WORKS[id], k = eff[id], sp = W.split(k);
+    el.querySelector('.n').textContent = k;
+    el.querySelector('[data-d="-1"]').disabled = k === 0;
+    el.querySelector('[data-d="1"]').disabled = free < (k === 0 ? W.min : 1);
+    el.classList.toggle('off', k === 0);
+    el.querySelector('.roles').innerHTML = Object.keys(sp).map(r => {
+      const R = ROLES[r], n = roleCount(r), nh = huts.filter(h => h.role === r).length;
+      return `<li><b>${n}</b> ${R.label} <span>· ${nh} ${R.hut}${nh === 1 ? '' : 'n'}, Platz für ${nh * R.per}</span></li>`;
+    }).join('');
+    const notes = [];
+    for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${construction && construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
+    if (id === 'wood') notes.push(`${alive.length - young} Bäume zum Fällen, ${young} wachsen noch.`);
+    if (id === 'saw') { const ms = huts.filter(h => h.role === 'sawyer'); notes.push(`An der Säge: ${ms.reduce((a, h) => a + h.logs, 0)} Stämme, ${ms.reduce((a, h) => a + h.planks, 0)} Bretter. Im Lager: ${fmt(S.logs)} ${S.logs === 1 ? 'Stamm' : 'Stämme'}, ${fmt(S.holz)} Bretter.`); }
+    el.querySelector('.wnote').textContent = notes.join(' ');
+  }
+}
 // Uhrzeit-Menü: vorspulen zum Tag/zur Nacht, Tagesverlauf anhalten
 const timeMenu = $('timeMenu');
 function closeTimeMenu() { if (timeMenu.hidden) return; timeMenu.hidden = true; $('btnTime').setAttribute('aria-expanded', 'false'); }
@@ -1514,7 +1855,7 @@ let skipSave = false;
 
 const SHRINE = [
   { id: 'temple', title: () => `Schrein weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Schrein strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },
-  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : 'Kein Platz. Deine Bewohner bauen aus Holz neue Häuser.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
+  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : 'Kein Platz. Aus Brettern entstehen neue Häuser, sobald genug im Lager sind.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
   { id: 'hand', title: () => `Hand stärken (Stufe ${S.hand + 1})`, desc: () => 'Formen wirkt 35 % weiter und kräftiger.', cost: handCost, buy: () => { S.hand++; } }
 ];
 function renderShrine() {
@@ -1539,7 +1880,7 @@ $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button da
 function foxDoing() {
   switch (fox.state) {
     case 'walk':
-      if (fox.next === 'store') return 'trägt einen Baum im Maul zum Brunnen';
+      if (fox.next === 'store') return 'trägt einen Baum im Maul zum Lager';
       if (fox.next === 'play') return 'läuft zum Dorfplatz, um zu spielen';
       return fox.act === 'help' ? 'läuft zu einem Baum, um Holz zu holen' : 'schleicht zu einem Baum und führt etwas im Schilde';
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
@@ -1572,13 +1913,14 @@ $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data
 {
   const away = Math.min((Date.now() - (S.ts || Date.now())) / 1000, 8 * 3600);
   if (loaded && away > 30) {
-    const pop = villagers.length, gRate = pop * prayYield() * .45 / 22 + passive(), hRate = pop * .55 / 22;
-    const g = gRate * away * .5, h = Math.min(hRate * away * .5, 400);
-    S.glaube += g; S.holz += h;
-    setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube, +${fmt(h)} Holz.`, 5), 900);
+    const free = villagers.filter(v => !v.role).length, gRate = free * prayYield() * .45 / 22 + passive();
+    const logIn = roleCount('lumber') / 16 * away * .5, sawn = Math.min(S.logs + logIn, roleCount('sawyer') / 10 * away * .5);
+    const g = gRate * away * .5, h = Math.min(Math.floor(sawn) * 2, 400), l = Math.min(Math.floor(logIn - sawn + S.logs) - S.logs, 300);
+    S.glaube += g; S.holz += h; S.logs = Math.max(0, S.logs + l);
+    setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube${h > 0 ? `, +${fmt(h)} Bretter` : ''}${l > 0 ? `, +${fmt(l)} Stämme` : ''}.`, 5), 900);
   }
 }
-function save() { if (skipSave) return; S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function save() { if (skipSave) return; savePaths(); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
@@ -1586,7 +1928,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) save(
 const clock = new THREE.Clock();
 const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
 const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
-let uiT = 0, secT = 0, birthT = 0, zzzT = 3;
+let uiT = 0, secT = 0, birthT = 0, zzzT = 3, jobT = 0;
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 setTool('hand'); renderName();
@@ -1602,8 +1944,15 @@ function frame() {
   S.glaube += passive() * dt; incomeAcc += passive() * dt;
   secT += dt; if (secT >= 1) { rate = rate * .85 + incomeAcc / secT * .15; incomeAcc = 0; secT = 0; }
   birthT += dt; if (birthT > 9) { birthT = 0; if (villagers.length < cap()) { const p = homeSpot(), v = spawnVillager(p.x, p.z); if (v) floatText(v.x, 1.6, v.z, 'Neue Seele', 's'); } }
-  if (!construction && S.holz >= houseCost()) { const site = freeSite(); if (site) { S.holz -= houseCost(); construction = { site, t: 0 }; site.used = true; scaff.x = site.x; scaff.z = site.z; scaff.o.rotation.y = site.ry; scaff.o.visible = true; } }
-  if (construction) { construction.t += dt; if (construction.t > 9) { construction.site.used = false; const hs = addHouse(construction.site); S.houses = houses.length; scaff.o.visible = false; construction = null; floatText(hs.x, 2.2, hs.z, 'Neues Haus', 's'); toast(`Ein neues Haus steht. Platz für ${cap()} Seelen.`); save(); } }
+  jobT -= dt; if (jobT <= 0) { jobT = 1; reconcileJobs(); }
+  if (!construction) { const b = nextBuild(); if (b && S.holz >= b.cost) { S.holz -= b.cost; construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
+  if (construction) { construction.t += dt; if (construction.t > 9) {
+    const c = construction; c.site.used = false; scaff.o.visible = false; construction = null;
+    if (c.role) { const e = addHut(c.role, c.site); S.huts[c.role]++; reconcileJobs(); floatText(e.x, 2.2, e.z, c.label, 's'); toast(`Eine neue ${c.label} steht. Platz für ${ROLES[c.role].per} weitere ${ROLES[c.role].label}.`); }
+    else { const hs = addHouse(c.site); S.houses = houses.length; floatText(hs.x, 2.2, hs.z, 'Neues Haus', 's'); toast(`Ein neues Haus steht. Platz für ${cap()} Seelen.`); }
+    save();
+  } }
+  for (const h of huts) if (h.saw) { h.sawing = Math.max(0, h.sawing - dt); if (h.sawing > 0) h.saw.rotation.x += dt * 14; }
 
   updateDay(dt, t);
   zzzT -= dt;
@@ -1611,6 +1960,7 @@ function frame() {
 
   // villagers
   for (const v of villagers) updateVillager(v, dt, t);
+  updateWear(dt);
   if (grabbed) { grabbed.x = hand.g.position.x; grabbed.z = hand.g.position.z + .05; grabbed.y = hand.g.position.y - .62; }
   for (const m of vAll) m.count = villagers.length;
   lights.length = 0;
@@ -1626,6 +1976,8 @@ function frame() {
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
     } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
+    else if (v.state === 'plant') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt; armA = armB = c.arm; splay = -.5; leg = .3; }
+    else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }
     else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
       bite = Math.max(0, Math.sin(t * 1.4 + v.ph * 3)) ** 4 * v.st;
@@ -1635,13 +1987,15 @@ function frame() {
       const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
       leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
     } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
-    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling') { armA = armB = -1.1; splay = .12; }
+    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
+    const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
+    const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
     dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
     const M = dummy.matrix;
     const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
     // Laterne in der linken Hand (nicht beim Hacken, Beten, Tragen: dann steht sie neben dem Bewohner)
     const handLantern = lantern && !v.carry && ['walk', 'idle', 'flee', 'dizzy'].includes(v.state);
-    if (handLantern) { armA = -.5 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .06 : 0); splay = Math.max(splay, .14); }
+    if (handLantern || sapling) { armA = (handLantern ? -.5 : -.35) + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .06 : 0); splay = Math.max(splay, .14); }
     let legA = leg, legB = -leg;
     if (v.st > 0) { // im Sitzen liegen die Beine vorne flach am Boden
       const sl = -1.5 - tilt; legA += (sl - legA) * v.st; legB += (sl - legB) * v.st;
@@ -1673,15 +2027,22 @@ function frame() {
     vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
     vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
     vParts.beard.setMatrixAt(i, L.beard ? M : zero);
-    vWood.setMatrixAt(i, v.carry ? M : zero);
-    // Axt: beim Hacken in beiden Händen (Drehpunkt Schultermitte), auf dem Weg zum Baum geschultert
-    if (v.state === 'walk' && v.next === 'tree' && !v.carry) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
-    if (v.state === 'chop') vAxe.forEach(m => part(m, 0, SHO_Y, armA, 0));
-    else if (v.state === 'walk' && v.next === 'tree') {
-      const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
-      // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand
-      vAxe.forEach(m => part(m, -.07, SHO_Y + .02 + Math.cos(a) * sh, a, 0, Math.sin(a) * sh));
-    } else vAxe.forEach(m => m.setMatrixAt(i, zero));
+    vWood.setMatrixAt(i, v.carry === 1 ? M : zero); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
+    for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
+    // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
+    if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
+    for (const set of [vAxe, vShovel]) {
+      if (set !== vTool) { set.forEach(m => m.setMatrixAt(i, zero)); continue; }
+      if (v.state === 'chop' || v.state === 'plant') set.forEach(m => part(m, 0, SHO_Y, armA, 0));
+      else if (shoulder) {
+        const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
+        // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand
+        set.forEach(m => part(m, -.07, SHO_Y + .02 + Math.cos(a) * sh, a, 0, Math.sin(a) * sh));
+      } else set.forEach(m => m.setMatrixAt(i, zero));
+    }
+    // Setzling in der linken Hand (abends hält sie die Laterne)
+    if (sapling && !handLantern) { const ca = Math.cos(splay) * .13; vSapling.forEach(m => part(m, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA) - .02, 0, 0, -ca * Math.sin(armA))); }
+    else vSapling.forEach(m => m.setMatrixAt(i, zero));
   });
   for (const m of vAll) m.instanceMatrix.needsUpdate = true;
   updateLights(t);
@@ -1704,8 +2065,8 @@ function frame() {
     } else if (tr.stumpT > 0) {
       tr.stumpT -= dt;
       dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
-      if (tr.stumpT <= 0) { tr.alive = true; tr.g = .2; }
     } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
+    else if (!tr.reserved && Math.random() < dt / 900) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus
   }
   treeSwarms[0].commit(tc2[0]); treeSwarms[1].commit(tc2[1]); stumpSwarm.commit(sc);
   const rc = [0, 0];
@@ -1793,7 +2154,9 @@ function frame() {
   if (uiT <= 0) {
     uiT = .25;
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
-    $('vH').textContent = fmt(S.holz); $('vHn').textContent = construction ? 'Haus im Bau' : (freeSite() ? `Haus ab ${houseCost()}` : 'Dorf voll');
+    $('vH').textContent = fmt(S.holz); { const nb = construction ? null : nextBuild(); $('vHn').textContent = construction ? `${construction.role ? 'Hütte' : 'Haus'} im Bau` : nb ? `${nb.role ? 'Hütte' : 'Haus'} ab ${nb.cost}` : 'Dorf voll'; }
+    updateLagerStock();
+    if (!$('sheetWork').hidden) renderWork();
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);
     { // Sonne bzw. Mond auf dem kleinen Himmelsbogen in der Uhrzeit-Kachel
       const sunUp = sunDir.y >= moonDir.y, a = sunUp ? (S.hour - 6.2) / 13.6 * Math.PI : ((S.hour - 19.6 + 24) % 24) / 10.8 * Math.PI, k = clamp(a, 0, Math.PI);
