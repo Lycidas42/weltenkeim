@@ -70,12 +70,11 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 /* Kreismenü und Einblendung am Tiergeist */
 #ring{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:4}
-#ring button{position:absolute;left:0;top:0;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:var(--panel-solid);border:1px solid var(--line);color:var(--ink);display:grid;place-content:center;justify-items:center;pointer-events:auto;box-shadow:0 6px 16px rgba(0,0,0,.35);transform:translate(0,0) scale(.3);opacity:0;transition:transform .2s cubic-bezier(.2,1.4,.4,1),opacity .15s}
+#ring button{position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);color:var(--ink);display:grid;place-content:center;justify-items:center;pointer-events:auto;box-shadow:0 3px 10px rgba(0,0,0,.28);transform:translate(0,0) scale(.3);opacity:0;transition:transform .2s cubic-bezier(.2,1.4,.4,1),opacity .15s}
 #ring.open button{transform:translate(var(--x),var(--y)) scale(1);opacity:1}
-#ring button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-#ring button span{font-size:10.5px;font-weight:700;line-height:1.1;margin-top:1px}
-#ring button.pet{color:#f6b3c0}
-#ring button.slap{color:#f2c27a}
+#ring button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#ring .ra-pet{color:#f6b3c0}
+#ring .ra-slap{color:#f2c27a}
 #ring button[aria-pressed="true"]{background:var(--soul);color:#10302a;border-color:var(--soul)}
 #foxBadge{position:absolute;left:0;top:0;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:6px 10px 7px;font-size:12.5px;line-height:1.25;width:max-content;max-width:210px;pointer-events:none;z-index:3;display:grid;gap:3px}
 #foxBadge b{font-family:var(--f-display);color:var(--glaube);font-size:17px;font-weight:700;line-height:1}
@@ -189,6 +188,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="bars" id="foxBars"></div>
     <div class="last" id="foxLast"></div>
     <div class="row">
+      <button class="act pet" id="btnPet">Streicheln</button>
+      <button class="act" id="btnSlap">Klaps</button>
       <button class="act" id="btnFocus" aria-pressed="false">Folgen</button>
     </div>
     <p class="formsLbl">Gestalt</p>

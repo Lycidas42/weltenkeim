@@ -599,11 +599,14 @@ const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
 
 // Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
 const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
-const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: .55, slap: .42 };
+const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: 2.05, slap: .62 }; // HIT: Reaktion, sobald die Hand weg ist
 const BACK_Z = [-.3, -.15, 0, .15, .3]; // Messstellen entlang des Rückens (Anteile der Tierhöhe, + = Kopf)
 function playHand(kind, onHit) {
   // ein laufendes oder stehendes Tier hält für die Geste inne (außer es trägt gerade Holz)
-  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) { if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null; foxIdle(HAND_DUR[kind] + .6); }
+  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) {
+    if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
+    foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
+  }
   Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile() });
 }
 // höchster Punkt nahe der Mittellinie an den Messstellen, im Raum des Tiers (foxPivot), damit die Hand auf dem
@@ -747,9 +750,11 @@ function updateFox(dt, t) {
   // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
   if (fox.once > 0) fox.once -= dt;
-  switch (fox.state) {
+  // Während einer Geste der Hand oder einer Einmal-Animation (Reaktion, Aufstehen, Wunder) bewegt sich das Tier
+  // nicht und wechselt nicht die Pose; so gleitet es nie in einer falschen Haltung über den Boden.
+  if (!handAnim.kind && fox.once <= 0) switch (fox.state) {
     case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
-    case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.6); } break;
+    case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
@@ -795,16 +800,21 @@ function foxCast(x, z) {
   if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && fox.next === 'store')) return;
   if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
   fox.h = Math.atan2(x - fox.x, z - fox.z); glowT = GLOW_T;
-  if (foxActs.cast) { fox.state = 'cast'; fox.timer = foxActs.cast.getClip().duration; foxOnce('cast'); } else { fox.hop = .5; foxIdle(1.5); }
+  if (foxActs.cast) { fox.state = 'cast'; fox.timer = .1; foxOnce('cast'); } // Dauer regelt foxOnce else { fox.hop = .5; foxIdle(1.5); }
 }
 function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
   if (handAnim.kind) return; // eine Geste nach der anderen
-  // die Hand führt die Geste aus, das Tier reagiert bei der Berührung
+  // die Hand führt die Geste aus; das Tier reagiert erst, wenn sie es wieder losgelassen hat
   playHand(kind, () => {
-    if (fox.state === 'rest') foxIdle(2); // aus dem Liegen aufspringen
     const top = foxPivot.position.y + CREATURES[fox.kind].h + .5;
-    if (kind === 'pet') { foxOnce('idle2'); floatText(fox.x, top, fox.z, '♥', 'love'); } else { foxOnce('hit'); fox.hop = .5; floatText(fox.x, top, fox.z, '!', 'w'); }
+    if (kind === 'pet') {
+      floatText(fox.x, top, fox.z, '♥', 'love');
+      if (fox.state === 'rest') fox.timer += 4; else foxOnce('idle2'); // liegend genießt es einfach weiter
+    } else {
+      floatText(fox.x, top, fox.z, '!', 'w');
+      if (fox.state === 'rest') { foxOnce('standUp'); foxIdle(1); } else { foxOnce('hit'); fox.hop = .5; }
+    }
   });
   if (a && t - fox.lastT < 25) {
     S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
@@ -912,13 +922,14 @@ const FOX_ACTIONS = [
   { id: 'sheet', label: () => 'Charakter', icon: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3.5"/>', run: () => openSheet('sheetFox') },
 ];
 let ringOpen = false, hoverFox = false;
+const ringRadius = () => 40 + FOX_ACTIONS.length * 4.5; // reine Symbole: kleiner Kreis, wächst mit der Zahl der Aktionen
 function openRing() {
-  const R = $('ring'), n = FOX_ACTIONS.length, rad = n > 4 ? 84 : 76; R.innerHTML = '';
+  const R = $('ring'), n = FOX_ACTIONS.length, rad = ringRadius(); R.innerHTML = '';
   FOX_ACTIONS.forEach((a, i) => {
     const ang = -Math.PI / 2 + i * 2 * Math.PI / n, b = document.createElement('button');
-    b.className = a.id; b.style.setProperty('--x', `${Math.cos(ang) * rad}px`); b.style.setProperty('--y', `${Math.sin(ang) * rad}px`);
+    b.className = 'ra-' + a.id; b.style.setProperty('--x', `${Math.cos(ang) * rad}px`); b.style.setProperty('--y', `${Math.sin(ang) * rad}px`);
     if (a.pressed) b.setAttribute('aria-pressed', a.pressed());
-    b.innerHTML = `<svg viewBox="0 0 24 24">${a.icon}</svg><span>${a.label()}</span>`;
+    b.innerHTML = `<svg viewBox="0 0 24 24">${a.icon}</svg>`; b.title = a.label(); b.setAttribute('aria-label', a.label());
     b.addEventListener('click', e => { e.stopPropagation(); closeRing(); a.run(); });
     R.appendChild(b);
   });
@@ -939,7 +950,7 @@ function placeFoxUI(dt) {
   const C = CREATURES[fox.kind], r = canvas.getBoundingClientRect(), y = foxPivot.position.y;
   toScreen(fox.x, y + C.h * .5, fox.z, tA); let cx = tA.x - r.left, cy = tA.y - r.top;
   // Kreis vollständig im Bild halten (oben Statusleiste, unten Werkzeugleiste)
-  if (ringOpen) { const m = (FOX_ACTIONS.length > 4 ? 84 : 76) + 34; cx = clamp(cx, m, r.width - m); cy = clamp(cy, m + 60, r.height - m - 110); }
+  if (ringOpen) { const m = ringRadius() + 28; cx = clamp(cx, m, r.width - m); cy = clamp(cy, m + 60, r.height - m - 110); }
   if (ringOpen) $('ring').style.transform = `translate(${cx}px, ${cy}px)`;
   const ask = fox.last && clock.elapsedTime - fox.lastT < 25, full = ringOpen || hoverFox, B = $('foxBadge');
   B.hidden = !(full || ask) || !$('sheetFox').hidden;
@@ -952,7 +963,7 @@ function placeFoxUI(dt) {
   }
   // über dem Kopf, bei offenem Menü über dem oberen Knopf; am Bildschirmrand halten
   toScreen(fox.x, y + C.h + .15, fox.z, tB);
-  const top = Math.min(tB.y - r.top, ringOpen ? cy - 118 : 1e9), bw = B.offsetWidth, bh = B.offsetHeight;
+  const top = Math.min(tB.y - r.top, ringOpen ? cy - ringRadius() - 28 : 1e9), bw = B.offsetWidth, bh = B.offsetHeight;
   const bx = clamp(cx - bw / 2, 8, r.width - bw - 8), by = clamp(top - bh - 6, 60, r.height - bh - 8);
   B.style.transform = `translate(${bx}px, ${by}px)`;
 }
@@ -1039,6 +1050,8 @@ $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
 function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
+$('btnPet').addEventListener('click', () => reinforce('pet'));
+$('btnSlap').addEventListener('click', () => reinforce('slap'));
 $('btnFocus').addEventListener('click', () => { follow = !follow; renderFollow(); if (follow) closeSheets(); });
 $('btnFollow').addEventListener('click', () => { follow = false; renderFollow(); });
 let resetArmed = false;
