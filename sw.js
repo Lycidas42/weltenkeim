@@ -49,8 +49,6 @@ const APP = [
   './assets/models/barrel.gltf',
   './assets/models/building_windmill_blue.bin',
   './assets/models/building_windmill_blue.gltf',
-  './assets/models/cloud_big.bin',
-  './assets/models/cloud_big.gltf',
   './assets/models/hexagons_medieval.png',
   './assets/models/tree_single_A_cut.bin',
   './assets/models/tree_single_A_cut.gltf',

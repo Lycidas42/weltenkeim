@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -178,6 +178,39 @@ function visualDir(d, out) {
   return out.set(d.x / hz * Math.cos(ve), Math.sin(ve), d.z / hz * Math.cos(ve));
 }
 const lightDir = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
+// Wetter: jeden Morgen (5 Uhr) neu gewürfelt, mittags manchmal ein Umschwung. cover = Bewölkung, rain = Regen, wind = Grundwind.
+const WEATHER = {
+  klar: { cover: 0, rain: 0, wind: .22, p: .22, label: 'klar' },
+  heiter: { cover: .3, rain: 0, wind: .38, p: .38, label: 'heiter' },
+  bewoelkt: { cover: .72, rain: 0, wind: .58, p: .25, label: 'bewölkt' },
+  regen: { cover: .97, rain: 1, wind: .85, p: .15, label: 'Regen' },
+};
+if (!WEATHER[S.weather]) S.weather = 'heiter';
+const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, wind: WEATHER[S.weather].wind, dir: Math.random() * 6.28, lastH: S.hour };
+function rollWeather() { let r = Math.random(); for (const k in WEATHER) { r -= WEATHER[k].p; if (r <= 0) return k; } return 'heiter'; }
+function setWeather(k) { if (WEATHER[k]) S.weather = k; }
+function updateWeather(dt, t) {
+  const h = S.hour, lh = weather.lastH; weather.lastH = h;
+  if ((lh < 5 && h >= 5) || (lh > h && h >= 5)) setWeather(rollWeather());          // neuer Tag
+  if (lh < 13 && h >= 13 && Math.random() < .3) setWeather(rollWeather());           // Umschwung am Mittag
+  const W = WEATHER[S.weather], k = Math.min(1, dt * .06);                            // Übergang über einige Sekunden
+  weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
+  weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
+}
+// Himmelsfarben je Wetter: strahlend blau, wenn klar; grau und trüb bei Bewölkung und Regen
+const SKY_CLEAR = { top: new THREE.Color('#2f86d4'), mid: new THREE.Color('#86c3ec'), hor: new THREE.Color('#d3eaf3') };
+const SKY_OV = { top: new THREE.Color('#87919b'), mid: new THREE.Color('#a3abb3'), hor: new THREE.Color('#bdc3c8') };
+const SKY_OVN = { top: new THREE.Color('#0c0e12'), mid: new THREE.Color('#14171c'), hor: new THREE.Color('#1d2128') };
+const SKY_N = { top: new THREE.Color('#000105'), mid: new THREE.Color('#03060f') };
+const skyTmp = new THREE.Color();
+function applyWeatherSky() {
+  const cv = weather.cover, day = 1 - sky.night, clear = smooth(.35, 0, cv), ov = smooth(.3, .95, cv);
+  sky.top.lerp(SKY_CLEAR.top, clear * day * .7); sky.mid.lerp(SKY_CLEAR.mid, clear * day * .55); sky.hor.lerp(SKY_CLEAR.hor, clear * day * .4);
+  sky.top.lerp(SKY_N.top, clear * sky.night * .8); sky.mid.lerp(SKY_N.mid, clear * sky.night * .6);   // klare Nacht: fast schwarz
+  for (const c of ['top', 'mid', 'hor']) sky[c].lerp(skyTmp.copy(SKY_OV[c]).lerp(SKY_OVN[c], sky.night), ov * .85);
+  sky.light.lerp(WHITE, ov * .5); sky.li *= 1 - .62 * ov; sky.hi *= 1 + .12 * ov;
+  sky.hemiS.lerp(skyTmp.set(0xb9c0c7).lerp(SKY_OVN.mid, sky.night), ov * .6);
+}
 // Zeitraffer bis zur Zielstunde (Tipp auf die Uhrzeit): Tag <-> Nacht in wenigen Sekunden
 let skipTo = null;
 const isDaytime = h => h >= 6 && h < 20;
@@ -191,7 +224,7 @@ function updateDay(dt, t) {
     const left = (skipTo - S.hour + 24) % 24, step = Math.min(left, dt * 3);
     S.hour = (S.hour + step) % 24; if (left - step < 1e-3) { S.hour = skipTo; skipTo = null; }
   } else if (!S.timePaused) S.hour = (S.hour + dt * hourRate(S.hour)) % 24;
-  const h = S.hour; sampleSky(h);
+  const h = S.hour; updateWeather(dt, t); sampleSky(h); applyWeatherSky();
   const ts = (h - 6.2) / 13.6 * Math.PI, tm = ((h - 19.6 + 24) % 24) / 10.8 * Math.PI; // Sonne 6:12–19:48, Mond 19:36–6:24
   sunDir.set(Math.cos(ts), Math.sin(ts) * .9, .4).normalize(); moonDir.set(-Math.cos(tm), Math.sin(tm) * .8, -.3).normalize();
   const sunUp = sunDir.y >= moonDir.y, body = sunUp ? sunDir : moonDir;
@@ -199,16 +232,16 @@ function updateDay(dt, t) {
   lightDir.copy(body); lightDir.y = Math.max(lightDir.y, .35); lightDir.normalize();
   sun.position.copy(lightDir).multiplyScalar(40); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
   hemi.color.copy(sky.hemiS); hemi.groundColor.copy(sky.hemiG); hemi.intensity = sky.hi;
-  scene.fog.color.copy(sky.hor);
+  scene.fog.color.copy(sky.hor); scene.fog.near = 42 - 18 * weather.rain; scene.fog.far = 105 - 30 * weather.rain; // Regen: diesig
   skyG.position.copy(camera.position);
   visualDir(sunDir, visSun); visualDir(moonDir, visMoon);
   skyMat.uniforms.sunDir.value.copy(visSun); skyMat.uniforms.sunCol.value.copy(sky.light);
   skyMat.uniforms.glow.value = smooth(-.25, .02, sunDir.y) * (.3 + .9 * (1 - Math.max(0, sunDir.y)) ** 3);
   sunSprite.position.copy(visSun).multiplyScalar(150); sunSprite.material.color.copy(sky.light).lerp(WHITE, .5);
-  sunSprite.material.opacity = smooth(-.04, .02, visSun.y);
+  sunSprite.material.opacity = smooth(-.04, .02, visSun.y) * (1 - smooth(.4, .9, weather.cover));
   moonSprite.position.copy(visMoon).multiplyScalar(150); moonHalo.position.copy(moonSprite.position);
-  moonSprite.material.opacity = smooth(-.03, .03, visMoon.y) * (.3 + .7 * sky.night); moonHalo.material.opacity = moonSprite.material.opacity * .45;
-  starMat.uniforms.op.value = smooth(.35, .95, sky.night); starMat.uniforms.t.value = t;
+  moonSprite.material.opacity = smooth(-.03, .03, visMoon.y) * (.3 + .7 * sky.night) * (1 - smooth(.4, .9, weather.cover)); moonHalo.material.opacity = moonSprite.material.opacity * .45;
+  starMat.uniforms.op.value = smooth(.35, .95, sky.night) * (1 - smooth(.15, .7, weather.cover)) * 1.15; starMat.uniforms.t.value = t;
 }
 // Tagesablauf der Bewohner
 const LUNCH = [12, 13.3], BED = 20.6, WAKE = 5.5;
@@ -412,9 +445,9 @@ const CREATURES = {
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A_cut.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
+  'tree_single_A_cut.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
   'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf'];
-const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCloud, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 /* ------------------------------------------------------------------ Pflanzen und Felsen (im Code erzeugt) */
@@ -1099,11 +1132,70 @@ function moveFree(o, tx, tz, d, nav) {
 }
 
 /* ------------------------------------------------------------------ clouds & effects */
-const clouds = [];
-for (let i = 0; i < 4; i++) { const c = gCloud.scene.clone(true); c.scale.setScalar(2.6 + Math.random()); c.position.set(rnd(30), 19 + Math.random() * 3, rnd(22)); scene.add(c); clouds.push(c); }
-const rainCloud = gCloud.scene.clone(true);
-rainCloud.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.color = new THREE.Color(0x8d98a4); } });
-rainCloud.visible = false; rainCloud.scale.setScalar(1.2); scene.add(rainCloud);
+// Wolken: Haufen aus verbeulten Kugeln, oben weiß, unten grau-blau, flache Unterseite. Wie viele und wie groß, hängt
+// am Wetter; sie ziehen mit dem Wind, werfen Schatten und werden durchsichtig, wenn sie den Blick auf die Insel verdecken.
+function cloudGeo(n) {
+  const parts = [];
+  for (let k = 0; k < n; k++) {
+    const x = (k / (n - 1) - .5) * 2.6 + rnd(.25), r = .55 + Math.random() * .5 * (1 - Math.abs(x) / 2);
+    parts.push(lumpy(new THREE.IcosahedronGeometry(r, 1), .14, 1.3).translate(x, r * .35 + Math.random() * .25, rnd(.45)));
+  }
+  const g = mergeGeometries(parts), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) p.setY(i, p.getY(i) * .25); // flache Unterseite
+  return paint(g, (x, y, z, ny, c) => c.set(0xc5cfdb).lerp(COL2.set(0xffffff), clamp(smooth(-.1, .9, y) * .8 + (ny > .4 ? .25 : 0), 0, 1)).multiplyScalar(.97 + .05 * jit(x, y, z)));
+}
+const CLOUD_GEOS = [5, 7, 9, 11].map(cloudGeo);
+const CLOUD_N = 22, clouds = [], cloudCol = new THREE.Color();
+for (let i = 0; i < CLOUD_N; i++) {
+  const m = new THREE.Mesh(CLOUD_GEOS[i % 4], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, transparent: true, opacity: 0, depthWrite: false }));
+  m.castShadow = true; m.renderOrder = 3; scene.add(m);
+  clouds.push({ m, x: rnd(40), z: rnd(40), y: 21 + Math.random() * 5, s: 2.2 + Math.random() * 2, rot: Math.random() * 6.28, rank: Math.random(), vis: 0 });
+}
+const cloudDummy = new THREE.Vector3(), segA = new THREE.Vector3(), segB = new THREE.Vector3();
+function updateClouds(dt) {
+  const cv = weather.cover, n = cv * CLOUD_N * 1.15, sp = (.4 + weather.wind * 1.6) * dt, dx = Math.cos(weather.dir), dz = Math.sin(weather.dir);
+  cloudCol.set(0xffffff).lerp(skyTmp.set(0x8f969e), smooth(.5, 1, cv) * .7).lerp(skyTmp.set(0x6b7179), weather.rain * .45);
+  segA.copy(camera.position); segB.copy(controls.target);
+  clouds.forEach((c, i) => {
+    c.x += dx * sp; c.z += dz * sp;
+    // was hinausweht, kommt auf der anderen Seite wieder herein
+    if (c.x * dx + c.z * dz > 42) { c.x -= dx * 84; c.z -= dz * 84; c.x += -dz * rnd(15); c.z += dx * rnd(15); }
+    const want = c.rank * CLOUD_N < n ? 1 : 0; c.vis += (want - c.vis) * Math.min(1, dt * .5);
+    const sc = c.s * (.7 + cv * .7);
+    c.m.position.set(c.x, c.y, c.z); c.m.rotation.y = c.rot; c.m.scale.set(sc, sc * (.75 + cv * .35), sc);
+    // Blick freihalten: nah an der Kamera oder auf der Linie Kamera → Insel durchsichtig
+    cloudDummy.set(c.x, c.y, c.z);
+    const near = smooth(sc * 1.2, sc * 3.2, cloudDummy.distanceTo(camera.position));
+    const ab = segB.clone().sub(segA), u = clamp(cloudDummy.clone().sub(segA).dot(ab) / ab.lengthSq(), 0, 1), dLine = cloudDummy.distanceTo(segA.clone().addScaledVector(ab, u));
+    const block = .22 + .78 * smooth(sc * .9, sc * 2.2, dLine);
+    c.m.material.opacity = c.vis * Math.min(near, block) * (.9 - .1 * weather.rain);
+    c.m.material.color.copy(cloudCol); c.m.visible = c.m.material.opacity > .01;
+    c.m.castShadow = c.vis > .5;
+  });
+}
+// Regen über der ganzen Insel (Wetter): kurze Striche, die um den Blickpunkt fallen
+const WRAIN_N = 1600, wrainPos = new Float32Array(WRAIN_N * 6), wrain = [];
+for (let i = 0; i < WRAIN_N; i++) wrain.push({ x: rnd(18), z: rnd(18), y: Math.random() * 14 });
+const wrainGeo = new THREE.BufferGeometry(); wrainGeo.setAttribute('position', new THREE.BufferAttribute(wrainPos, 3));
+const wrainLines = new THREE.LineSegments(wrainGeo, new THREE.LineBasicMaterial({ color: 0xc8dcef, transparent: true, opacity: 0, depthWrite: false }));
+wrainLines.frustumCulled = false; scene.add(wrainLines);
+function updateWeatherRain(dt) {
+  const k = smooth(.2, .8, weather.rain); wrainLines.visible = k > .01; if (!wrainLines.visible) return;
+  wrainLines.material.opacity = .45 * k;
+  const cx = controls.target.x, cz = controls.target.z, wx = Math.cos(weather.dir) * weather.wind * .35, wz = Math.sin(weather.dir) * weather.wind * .35, n = Math.floor(WRAIN_N * k);
+  for (let i = 0; i < WRAIN_N; i++) {
+    const d = wrain[i];
+    if (i >= n) { wrainPos.fill(0, i * 6, i * 6 + 6); continue; }
+    d.y -= dt * 15; d.x += wx * dt * 15; d.z += wz * dt * 15;
+    let ax = cx + d.x, az = cz + d.z; const g = surfaceAt(ax, az);
+    if (d.y < g || Math.abs(d.x) > 18 || Math.abs(d.z) > 18) { d.x = rnd(18); d.z = rnd(18); d.y = g + 9 + Math.random() * 5; ax = cx + d.x; az = cz + d.z; }
+    wrainPos.set([ax, d.y, az, ax - wx * .4, d.y + .45, az - wz * .4], i * 6);
+  }
+  wrainGeo.attributes.position.needsUpdate = true;
+}
+// Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
+const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4 }));
+rainCloud.castShadow = true; rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
 const RAIN_N = 450;
 const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAIN_N * 3), 3));
 const rainPts = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xbfe4ff, size: .09, transparent: true, opacity: .8 }));
@@ -2684,7 +2776,7 @@ function frame() {
     const y = heightAt(tr.x, tr.z);
     if (y < .05) { tr.gone = true; if (tr.reserved && tr.reserved !== 'fox') tr.reserved.tree = null; tr.reserved = null; continue; }
     if (tr.alive) {
-      if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008);
+      if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008 * (1 + 2 * weather.rain)); // Regen lässt Bäume schneller wachsen
       const s = ST * tr.g, pull = treeGrab && treeGrab.tr === tr ? treeGrab.prog : 0;
       if (tr.shake > 0) tr.shake = Math.max(0, tr.shake - dt * 3.5);
       const shk = tr.shake ? Math.sin(t * 45) * tr.shake * .045 : 0;
@@ -2694,7 +2786,7 @@ function frame() {
       tr.stumpT -= dt;
       dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
     } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
-    else if (!tr.reserved && Math.random() < dt / 900) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus
+    else if (!tr.reserved && Math.random() < dt / 900 * (1 + 3 * weather.rain)) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus, bei Regen öfter
   }
   treeMeshes.forEach((m, k) => { m.count = tc2[k]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }); stumpSwarm.commit(sc);
   const rc = ROCK_GEOS.map(() => 0);
@@ -2754,9 +2846,9 @@ function frame() {
     if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; }
   }
   if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
-  for (const c of clouds) { c.position.x += dt * .4; if (c.position.x > 36) c.position.x = -36; }
+  updateClouds(dt); updateWeatherRain(dt);
   // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
-  waterU.uT.value = t; waterU.uWind.value += (clamp(.38 + noise(t * .012, 3.7) * .7 + (rain.t > 0 ? .35 : 0), .08, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
+  waterU.uT.value = t; waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
   updateTerrain(dt);
 
   // camera
@@ -2815,7 +2907,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, wish, startWish, shrine, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
