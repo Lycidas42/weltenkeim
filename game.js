@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0 }, logs: 0, meat: 0, fish: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -42,14 +42,19 @@ const ROLES = {
   lumber: { label: 'Holzfäller', hut: 'Holzfällerhütte', per: 4, cost: n => 14 + 8 * n },
   forester: { label: 'Förster', hut: 'Försterhütte', per: 3, cost: n => 12 + 6 * n },
   sawyer: { label: 'Säger', hut: 'Sägemühle', per: 2, cost: n => 24 + 12 * n },
+  hunter: { label: 'Jäger', hut: 'Jagdhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
+  fisher: { label: 'Fischer', hut: 'Fischerhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
 };
 // Arbeitsstätten: der Spieler weist ihnen Bewohner zu (0 oder mindestens `min`), sie verteilen sich auf die Berufe
 const WORKS = {
   wood: { label: 'Wald', min: 3, desc: 'Holzfäller fällen Bäume und bringen die Stämme ins Lager. Förster pflanzen neue Bäume.', split: k => { const f = Math.max(1, Math.round(k / 3)); return { lumber: k - f, forester: f }; } },
+  jagd: { label: 'Jagd', min: 1, desc: 'Jäger pirschen sich mit Pfeil und Bogen an Rehe und Hasen heran und bringen das Wild als Fleisch ins Lager. Das Wild wächst nach.', split: k => ({ hunter: k }) },
+  fischerei: { label: 'Fischerei', min: 1, desc: 'Fischer angeln vom Steg ihrer Hütte an der Küste und bringen den Fang ins Lager. Die Fische wachsen nach.', split: k => ({ fisher: k }) },
   saw: { label: 'Sägemühle', min: 1, desc: 'Säger sägen aus Stämmen Bretter, das Baumaterial für Hütten und Häuser. Freie Bewohner tragen die Stämme aus dem Lager zur Säge und die Bretter zurück.', split: k => ({ sawyer: k }) },
 };
 for (const id in WORKS) if (typeof S.jobs[id] !== 'number' || !isFinite(S.jobs[id]) || S.jobs[id] < 0) S.jobs[id] = 0;
-for (const r in ROLES) if (typeof S.huts[r] !== 'number' || !isFinite(S.huts[r]) || S.huts[r] < 1) S.huts[r] = 1;
+for (const r in ROLES) if (typeof S.huts[r] !== 'number' || !isFinite(S.huts[r]) || S.huts[r] < (ROLES[r].opt ? 0 : 1)) S.huts[r] = ROLES[r].opt ? 0 : 1; // Jagd- und Fischerhütte erst bei Bedarf
+for (const k of ['meat', 'fish']) if (typeof S[k] !== 'number' || !isFinite(S[k]) || S[k] < 0) S[k] = 0;
 if (typeof S.logs !== 'number' || !isFinite(S.logs) || S.logs < 0) S.logs = 0;
 const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' } };
 
@@ -339,7 +344,14 @@ const STREAM = (() => {
       const n = jj * N + ii; if (done[n]) continue; done[n] = 1; par[n] = k; lv[n] = Math.max(Hr[n], lv[k]); push(n, lv[n]);
     }
   }
-  let src = 0; for (let k = 0; k < N * N; k++) if (H[k] > H[src]) src = k;
+  // Quelle: unter den hohen Lagen (ab 60 % der Gipfelhöhe) die, deren Wasser den längsten Weg zum Meer hat
+  let top = 0; for (let k = 0; k < N * N; k++) if (H[k] > H[top]) top = k;
+  let src = top, bestLen = 0;
+  for (let k = 0; k < N * N; k++) {
+    if (H[k] < H[top] * .6 || (k % N) % 3 || ((k / N) | 0) % 3) continue; // jeden dritten Punkt prüfen genügt
+    let n = 0; for (let q = k; q >= 0 && n < 900; q = par[q]) { n++; if (H[q] < -.05) break; }
+    if (n > bestLen) { bestLen = n; src = k; }
+  }
   const raw = []; for (let k = src; k >= 0 && raw.length < 600; k = par[k]) { raw.push({ x: -HALF + (k % N) * CELL, z: -HALF + ((k / N) | 0) * CELL }); if (H[k] < -.05) break; }
   // glätten (gleitender Mittelwert) und gleichmäßig neu abtasten
   let pts = raw;
@@ -620,8 +632,9 @@ const CREATURES = {
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
   'tree_single_A_cut.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
-  'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf'];
-const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
+  'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf',
+  'building_home_A_yellow.gltf', 'building_home_B_yellow.gltf', 'target.gltf', 'bucket_arrows.gltf'];
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel, gHutYellowA, gHutYellowB, gTarget, gArrows] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 /* ------------------------------------------------------------------ Pflanzen und Felsen (im Code erzeugt) */
@@ -1048,7 +1061,27 @@ const HUT = {
   lumber: { gl: gHutRed, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .45 } },
   forester: { gl: gHutGreen, k: SB, door: { x: 0, z: .32 }, work: { x: .28, z: .6 } },
   sawyer: { gl: gSawmill, k: 1.2, door: { x: -.32, z: .62 }, work: { x: .3, z: .55 } },
+  hunter: { gl: gHutYellowA, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .5 } },
+  fisher: { gl: gHutYellowB, k: SB, door: { x: .14, z: .32 }, work: { x: -.45, z: .6 } },
 };
+// Fischerplätze an der Küste: Hütte etwas landeinwärts, Tür zum Meer, ein Steg führt ins tiefere Wasser
+const fisherSites = [];
+for (let i = 0; i < 40; i++) {
+  const a = i / 40 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
+  let r = 12; while (r < HALF && heightAt(dx * r, dz * r) > .3) r += .2;
+  if (r >= HALF - 1) continue;
+  const sx = dx * r, sz = dz * r, hx = sx - dx * 2.4, hz = sz - dz * 2.4, h = heightAt(hx, hz);
+  let slope = 0; for (const [ox, oz] of [[.8, 0], [-.8, 0], [0, .8], [0, -.8]]) slope = Math.max(slope, Math.abs(heightAt(hx + ox, hz + oz) - h));
+  if (h < .35 || h > 2 || slope > .6 || -.02 - heightAt(sx + dx * 3.2, sz + dz * 3.2) < .5 || streamDist(hx, hz) < 3 || Math.hypot(hx - SHRINE_POS.x, hz - SHRINE_POS.z) < 6) continue;
+  fisherSites.push({ x: hx, z: hz, ry: Math.atan2(dx, dz), used: false, a, shore: { x: sx, z: sz }, dir: { x: dx, z: dz } });
+}
+// Stege der Fischer: Laufhöhe für Bewohner (groundAt) und Angelplatz am Ende
+const jetties = [];
+function groundAt(x, z) {
+  let y = surfaceAt(x, z);
+  for (const J of jetties) { const rx = x - J.x, rz = z - J.z, t = rx * J.dx + rz * J.dz, u = -rx * J.dz + rz * J.dx; if (t > -.2 && t < J.len + .1 && Math.abs(u) < .32) y = Math.max(y, J.y); }
+  return y;
+}
 const huts = [];
 let worldReady = false; // erst wenn die Bäume stehen, können Hütten eine Lichtung schlagen
 // Werkstätten haben eigene Bauplätze am Waldrand, so nehmen sie den Wohnhäusern keinen Platz weg
@@ -1060,6 +1093,7 @@ for (let i = 0; i < 18; i++) {
 }
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
+  if (role === 'fisher') { const fs = fisherSites.filter(st => !st.used && fisherSites.every(o => !o.used || Math.abs(Math.atan2(Math.sin(o.a - st.a), Math.cos(o.a - st.a))) > .5)); return fs.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0] || null; }
   const free = hutSites.filter(st => !st.used); if (!free.length) return null;
   if (role !== 'sawyer') return free[0];
   return free.reduce((b, st) => (Math.hypot(st.x - LAGER.x, st.z - LAGER.z) < Math.hypot(b.x - LAGER.x, b.z - LAGER.z) ? st : b));
@@ -1073,12 +1107,23 @@ function addHut(role, site) {
   e.logs = 0; e.planks = 0; // Vorrat an der Säge: Träger bringen Stämme und holen Bretter
   if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
   if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(TK[Math.random() < .5 ? 0 : 2], p.x, p.z, Math.random() * 6, ST * .2); }
+  if (role === 'hunter') { const p = localPt(e, .7, .35); place(gTarget, p.x, p.z, site.ry, 1.6); e.pile = p; const q = localPt(e, -.55, .15); place(gArrows, q.x, q.z, site.ry, 1.6); }
+  if (role === 'fisher') { // Steg aus Planken auf Pfählen, vom Ufer ins Meer
+    const sh = site.shore, d = site.dir, x0 = sh.x - d.x * .6, z0 = sh.z - d.z * .6, len = 3.4, y = Math.max(heightAt(sh.x, sh.z), .05) + .14;
+    const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: .9, flatShading: true }), dark = new THREE.MeshStandardMaterial({ color: 0x5a3f28, roughness: .9, flatShading: true });
+    for (let t = 0; t < len; t += .17) { const b = new THREE.Mesh(new THREE.BoxGeometry(.58, .035, .14), wood); b.position.set(rnd(.015), 0, t); b.rotation.y = rnd(.04); g.add(b); }
+    for (let t = .3; t < len; t += 1) for (const sx of [-1, 1]) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(.03, .035, 1.4, 6), dark); pl.position.set(sx * .27, -.68, t); g.add(pl); }
+    g.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+    g.position.set(x0, y, z0); g.rotation.y = Math.atan2(d.x, d.z); scene.add(g);
+    e.jetty = { x: x0, z: z0, dx: d.x, dz: d.z, len, y: y + .02, end: { x: x0 + d.x * (len - .25), z: z0 + d.z * (len - .25) }, bob: { x: x0 + d.x * (len + 1.7), z: z0 + d.z * (len + 1.7) } };
+    jetties.push(e.jetty);
+  }
   huts.push(e); return e;
 }
 const hutDoor = (e, d = .25) => localPt(e, e.H.door.x, e.H.door.z + d / e.o.scale.x);
 const hutWork = e => localPt(e, e.H.work.x, e.H.work.z);
 for (const r in ROLES) for (let i = 0; i < S.huts[r]; i++) { const st = hutSite(r); if (st) addHut(r, st); }
-for (const r in ROLES) S.huts[r] = Math.max(1, huts.filter(h => h.role === r).length);
+for (const r in ROLES) S.huts[r] = huts.filter(h => h.role === r).length;
 
 /* ------------------------------------------------------------------ trees & rocks */
 const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
@@ -1247,7 +1292,7 @@ function navObstacles() {
   const rects = [], circles = [];
   const rect = (e, f) => { const k = e.o.scale.x, p = localPt(e, f[0], f[1]); rects.push({ x: p.x, z: p.z, ry: e.o.rotation.y, hx: f[2] * k, hz: f[3] * k }); };
   for (const h of houses) { rect(h, h.b ? FOOT.homeB : FOOT.homeA); if (h.garden) rects.push({ x: h.garden.x, z: h.garden.z, ry: h.garden.ry, hx: .58, hz: .4 }); }
-  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
+  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : h.role === 'fisher' ? FOOT.homeB : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
   circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: MILL_POS.x, z: MILL_POS.z, r: .8 }, ...sacredProps.obstacles);
   if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
@@ -1529,8 +1574,10 @@ const waterDepthAt = (x, z) => -.02 - heightAt(x, z);
 const RIPPLE_N = 8, ripples = [], rippleMesh = new THREE.InstancedMesh(new THREE.RingGeometry(.8, 1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xe8f4ff, transparent: true, opacity: .6, depthWrite: false }), RIPPLE_N);
 rippleMesh.frustumCulled = false; rippleMesh.count = 0; rippleMesh.userData.noSnow = true; scene.add(rippleMesh);
 const splash = (x, z) => { if (ripples.length >= RIPPLE_N) ripples.shift(); ripples.push({ x, z, t: 0 }); spawnChips(x, .05, z, Math.random() * 6.28); };
-let fishJumpT = 3;
+let fishJumpT = 3, fishT = 40;
+const FISH_TARGET = 54;
 function updateFish(dt, t) {
+  if ((fishT -= dt) <= 0 && fish.length < FISH_TARGET && fish.length) { fishT = 40; const o = fish[Math.floor(Math.random() * fish.length)]; fish.push({ x: o.x + rnd(.5), z: o.z + rnd(.5), h: o.h, sp: .35 + Math.random() * .2, ph: Math.random() * 6.28, jump: 0, s: .85 + Math.random() * .4 }); } // Fische wachsen nach
   fishJumpT -= dt;
   if (fishJumpT <= 0) { // springen nur, wo Absprung und Landestelle tief genug sind (nicht am Ufer)
     fishJumpT = 2.5 + Math.random() * 5; const f = fish[Math.floor(Math.random() * fish.length)];
@@ -1558,8 +1605,24 @@ function updateFish(dt, t) {
   rippleMesh.count = ripples.length; rippleMesh.material.opacity = ripples.length ? .5 : 0; rippleMesh.instanceMatrix.needsUpdate = true;
 }
 // Rehe und Hasen: äsen bzw. sitzen, ziehen umher, fliehen vor Bewohnern, dem Tiergeist und der Hand
+// Wild wächst nach: fehlen Tiere, kommt etwa jede halbe Minute eines an einem ruhigen Ort dazu
+const WILD_TARGET = { reh: 8, hase: 12 }; let wildT = 30;
+function killAnimal(a) { a.state = 'dead'; a.timer = 40; a.m.g.rotation.z = Math.PI / 2; }
+function removeAnimal(a) { scene.remove(a.m.g); wild.splice(wild.indexOf(a), 1); }
 function updateWild(dt, t) {
-  for (const a of wild) {
+  if ((wildT -= dt) <= 0) {
+    wildT = 30;
+    for (const kind of ['reh', 'hase']) if (wild.filter(a => a.kind === kind && a.state !== 'dead').length < WILD_TARGET[kind]) {
+      const at = wildSpot(0, 0, HALF * .9); if (at && villagers.every(v => Math.hypot(v.x - at.x, v.z - at.z) > 6)) wild.push({ kind, ...at, h: Math.random() * 6.28, state: 'idle', timer: 3, ph: Math.random() * 6.28, sp: 0, m: kind === 'reh' ? makeDeer() : makeHare(), threatT: 0 });
+      break;
+    }
+  }
+  for (const a of [...wild]) {
+    if (a.state === 'dead') { // liegt, bis ein Jäger es holt (sonst verschwindet es nach einer Weile)
+      a.timer -= dt; a.m.g.position.set(a.x, heightAt(a.x, a.z) + (a.kind === 'reh' ? .12 : .05), a.z);
+      if (a.timer <= 0) removeAnimal(a);
+      continue;
+    }
     const deer = a.kind === 'reh';
     a.threatT -= dt;
     if (a.threatT <= 0) { // Gefahr prüfen
@@ -1689,9 +1752,17 @@ const vPlanks = vMesh(mergeGeometries([0, 1, 2].map(k => new THREE.BoxGeometry(.
 const vHats = {
   lumber: vMesh(mergeGeometries([new THREE.SphereGeometry(.084, 10, 6, 0, Math.PI * 2, 0, Math.PI * .52).translate(0, HEAD_Y + .006, 0), new THREE.CylinderGeometry(.086, .086, .025, 10).translate(0, HEAD_Y + .006, 0), new THREE.SphereGeometry(.022, 6, 4).translate(0, HEAD_Y + .09, 0)]), 0xb8392c, .95),
   forester: vMesh(mergeGeometries([new THREE.CylinderGeometry(.125, .125, .012, 12).translate(0, HEAD_Y + .035, 0), new THREE.CylinderGeometry(.06, .078, .075, 10).translate(0, HEAD_Y + .075, 0)]), 0x3f6b2a, .95),
+  hunter: vMesh(mergeGeometries([new THREE.ConeGeometry(.09, .1, 8).translate(0, HEAD_Y + .09, -.005), new THREE.CylinderGeometry(.1, .1, .012, 10).translate(0, HEAD_Y + .04, 0), new THREE.BoxGeometry(.012, .09, .02).rotateX(-.5).translate(.07, HEAD_Y + .1, -.04)]), 0x2f4a2a, .95),
+  fisher: vMesh(mergeGeometries([new THREE.SphereGeometry(.085, 10, 6, 0, Math.PI * 2, 0, Math.PI * .5).translate(0, HEAD_Y + .01, 0), new THREE.CylinderGeometry(.075, .13, .03, 12).translate(0, HEAD_Y + .01, -.015)]), 0xe8c42f, .7),
   sawyer: vMesh(mergeGeometries([new THREE.SphereGeometry(.083, 10, 6, 0, Math.PI * 2, 0, Math.PI * .45).scale(1, .8, 1).translate(0, HEAD_Y + .02, -.004), new THREE.BoxGeometry(.1, .01, .05).translate(0, HEAD_Y + .03, .085)]), 0x6b4a2e, .95),
 };
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats)];
+// Bogen (Bogenarm entlang der Hand, Sehne), Köcher auf dem Rücken, Angel, Fang und Wild zum Tragen
+const vBow = vMesh(mergeGeometries([new THREE.TorusGeometry(.13, .008, 4, 14, Math.PI * .9).rotateZ(Math.PI / 2 - Math.PI * .45).rotateY(Math.PI / 2).translate(0, -.13, -.02), new THREE.CylinderGeometry(.002, .002, .25, 3).translate(0, -.13, -.13)]), 0x6b4527, .8);
+const vQuiver = vMesh(mergeGeometries([new THREE.CylinderGeometry(.028, .024, .16, 6).rotateX(.35).translate(.03, .2, -.08), ...[0, 1, 2].map(k => new THREE.ConeGeometry(.01, .04, 4).translate(.02 + k * .012, .3, -.12))]), 0x5a3a22, .9);
+const vRod = vMesh(new THREE.CylinderGeometry(.004, .008, .62, 4).translate(0, .31, 0).rotateX(-1.1).translate(0, -.13, 0), 0x8a6440, .8);
+const vGame = vMesh(new THREE.SphereGeometry(1, 7, 5).scale(.09, .06, .16).translate(0, .25, -.02), 0x8d6a46, .95);
+const vBasket = vMesh(mergeGeometries([new THREE.CylinderGeometry(.08, .065, .09, 8).translate(0, .2, .13), ...[0, 1].map(k => new THREE.ConeGeometry(.02, .06, 3).rotateZ(Math.PI / 2).translate(-.03 + k * .06, .26, .13))]), 0xa98a5c, .95);
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats), vBow, vQuiver, vRod, vGame, vBasket];
 // Lichtschein nachts: Lichthöfe um Laternen (zur Kamera gedreht) und warme Lichtflecken am Boden vor Türen und unter Laternen
 const glowMat = c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
 const haloMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(0xffb85c), VCAP + 64);
@@ -2214,10 +2285,10 @@ function leaveJob(v) {
   if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
   // Last abgeben: ein Stamm geht zurück ins Lager, fertige Bretter zählen als Holz (außer er ist schon auf dem Weg dorthin)
   if (v.state === 'saw' && v.hut) v.hut.logs++; // angefangener Stamm bleibt an der Säge
-  const keep = v.state === 'walk' && v.next === 'store';
+  const keep = v.state === 'walk' && ['store', 'storeMeat', 'storeFish'].includes(v.next);
   if (v.carry && !keep) { if (v.carry === 1) S.logs++; v.carry = 0; }
   if (['chop', 'plant', 'saw'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
-  v.role = null; v.hut = null; v.saplings = 0;
+  v.role = null; v.hut = null; v.saplings = 0; v.prey = null; v.catch = 0; if (v.state === 'aim' || v.state === 'fish') idle(v, .3);
 }
 // Bewohner auf Berufe verteilen: so viele wie gewünscht und Hüttenplätze frei sind, der Rest betet als Dorfbewohner
 function reconcileJobs() {
@@ -2240,7 +2311,7 @@ function reconcileJobs() {
 function roleCount(r) { return villagers.filter(v => v.role === r).length; }
 
 /* ------------------------------------------------------------------ villager AI */
-function walk(v, x, z, next) { v.state = 'walk'; v.next = next; setGoal(v, x, z, navV); }
+function walk(v, x, z, next) { v.state = 'walk'; v.next = next; v.stalk = next === 'aim'; setGoal(v, x, z, navV); }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
 function goLunch(v) { const a = Math.random() * Math.PI * 2, r = .85 + Math.random() * 1.6; walk(v, LUNCH_AT.x + Math.cos(a) * r, LUNCH_AT.z + Math.sin(a) * r, 'lunch'); }
 function goHome(v) {
@@ -2307,12 +2378,84 @@ const JOB = {
     if (sp.tree) { sp.tree.reserved = v; v.tree = sp.tree; }
     walk(v, tx + Math.cos(a) * .3, tz + Math.sin(a) * .3, 'plant');
   },
+  hunter(v) { // Wild suchen, anpirschen, zielen, schießen; Beute holen und ins Lager bringen
+    if (v.carry === 3) { const p = lagerDrop(); walk(v, p.x, p.z, 'storeMeat'); return; }
+    if (v.prey && v.prey.state === 'dead' && wild.includes(v.prey)) { walk(v, v.prey.x + rnd(.2), v.prey.z + rnd(.2), 'pickup'); return; }
+    let best = null, bd = 26 * 26;
+    for (const a of wild) { if (a.state === 'dead' || villagers.some(o => o !== v && o.prey === a)) continue; const d = (a.x - v.hut.x) ** 2 + (a.z - v.hut.z) ** 2; if (d < bd) { bd = d; best = a; } }
+    if (!best) { atHut(v); return; }
+    v.prey = best; const dx = v.x - best.x, dz = v.z - best.z, d = Math.hypot(dx, dz) || 1, r = best.kind === 'reh' ? 4.6 : 3.6;
+    walk(v, best.x + dx / d * r, best.z + dz / d * r, 'aim'); v.stalk = true;
+  },
+  fisher(v) { // zum Stegende, angeln, nach drei Fischen den Fang ins Lager bringen
+    if (v.carry === 4) { const p = lagerDrop(); walk(v, p.x, p.z, 'storeFish'); return; }
+    const J = v.hut && v.hut.jetty; if (!J) { atHut(v); return; }
+    if (Math.hypot(v.x - J.end.x, v.z - J.end.z) > .3) { walk(v, J.end.x, J.end.z, 'fishspot'); return; }
+    startFishing(v);
+  },
   sawyer(v) { // bleibt an der Säge und sägt, was die Träger bringen
     const p = hutWork(v.hut);
     if (Math.hypot(v.x - p.x, v.z - p.z) > .3) { walk(v, p.x, p.z, 'saw'); return; }
     startSaw(v);
   },
 };
+// Pfeile im Flug
+const arrows = [], arrowGeo = mergeGeometries([new THREE.CylinderGeometry(.005, .005, .3, 4).rotateX(Math.PI / 2), new THREE.ConeGeometry(.012, .04, 4).rotateX(Math.PI / 2).translate(0, 0, .17)]);
+const arrowMat = new THREE.MeshStandardMaterial({ color: 0x6b4527, roughness: .8 });
+function shoot(v) {
+  const a = v.prey; if (!a || !wild.includes(a) || a.state === 'dead') { v.prey = null; idle(v, .5); return; }
+  const o = new THREE.Mesh(arrowGeo, arrowMat); o.userData.noSnow = true; scene.add(o);
+  const hit = Math.random() < (a.kind === 'reh' ? .55 : .65), tx = a.x + (hit ? 0 : rnd(.8)), tz = a.z + (hit ? 0 : rnd(.8));
+  arrows.push({ o, v, a, hit, x0: v.x + Math.sin(v.h) * .1, z0: v.z + Math.cos(v.h) * .1, y0: v.y + .32, x1: tx, z1: tz, y1: heightAt(tx, tz) + (a.kind === 'reh' ? .35 : .1), t: 0, dur: Math.hypot(tx - v.x, tz - v.z) / 9, stuck: 0 });
+}
+function updateArrows(dt) {
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const r = arrows[i];
+    if (r.stuck > 0) { r.stuck -= dt; if (r.stuck <= 0) { scene.remove(r.o); arrows.splice(i, 1); } continue; }
+    r.t = Math.min(1, r.t + dt / r.dur); const k = r.t, arc = Math.sin(k * Math.PI) * .25;
+    const x = r.x0 + (r.x1 - r.x0) * k, z = r.z0 + (r.z1 - r.z0) * k, y = r.y0 + (r.y1 - r.y0) * k + arc;
+    r.o.position.set(x, y, z); r.o.lookAt(r.x1, r.y1 + (k < .5 ? arc : -arc * .5), r.z1);
+    if (r.t >= 1) {
+      r.stuck = 4;
+      if (r.hit && wild.includes(r.a) && r.a.state !== 'dead') { killAnimal(r.a); floatText(r.a.x, heightAt(r.a.x, r.a.z) + .7, r.a.z, 'Treffer!', 'w'); scene.remove(r.o); r.stuck = 0; arrows.splice(i, 1); }
+      else { r.a.threatT = 0; r.a.state = 'idle'; r.a.timer = 0; if (r.v.prey === r.a) r.v.prey = null; floatText(r.x1, r.y1 + .5, r.z1, 'Daneben', 'w'); }
+    }
+  }
+}
+// Angeln: auswerfen, warten, Biss, einholen; ein Fisch in der Nähe der Pose beißt eher (und fehlt dann im Meer)
+function startFishing(v) { const J = v.hut.jetty; v.state = 'fish'; v.fp = 'cast'; v.timer = .9; v.h = Math.atan2(J.dx, J.dz); }
+function fishStep(v, dt) {
+  const J = v.hut && v.hut.jetty; if (!J) { idle(v, .5); return; }
+  v.timer -= dt;
+  if (v.timer > 0) return;
+  if (v.fp === 'cast') { v.fp = 'wait'; v.timer = 3 + Math.random() * 6; return; }
+  if (v.fp === 'wait') { v.fp = 'bite'; v.timer = .9; return; }
+  // Biss: einholen
+  let near = -1, nd = 8 * 8; fish.forEach((f, i) => { const d = (f.x - J.bob.x) ** 2 + (f.z - J.bob.z) ** 2; if (d < nd && !f.jump) { nd = d; near = i; } });
+  if (near >= 0 || Math.random() < .35) {
+    if (near >= 0) fish.splice(near, 1);
+    v.catch = (v.catch || 0) + 1; floatText(v.x, v.y + .7, v.z, 'Fisch!', 'h'); splash(J.bob.x, J.bob.z);
+  } else floatText(v.x, v.y + .7, v.z, 'Nichts', 'w');
+  if (v.catch >= 3) { v.catch = 0; v.carry = 4; const p = lagerDrop(); walk(v, p.x, p.z, 'storeFish'); return; }
+  v.fp = 'cast'; v.timer = .9;
+}
+const lines = [];
+function updateFishingLines(t) {
+  const fishers = villagers.filter(v => v.state === 'fish' && v.fp !== 'cast' && v.hut && v.hut.jetty);
+  while (lines.length < fishers.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe8e8e0, transparent: true, opacity: .7 })); l.frustumCulled = false; scene.add(l);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd8352a, roughness: .5 })); b.userData.noSnow = true; scene.add(b);
+    lines.push({ l, b });
+  }
+  lines.forEach((L, k) => {
+    const v = fishers[k]; L.l.visible = L.b.visible = !!v; if (!v) return;
+    const J = v.hut.jetty, dip = v.fp === 'bite' ? -.05 - Math.abs(Math.sin(t * 18)) * .04 : Math.sin(t * 2 + v.ph) * .015;
+    const tipx = v.x + Math.sin(v.h) * .45, tipz = v.z + Math.cos(v.h) * .45, tipy = v.y + .62, bx = J.bob.x, bz = J.bob.z, by = -.02 + dip;
+    L.l.geometry.attributes.position.array.set([tipx, tipy, tipz, bx, by, bz]); L.l.geometry.attributes.position.needsUpdate = true;
+    L.b.position.set(bx, by, bz);
+  });
+}
 function startSaw(v) {
   const hs = v.hut, sw = localPt(hs, .28, .12); v.h = Math.atan2(sw.x - v.x, sw.z - v.z);
   if (hs.logs >= 1) { hs.logs--; v.carry = 1; v.state = 'saw'; v.timer = 2.4; } else idle(v, 1); // wartet auf Stämme
@@ -2329,6 +2472,15 @@ function arrive(v) {
     case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
     case 'store': v.carry = 0; addLogs(1, v.x, v.y + .2, v.z); idle(v, .4); break;
     case 'saw': if (v.role === 'sawyer' && v.hut) startSaw(v); else idle(v, .4); break;
+    case 'aim': { // in Schussweite: zielen (ist das Tier weitergezogen, neu anpirschen)
+      const a = v.prey; v.stalk = false;
+      if (!a || !wild.includes(a) || a.state === 'dead' || Math.hypot(a.x - v.x, a.z - v.z) > 7) { v.prey = a && a.state === 'dead' ? a : null; idle(v, .3); break; }
+      v.state = 'aim'; v.timer = 1.3; v.h = Math.atan2(a.x - v.x, a.z - v.z); break;
+    }
+    case 'pickup': { const a = v.prey; if (a && a.state === 'dead' && wild.includes(a)) { v.meat = a.kind === 'reh' ? 3 : 1; removeAnimal(a); v.carry = 3; const p = lagerDrop(); walk(v, p.x, p.z, 'storeMeat'); } else idle(v, .3); v.prey = null; break; }
+    case 'storeMeat': { const n = v.meat || 1; v.carry = 0; v.meat = 0; S.meat += n; floatText(v.x, v.y + .9, v.z, `+${n} Fleisch`, 'h'); idle(v, .4); break; }
+    case 'fishspot': if (v.role === 'fisher' && v.hut && v.hut.jetty) startFishing(v); else idle(v, .3); break;
+    case 'storeFish': v.carry = 0; S.fish += 3; floatText(v.x, v.y + .9, v.z, '+3 Fisch', 'h'); idle(v, .4); break;
     case 'pickLogs': { // Träger nimmt Stämme im Lager
       const H = v.haul, n = H ? Math.min(H.n, Math.floor(S.logs)) : 0;
       if (!n) { v.haul = null; idle(v, .5); break; }
@@ -2359,10 +2511,16 @@ function arrive(v) {
 function updateVillager(v, dt, t) {
   if (v.haste > 0) v.haste -= dt;
   if (v.cheer > 0) v.cheer -= dt;
-  const sp = .95 * (v.haste > 0 ? 2.3 : 1);
+  const sp = .95 * (v.haste > 0 ? 2.3 : 1) * (v.stalk && v.state === 'walk' && v.next === 'aim' ? .55 : 1); // anpirschen: langsamer
   switch (v.state) {
     case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
-    case 'walk': addWear(v.x, v.z, dt); if (followPath(v, sp * dt)) arrive(v); break;
+    case 'walk':
+      if (v.next === 'aim' && v.prey) { // Jäger: in Schussweite stehen bleiben, sonst den Weg ab und zu zur ziehenden Beute neu legen
+        const d = Math.hypot(v.prey.x - v.x, v.prey.z - v.z);
+        if (d < (v.prey.kind === 'reh' ? 5.2 : 4.2)) { arrive(v); break; }
+        if ((v.aimT = (v.aimT || 0) - dt) <= 0) { v.aimT = 2; const dx = v.x - v.prey.x, dz = v.z - v.prey.z, l = Math.hypot(dx, dz) || 1; setGoal(v, v.prey.x + dx / l * 4, v.prey.z + dz / l * 4, navV); }
+      }
+      addWear(v.x, v.z, dt); if (followPath(v, sp * dt)) arrive(v); break;
     case 'chop': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
       const tr = v.tree, now = v.cp % 1;
@@ -2378,6 +2536,8 @@ function updateVillager(v, dt, t) {
     }
       if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'lunch': if (S.hour >= v.until || S.hour < LUNCH[0]) idle(v, Math.random() * 1.5); break;
+    case 'aim': { const a = v.prey; if (a && wild.includes(a) && a.state !== 'dead') v.h = Math.atan2(a.x - v.x, a.z - v.z); v.timer -= dt; if (v.timer <= 0) { shoot(v); idle(v, .9); } break; }
+    case 'fish': fishStep(v, dt); break;
     case 'beg': // kniet und fleht, ab und zu steigt ein Funke auf
       if (!v.wish || !wish.kind) { idle(v, .4); break; }
       v.timer += dt; if (v.timer > 1.6) { v.timer = 0; spawnMote(v.x, v.y + .45, v.z); } break;
@@ -2417,7 +2577,7 @@ function updateVillager(v, dt, t) {
       return;
     }
   }
-  v.y = surfaceAt(v.x, v.z);
+  v.y = groundAt(v.x, v.z); // auf dem Steg der Fischer auf Deckhöhe
 }
 
 /* ------------------------------------------------------------------ fox AI */
@@ -2982,6 +3142,8 @@ function renderWork() {
     const notes = [];
     for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${construction && construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
     if (id === 'wood') notes.push(`${alive.length - young} Bäume zum Fällen, ${young} wachsen noch.`);
+    if (id === 'jagd') notes.push(`Auf der Insel: ${wild.filter(a => a.kind === 'reh' && a.state !== 'dead').length} Rehe, ${wild.filter(a => a.kind === 'hase' && a.state !== 'dead').length} Hasen. Im Lager: ${fmt(S.meat)} Fleisch.`);
+    if (id === 'fischerei') notes.push(`Fische vor der Küste: ${fish.length}. Im Lager: ${fmt(S.fish)} Fisch.`);
     if (id === 'saw') { const ms = huts.filter(h => h.role === 'sawyer'); notes.push(`An der Säge: ${ms.reduce((a, h) => a + h.logs, 0)} Stämme, ${ms.reduce((a, h) => a + h.planks, 0)} Bretter. Im Lager: ${fmt(S.logs)} ${S.logs === 1 ? 'Stamm' : 'Stämme'}, ${fmt(S.holz)} Bretter.`); }
     el.querySelector('.wnote').textContent = notes.join(' ');
   }
@@ -3179,6 +3341,8 @@ function frame() {
     } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
     else if (v.state === 'plant') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt; armA = armB = c.arm; splay = -.5; leg = .3; }
     else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }
+    else if (v.state === 'aim') { const draw = smooth(1.3, .5, v.timer); armA = -1.57; armB = -1.45; splay = .08; armRz = .55 + draw * .35; tilt = -.05; leg = .2; } // Bogen spannen
+    else if (v.state === 'fish') { const c = v.fp === 'cast' ? smooth(.9, 0, v.timer) : 1, bite = v.fp === 'bite' ? Math.sin(v.timer * 20) * .15 : 0; armB = -2.4 + c * 1.3 + bite; armA = -.9; splay = .1; }
     else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
     else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
@@ -3190,6 +3354,7 @@ function frame() {
       leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
     } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
     if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
+    if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
     else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
     const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
     const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
@@ -3231,6 +3396,11 @@ function frame() {
     vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
     vParts.beard.setMatrixAt(i, L.beard ? M : zero);
     vWood.forEach(m => m.setMatrixAt(i, v.carry === 1 ? M : zero)); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
+    vGame.setMatrixAt(i, v.carry === 3 ? M : zero); vBasket.setMatrixAt(i, v.carry === 4 ? M : zero);
+    // Jäger: Bogen in der linken Hand, Köcher auf dem Rücken; Fischer: Angel in der rechten Hand
+    if (v.role === 'hunter' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state)) part(vBow, .085, SHO_Y, v.state === 'aim' ? -1.57 : (v.state === 'walk' ? armA : -.3), splay); else vBow.setMatrixAt(i, zero);
+    vQuiver.setMatrixAt(i, v.role === 'hunter' ? M : zero);
+    if (v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state)) part(vRod, -.085, SHO_Y, v.state === 'fish' ? armB : -.4, -splay); else vRod.setMatrixAt(i, zero);
     for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
     // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
     if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
@@ -3248,6 +3418,7 @@ function frame() {
     else vSapling.forEach(m => m.setMatrixAt(i, zero));
   });
   for (const m of vAll) m.instanceMatrix.needsUpdate = true;
+  updateArrows(dt); updateFishingLines(t);
   updateLights(t);
   updateChips(dt);
   updateShrine(dt, t);
@@ -3367,7 +3538,7 @@ function frame() {
     uiT = .25;
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
     // Lager: alle Rohstoffe und was als Nächstes gebaut wird
-    $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz);
+    $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish);
     { const nb = construction ? null : nextBuild(); $('sBuild').textContent = construction ? `${construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
@@ -3395,7 +3566,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
