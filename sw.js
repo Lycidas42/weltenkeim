@@ -24,6 +24,7 @@ const APP = [
   './assets/models/animals/Alpaca.glb',
   './assets/models/animals/Cat.glb',
   './assets/models/animals/Fox_HD.glb',
+  './assets/models/hand/GodHand.glb',
   './assets/models/building_church_blue.bin',
   './assets/models/building_church_blue.gltf',
   './assets/models/building_home_A_blue.bin',

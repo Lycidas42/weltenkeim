@@ -16,10 +16,10 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', hand: { skin: '#e9b48c', nails: '#f4ddd3' }, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
-if (loaded && typeof loaded === 'object') Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}) });
+if (loaded && typeof loaded === 'object') Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), hand: Object.assign({}, S.hand, loaded.hand || {}) });
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
 const passive = () => 0.06 * S.temple;
 const cap = () => 4 + 3 * S.houses;
@@ -154,8 +154,8 @@ const CREATURES = {
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_church_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`];
-const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature] = await Promise.all(files.map(load));
+  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb', 'hand/GodHand.glb'];
+const [gHomeA, gHomeB, gChurch, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand, gHand2] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 class Swarm {
@@ -308,8 +308,6 @@ let foxModel = null, foxMixer = null, foxActs = {};
 function buildRig(id, gltf, fur = false) {
   const C = CREATURES[id], model = shadowify(gltf.scene);
   model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
-  if (fur && !model.userData.fur) model.userData.fur = addFur(model);
-  model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0); model.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
   model.scale.setScalar(C.h / size.y); model.updateMatrixWorld(true);
@@ -317,6 +315,10 @@ function buildRig(id, gltf, fur = false) {
   const head = model.getObjectByName(C.head || 'Head'), box = new THREE.Box3().setFromObject(model), c = box.getCenter(new THREE.Vector3());
   if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
   model.position.y = -box.min.y;
+  const dims = box.getSize(new THREE.Vector3());
+  // Fell erst nach dem Vermessen anlegen: die Schichten sind Skinned-Meshes ohne berechnete Knochenmatrizen
+  if (fur && !model.userData.fur) model.userData.fur = addFur(model);
+  model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   const mixer = new THREE.AnimationMixer(model), acts = {};
   for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) acts[k] = mixer.clipAction(clip); }
   for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!acts[k] && acts[f]) { acts[k] = mixer.clipAction(acts[f].getClip().clone()); acts[k].timeScale = ts; }
@@ -325,7 +327,7 @@ function buildRig(id, gltf, fur = false) {
   for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
-  return { model, mixer, acts, cur: null, id };
+  return { model, mixer, acts, cur: null, id, dims };
 }
 // Animation auf einem Rig weich überblenden; restart spielt eine laufende Animation von vorn
 function rigPlay(rig, name, restart = false) {
@@ -512,14 +514,15 @@ const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.Pers
   const rim = new THREE.DirectionalLight(0xbfe0ff, 1.1); rim.position.set(-3, 2.5, -3); P.scene.add(rim);
   P.ground = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5b8a46, roughness: 1 }));
   P.scene.add(P.ground, P.pivot);
-  P.hand = makeHand(); P.scene.add(P.hand.g);
 }
 async function showPortrait() {
   const P = portrait, id = fox.kind, C = CREATURES[id];
   if ((P.rig && P.rig.id === id) || P.loading === id) return;
+  if (!P.hand) { P.hand = makeHand(gHand2); P.scene.add(P.hand.g); styleHand(P.hand); }
   if (!P.renderer) {
     P.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     P.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('foxPortrait').appendChild(P.renderer.domElement);
+    P.renderer.setSize($('foxPortrait').clientWidth || 300, $('foxPortrait').clientHeight || 150);
   }
   P.loading = id;
   try {
@@ -528,11 +531,11 @@ async function showPortrait() {
     if (P.rig) P.pivot.remove(P.rig.model);
     P.rig = buildRig(id, g, !!C.hd); P.pivot.add(P.rig.model);
     // Kamera schräg von vorn, Bildausschnitt an die Größe des Tiers anpassen
-    const size = new THREE.Box3().setFromObject(P.rig.model).getSize(new THREE.Vector3());
+    const size = P.rig.dims;
     P.ground.scale.setScalar(Math.max(size.x, size.z) * .75);
     P.look.set(0, size.y * .45, 0); P.dist = Math.max(size.y, size.z * .8) * 1.75;
     rigPlay(P.rig, fox.cur || 'idle');
-  } catch (e) { /* ohne Porträt bleibt das Panel nutzbar */ }
+  } catch (e) { console.warn("Porträt:", e); } // ohne Porträt bleibt das Panel nutzbar
   finally { if (P.loading === id) P.loading = null; }
 }
 function renderPortrait(dt, t) {
@@ -554,26 +557,46 @@ const ACT_DESC = { help: 'Holz zum Brunnen gebracht', play: 'mit dem Dorf gespie
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 
 /* ------------------------------------------------------------------ hand */
-function makeHand() {
-  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xebb88f, roughness: .55, flatShading: true, emissive: 0x4a2208, emissiveIntensity: .22 });
-  const add = (geo, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
-  add(new THREE.BoxGeometry(.66, .17, .62), inner, 0, 0, 0);
-  const fingers = [];
-  [[-.24, .36], [-.08, .44], [.08, .46], [.24, .39]].forEach(([x, l]) => {
-    const p1 = new THREE.Group(); p1.position.set(x, 0, -.31); inner.add(p1);
-    add(new THREE.BoxGeometry(.135, .135, l), p1, 0, 0, -l / 2);
-    const p2 = new THREE.Group(); p2.position.z = -l; p1.add(p2);
-    add(new THREE.BoxGeometry(.125, .125, l * .7), p2, 0, 0, -l * .35);
-    fingers.push([p1, p2]);
+// Gotteshand (assets/models/hand/GodHand.glb, Quelle assets/source/GodHand.blend): Skinned-Mesh mit 18 Knochen.
+// Finger zeigen nach -Z, Handfläche nach unten, Daumen nach +X. Gebeugt wird um die lokale X-Achse der Knochen
+// (negativ = zur Handfläche), gespreizt um die lokale Z-Achse.
+function makeHand(gltf) {
+  const g = new THREE.Group(), model = gltf.scene, bones = {}, rest = {}, mats = {};
+  model.rotation.x = .18; g.add(model);
+  model.traverse(o => {
+    if (o.isBone) { bones[o.name] = o; rest[o.name] = o.quaternion.clone(); }
+    if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; for (const m of [].concat(o.material)) { mats[m.name] = m; m.roughness = m.name === 'Nails' ? .3 : .55; m.metalness = 0; m.emissive = new THREE.Color(m.name === 'Nails' ? 0x000000 : 0x3a1606); m.emissiveIntensity = .25; } }
   });
-  const th = new THREE.Group(); th.position.set(.34, -.02, .08); th.rotation.y = -.7; inner.add(th);
-  add(new THREE.BoxGeometry(.14, .14, .34), th, 0, 0, -.17);
-  inner.rotation.x = .18;
   g.visible = false;
-  return { g, fingers, th, curl: .1, pos: new THREE.Vector3(0, 3, 0), prev: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(0, 2, 0) };
+  return { g, bones, rest, mats, pose: Object.assign({}, HAND_POSES.relax), curl: .1, pos: new THREE.Vector3(0, 3, 0), prev: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(0, 2, 0) };
 }
-const hand = makeHand(); scene.add(hand.g);
+// Handhaltungen: curl = Finger beugen (0 offen … 1 Faust), thumb = Daumen, spread = spreizen, point = Zeigefinger gestreckt
+const HAND_POSES = {
+  relax: { curl: .2, thumb: .2, spread: .35, point: 0 },
+  grab: { curl: .55, thumb: .55, spread: .1, point: 0 },
+  hold: { curl: .82, thumb: .85, spread: 0, point: 0 },
+  fist: { curl: 1, thumb: 1, spread: 0, point: 0 },
+  flat: { curl: 0, thumb: 0, spread: .12, point: 0 },
+  claw: { curl: .68, thumb: .7, spread: .45, point: 0 },
+  point: { curl: 1, thumb: .85, spread: 0, point: 1 },
+};
+const FINGERS = ['Index', 'Middle', 'Ring', 'Pinky'], SPREAD = [9, 2, -4, -11], hE = new THREE.Euler(), hQ = new THREE.Quaternion();
+function setBone(h, n, x, z = 0) { const b = h.bones[n]; if (!b) return; b.quaternion.copy(h.rest[n]).multiply(hQ.setFromEuler(hE.set(x, 0, z))); }
+// Haltung weich ansteuern und auf die Knochen übertragen; t sorgt für leichtes Fingerspiel
+function poseHand(h, target, dt, t, speed = 14) {
+  const k = 1 - Math.exp(-dt * speed), P = h.pose, D = Math.PI / 180;
+  for (const key in P) P[key] += (target[key] - P[key]) * k;
+  FINGERS.forEach((f, i) => {
+    const c = f === 'Index' ? P.curl * (1 - P.point) : P.curl, w = Math.sin(t * 2 + i * 1.3) * .025;
+    setBone(h, f + '1', (-75 * c - 4) * D + w, SPREAD[i] * P.spread * D);
+    setBone(h, f + '2', (-92 * c - 6) * D + w);
+    setBone(h, f + '3', (-62 * c - 4) * D);
+  });
+  setBone(h, 'Thumb0', -22 * P.thumb * D);
+  setBone(h, 'Thumb1', (-35 * P.thumb - 3) * D); setBone(h, 'Thumb2', (-45 * P.thumb - 4) * D); setBone(h, 'Thumb3', -40 * P.thumb * D);
+}
+function styleHand(h) { if (h.mats.Skin) h.mats.Skin.color.set(S.hand.skin); if (h.mats.Nails) h.mats.Nails.color.set(S.hand.nails); }
+const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
 
 // Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
 const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
@@ -584,25 +607,23 @@ function updateHandAnim(dt, t) {
   const A = handAnim, C = CREATURES[fox.kind], hand = portrait.hand; A.t += dt;
   const back = portrait.pivot.position.y + C.h * .62, s = clamp(C.h / 2.4, .5, 1);
   const ease = x => x * x * (3 - 2 * x), seg = (a, b) => clamp((A.t - a) / (b - a), 0, 1);
-  let along = 0, lift = 0, curl = .15, tilt = 0;
+  let along = 0, lift = 0, tilt = 0, pose = HAND_POSES.relax;
   if (A.kind === 'pet') {
     // herabsinken, drei Striche vom Nacken zum Rücken, wieder abheben
     const down = ease(seg(0, .45)), up = ease(seg(1.75, 2.1)), stroke = seg(.45, 1.75);
     along = .25 - (stroke * 3 % 1) * .5; lift = (1 - down) * 1.4 + up * 1.4 + Math.sin(stroke * 3 * Math.PI) ** 2 * .06;
-    curl = .22; tilt = -.15;
+    tilt = -.15; pose = { curl: .25 + Math.sin(A.t * 9) * .08, thumb: .2, spread: .3, point: 0 };
     if (stroke > 0 && A.hearts < 3 && A.t > .55 + A.hearts * .43) { A.hearts++; floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, '♥', 'love'); }
   } else {
     // ausholen, schnell zuschlagen, zurückziehen
     const raise = ease(seg(0, .3)), swat = seg(.3, .42), away = ease(seg(.55, .95));
-    lift = raise * .7 - swat * swat * .62 + away * 1.2; along = -.1; curl = .05; tilt = raise * .5 - swat * .7;
+    lift = raise * .7 - swat * swat * .62 + away * 1.2; along = -.1; tilt = raise * .5 - swat * .7; pose = A.t < .5 ? HAND_POSES.flat : HAND_POSES.relax;
   }
   if (A.hit && A.t >= HAND_HIT[A.kind]) { A.hit(); A.hit = null; }
   hand.g.visible = true; hand.g.scale.setScalar(s);
   hand.g.position.set(0, back + .12 * s + lift, along * C.h);
   hand.g.rotation.set(tilt, Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
-  hand.curl += (curl - hand.curl) * (1 - Math.exp(-dt * 14));
-  hand.fingers.forEach(([a, b], i) => { a.rotation.x = -hand.curl * 1.1 - Math.sin(t * 6 + i) * .04; b.rotation.x = -hand.curl * 1.3; });
-  hand.th.rotation.x = -hand.curl * .8;
+  poseHand(hand, pose, dt, t, 18);
   if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
 }
 
@@ -794,6 +815,63 @@ function tryMiracle(p) {
   foxCast(p.x, p.z);
 }
 
+/* ------------------------------------------------------------------ Bäume ausreißen */
+// Mit der Hand einen Baum packen und halten oder nach oben ziehen: er wackelt, reißt samt Wurzeln aus,
+// liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
+// wächst später ein neuer Baum.
+let treeGrab = null;
+const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, tilt: 0 };
+const heldObjs = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
+const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
+rootBall.castShadow = true; rootBall.visible = false; scene.add(rootBall);
+function treeAt(cx, cy) {
+  let best = null, bd = 46;
+  for (const t of trees) {
+    if (!t.alive || t.gone || t.g < .6) continue;
+    const d = screenDist(t.x, heightAt(t.x, t.z) + .8 * t.g * ST, t.z, cx, cy); if (d < bd) { bd = d; best = t; }
+  }
+  return best;
+}
+function uprootTree(tr) {
+  if (tr.reserved === 'fox') { fox.tree = null; if (fox.state === 'walk' || fox.state === 'work') foxIdle(1); }
+  else if (tr.reserved) tr.reserved.tree = null;
+  tr.reserved = null; tr.alive = false; tr.stumpT = 0; tr.regrow = 50 + Math.random() * 30;
+  Object.assign(heldTree, { on: true, flying: false, type: tr.type, g: tr.g, rot: tr.rot, tilt: 0 });
+  floatText(tr.x, heightAt(tr.x, tr.z) + 2.2, tr.z, 'Ausgerissen!', 'w');
+  for (const v of villagers) { const dx = v.x - tr.x, dz = v.z - tr.z, d = Math.hypot(dx, dz); if (d < 2.5 && ['idle', 'walk', 'chop'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 1.5; v.tx = v.x + dx / (d || 1) * 2.5; v.tz = v.z + dz / (d || 1) * 2.5; } }
+}
+function throwTree() {
+  const k = clamp(hand.vel.length(), 0, 12) / (hand.vel.length() || 1);
+  heldTree.flying = true; heldTree.vel.set(hand.vel.x * k, hand.vel.y * .4 * k + 2, hand.vel.z * k); heldTree.spin = rnd(3);
+}
+function updateTrees(dt, t) {
+  if (treeGrab) {
+    if (!treeGrab.tr.alive) treeGrab = null;
+    else {
+      // halten zieht langsam, nach oben wischen schneller
+      treeGrab.prog += dt * .4 + Math.max(0, treeGrab.lastY - pointerXY.y) / 160; treeGrab.lastY = pointerXY.y;
+      if (treeGrab.prog >= 1) { const tr = treeGrab.tr; treeGrab = null; uprootTree(tr); }
+    }
+  }
+  const o = heldObjs[heldTree.type];
+  heldObjs.forEach(x => x.visible = false); rootBall.visible = false;
+  if (!heldTree.on) return;
+  const s = ST * heldTree.g;
+  if (heldTree.flying) {
+    heldTree.vel.y -= 16 * dt; heldTree.pos.addScaledVector(heldTree.vel, dt); heldTree.tilt += heldTree.spin * dt + dt * 2.5;
+    const gy = heightAt(heldTree.pos.x, heldTree.pos.z);
+    if (heldTree.pos.y < Math.max(gy, 0) && heldTree.vel.y < 0) {
+      heldTree.on = false; heldTree.flying = false;
+      if (gy < -.1) floatText(heldTree.pos.x, .6, heldTree.pos.z, 'Platsch!', 'w');
+      else { const n = Math.max(1, Math.round(3 * heldTree.g)); addHolz(n, heldTree.pos.x, gy + .4, heldTree.pos.z); }
+      return;
+    }
+  } else heldTree.pos.set(hand.g.position.x, hand.g.position.y - .95 * s, hand.g.position.z);
+  o.visible = true; rootBall.visible = true;
+  o.position.copy(heldTree.pos); o.rotation.set(Math.min(heldTree.tilt, 1.4) + Math.sin(t * 3) * .05, heldTree.rot, 0); o.scale.setScalar(s);
+  rootBall.position.copy(heldTree.pos); rootBall.rotation.copy(o.rotation); rootBall.scale.setScalar(heldTree.g);
+}
+
 /* ------------------------------------------------------------------ input */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let tool = 'hand', primary = null, pressing = false, grabbed = null, handShown = false;
@@ -818,10 +896,13 @@ function onToolDown(cx, cy) {
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) { grabbed = best; if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
+    else if (!heldTree.on) { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
   } else if (tool === 'miracle' && hitOk) { tryMiracle(hit); pressing = false; return; }
   pressing = true;
 }
 function onToolUp() {
+  if (treeGrab) treeGrab = null; // losgelassen, bevor der Baum nachgab
+  if (heldTree.on) throwTree();
   if (grabbed) { const v = grabbed; grabbed = null; v.state = 'falling'; const k = clamp(hand.vel.length(), 0, 14) / (hand.vel.length() || 1);
     v.vx = hand.vel.x * k; v.vz = hand.vel.z * k; v.vy = hand.vel.y * .4 * k + 2.5; }
   pressing = false;
@@ -845,7 +926,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
   blick: 'Ziehen dreht die Welt. Zwei Finger oder Mausrad: verschieben und zoomen.',
-  get hand() { return `Bewohner packen und werfen. ${S.name} antippen, um ihn zu erziehen.`; },
+  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen. ${S.name} antippen, um ihn zu erziehen.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -1011,13 +1092,14 @@ function frame() {
     if (y < .05) { tr.gone = true; if (tr.reserved && tr.reserved !== 'fox') tr.reserved.tree = null; tr.reserved = null; continue; }
     if (tr.alive) {
       if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008);
-      const s = ST * tr.g; dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03, tr.rot, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
+      const s = ST * tr.g, pull = treeGrab && treeGrab.tr === tr ? treeGrab.prog : 0;
+      dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
       treeSwarms[tr.type].set(tc2[tr.type]++, dummy.matrix);
     } else if (tr.stumpT > 0) {
       tr.stumpT -= dt;
       dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
       if (tr.stumpT <= 0) { tr.alive = true; tr.g = .2; }
-    }
+    } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
   }
   treeSwarms[0].commit(tc2[0]); treeSwarms[1].commit(tc2[1]); stumpSwarm.commit(sc);
   const rc = [0, 0];
@@ -1027,23 +1109,27 @@ function frame() {
   if (millFan) millFan.rotation.z += dt * 1.4;
 
   updateFox(dt, t);
+  updateTrees(dt, t);
 
   // hand
   if (handAnim.kind) updateHandAnim(dt, t);
   const showHand = tool !== 'blick' && handShown && hitOk;
   hand.g.visible = showHand;
   if (showHand) {
-    const lift = grabbed ? 1.0 : (pressing && tool === 'sculpt') ? .75 : 1.5;
-    hand.target.set(hit.x, Math.max(hit.y, 0) + lift, hit.z);
+    const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : grabbed ? 1.0 : (pressing && tool === 'sculpt') ? .75 : 1.5;
+    if (treeGrab) {
+      // am Stamm festhalten und zittern, je weiter der Baum nachgibt
+      const tr = treeGrab.tr, j = treeGrab.prog * .05;
+      hand.target.set(tr.x + rnd(j), heightAt(tr.x, tr.z) + .95 * tr.g * ST + treeGrab.prog * .25, tr.z + rnd(j));
+    } else hand.target.set(hit.x, Math.max(hit.y, 0) + lift, hit.z);
     hand.prev.copy(hand.g.position);
     hand.g.position.lerp(hand.target, 1 - Math.exp(-dt * 16));
     const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
     const dx = controls.target.x - camera.position.x, dz = controls.target.z - camera.position.z;
     hand.g.rotation.y = Math.atan2(-dx, -dz);
-    const curlT = grabbed ? 1 : pressing ? (tool === 'sculpt' ? (sculptDir > 0 ? .15 : .6) : .5) : .12;
-    hand.curl += (curlT - hand.curl) * (1 - Math.exp(-dt * 14));
-    hand.fingers.forEach(([a, b], i) => { a.rotation.x = -hand.curl * 1.1 - Math.sin(t * 2 + i) * .03; b.rotation.x = -hand.curl * 1.3; });
-    hand.th.rotation.x = -hand.curl * .8;
+    const pose = grabbed || heldTree.on ? HAND_POSES.hold : treeGrab ? HAND_POSES.claw
+      : pressing ? (tool === 'sculpt' ? (sculptDir > 0 ? HAND_POSES.flat : HAND_POSES.fist) : HAND_POSES.grab) : HAND_POSES.relax;
+    poseHand(hand, pose, dt, t);
   }
 
   // effects

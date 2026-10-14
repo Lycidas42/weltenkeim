@@ -29,6 +29,10 @@ Katze (`Cat.glb`):
 - Quelle: https://opengameart.org/content/animated-animales-low-poly
 - Bearbeitung: von FBX nach glTF konvertiert (FBX2glTF), Materialfarben neu gesetzt, Animationen umbenannt. Augen werden im Spielcode ergänzt.
 
+## Gotteshand (`models/hand/GodHand.glb`, Quelle `source/GodHand.blend`)
+
+Für Weltenkeim selbst gebaut in Blender 5.2 (Metaballs, Voxel-Remesh, eigenes Skelett mit 18 Knochen, Fingernägel als eigenes Material). Gehört zum Projekt, keine fremde Lizenz.
+
 ## Three.js
 
 `vendor/three-0.170.0/`, MIT-Lizenz, siehe `vendor/three-0.170.0/LICENSE`.
