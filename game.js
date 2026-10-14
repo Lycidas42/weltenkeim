@@ -309,13 +309,16 @@ let foxModel = null, foxMixer = null, foxActs = {};
 function buildRig(id, gltf, fur = false) {
   const C = CREATURES[id], model = shadowify(gltf.scene);
   model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
-  model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0); model.updateMatrixWorld(true);
-  const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
-  model.scale.setScalar(C.h / size.y); model.updateMatrixWorld(true);
+  // In der Grundpose vermessen: ein wiederverwendetes Modell kann noch liegen oder geduckt sein, und die
+  // Begrenzungsbox von Skinned-Meshes hängt von der Pose ab. Sonst wird das Tier mal riesig, mal winzig.
+  resetBones(model);
+  model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0);
+  const size = restBox(model).getSize(new THREE.Vector3());
+  model.scale.setScalar(C.h / size.y);
   // Blickrichtung aus der Kopfposition ableiten, damit +Z vorne ist
-  const head = model.getObjectByName(C.head || 'Head'), box = new THREE.Box3().setFromObject(model), c = box.getCenter(new THREE.Vector3());
+  let box = restBox(model); const head = model.getObjectByName(C.head || 'Head'), c = box.getCenter(new THREE.Vector3());
   if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
-  model.position.y = -box.min.y;
+  box = restBox(model); model.position.y = -box.min.y;
   const dims = box.getSize(new THREE.Vector3());
   // Fell erst nach dem Vermessen anlegen: die Schichten sind Skinned-Meshes ohne berechnete Knochenmatrizen
   if (fur && !model.userData.fur) model.userData.fur = addFur(model);
@@ -330,6 +333,29 @@ function buildRig(id, gltf, fur = false) {
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
   return { model, mixer, acts, cur: null, id, dims };
+}
+// Knochen auf ihre Werte beim Laden zurücksetzen. Nicht skeleton.pose(): das rechnet bei aus Blender
+// exportierten Modellen die Skalierung des Armature-Knotens (×100) ein zweites Mal ein.
+function resetBones(model) {
+  model.traverse(o => {
+    if (!o.isBone) return;
+    const r = o.userData.rest || (o.userData.rest = { p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() });
+    o.position.copy(r.p); o.quaternion.copy(r.q); o.scale.copy(r.s);
+  });
+  model.updateMatrixWorld(true);
+}
+// Begrenzungsbox in der aktuellen Knochenpose (nach resetBones also die Grundpose). Skinned-Meshes werden über
+// ihre verformten Vertices vermessen, weil die rohe Geometrie je nach Export in einem anderen Raum liegt.
+function restBox(model) {
+  const box = new THREE.Box3(), b = new THREE.Box3(), v = new THREE.Vector3(); model.updateMatrixWorld(true);
+  model.traverse(o => {
+    if (!o.isMesh || o.userData.shell) return;
+    if (o.isSkinnedMesh) {
+      o.skeleton.update(); const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 3) { o.getVertexPosition(i, v); box.expandByPoint(v.applyMatrix4(o.matrixWorld)); }
+    } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld)); }
+  });
+  return box;
 }
 // Animation auf einem Rig weich überblenden; restart spielt eine laufende Animation von vorn
 function rigPlay(rig, name, restart = false) {
@@ -371,13 +397,7 @@ const NO_POSE = { rot: {}, pos: {} };
 const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.pos });
 // keys: [{ t, pose }] -> AnimationClip, ausgehend von der ersten Frame der Basis-Animation
 function poseClip(model, baseClip, name, keys) {
-  // Knochen auf ihre Werte beim Laden zurücksetzen. Nicht skeleton.pose(): das rechnet bei aus Blender
-  // exportierten Modellen die Skalierung des Armature-Knotens (×100) ein zweites Mal ein.
-  model.traverse(o => {
-    if (!o.isBone) return;
-    const r = o.userData.rest || (o.userData.rest = { p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() });
-    o.position.copy(r.p); o.quaternion.copy(r.q); o.scale.copy(r.s);
-  });
+  resetBones(model);
   const mixer = new THREE.AnimationMixer(model), act = mixer.clipAction(baseClip); act.play(); mixer.update(0);
   model.updateMatrixWorld(true);
   const space = model.parent ? model.parent.matrixWorld.clone().invert() : new THREE.Matrix4(), spaceQ = new THREE.Quaternion().setFromRotationMatrix(space);
@@ -528,7 +548,7 @@ async function loadCreature(id) {
 }
 // Porträt im Charakter-Blatt: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das
 // Fell-Modell), die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, die Weltkamera bleibt unberührt.
-const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, look: new THREE.Vector3(), dist: 4 };
+const portrait = { hand: null, renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, look: new THREE.Vector3(), dist: 4 };
 {
   const P = portrait;
   P.scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x4d6b3c, 1.4));
@@ -540,6 +560,7 @@ const portrait = { renderer: null, scene: new THREE.Scene(), cam: new THREE.Pers
 async function showPortrait() {
   const P = portrait, id = fox.kind, C = CREATURES[id];
   if ((P.rig && P.rig.id === id) || P.loading === id) return;
+  if (!P.hand && !P.handLoading) P.handLoading = load('hand/GodHand.glb').then(g => { P.hand = makeHand(g); P.scene.add(P.hand.g); styleHand(P.hand); }).catch(() => {});
   if (!P.renderer) {
     P.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     P.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('foxPortrait').appendChild(P.renderer.domElement);
@@ -629,26 +650,29 @@ function playHand(kind, onHit) {
     if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
     foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
   }
-  Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile() });
+  const P = portrait;
+  Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile(), pback: P.rig ? backProfile(P.rig.model, P.pivot) : null });
 }
 // höchster Punkt nahe der Mittellinie an den Messstellen, im Raum des Tiers (foxPivot), damit die Hand auf dem
 // Rücken aufliegt statt einzusinken
-function backProfile() {
+function backProfile(model = foxModel, space = foxPivot) {
   const h = CREATURES[fox.kind].h, out = BACK_Z.map(() => -1e9), v = new THREE.Vector3();
-  foxPivot.updateMatrixWorld(true);
-  foxModel.traverse(m => {
+  if (!model) return out.map(() => h * .62);
+  space.updateMatrixWorld(true);
+  const fur = model.userData.fur ? FUR.len * 1.3 : 0;
+  model.traverse(m => {
     if (!m.isSkinnedMesh || m.userData.shell) return;
     m.skeleton.update(); const pos = m.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 2) {
-      m.getVertexPosition(i, v); foxPivot.worldToLocal(v.applyMatrix4(m.matrixWorld)); if (Math.abs(v.x) > .12 * h) continue;
+      m.getVertexPosition(i, v); space.worldToLocal(v.applyMatrix4(m.matrixWorld)); if (Math.abs(v.x) > .12 * h) continue;
       BACK_Z.forEach((z, k) => { if (Math.abs(v.z - z * h) < .07 * h && v.y > out[k]) out[k] = v.y; });
     }
   });
-  return out.map(y => (y > -1e8 ? y : h * .62));
+  return out.map(y => (y > -1e8 ? y : h * .62) + fur);
 }
-function backAt(A, z, h) { // Rückenhöhe an Längsposition z (linear zwischen den Messstellen)
+function backAt(back, z, h) { // Rückenhöhe an Längsposition z (linear zwischen den Messstellen)
   const f = clamp((z / h - BACK_Z[0]) / (BACK_Z[1] - BACK_Z[0]), 0, BACK_Z.length - 1.001), i = Math.floor(f);
-  return A.back[i] + (A.back[i + 1] - A.back[i]) * (f - i);
+  return back[i] + (back[i + 1] - back[i]) * (f - i);
 }
 function updateHandAnim(dt, t) {
   // Positionen im Raum des Tiers (schaut nach +Z), dann in die Welt übertragen
@@ -670,10 +694,17 @@ function updateHandAnim(dt, t) {
   if (A.hit && A.t >= HAND_HIT[A.kind]) { A.hit(); A.hit = null; }
   hand.g.visible = true; hand.g.scale.setScalar(s);
   // Handfläche liegt etwa 0,07 (Handmaß) über ihrem Ursprung auf: so knapp über dem Rücken
-  hand.g.position.set(0, backAt(A, along * C.h, C.h) + .07 * s + lift, along * C.h); foxPivot.localToWorld(hand.g.position);
+  hand.g.position.set(0, backAt(A.back, along * C.h, C.h) + .07 * s + lift, along * C.h); foxPivot.localToWorld(hand.g.position);
   hand.g.rotation.set(tilt, fox.h + Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
   poseHand(hand, pose, dt, t, 18);
-  if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
+  // dieselbe Geste an der zweiten Hand im Porträt (Tier steht dort im Ursprung, Blick nach +Z)
+  const P = portrait, ph = P.hand;
+  if (ph && A.pback) {
+    ph.g.visible = true; ph.g.scale.setScalar(s); ph.g.rotation.set(tilt, Math.PI, 0, 'YXZ');
+    ph.g.position.set(0, backAt(A.pback, along * C.h, C.h) + .07 * s + lift, along * C.h); P.pivot.localToWorld(ph.g.position);
+    poseHand(ph, pose, dt, t, 18);
+  }
+  if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); if (ph) ph.g.visible = false; }
 }
 
 /* ------------------------------------------------------------------ UI helpers */
