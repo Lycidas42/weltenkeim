@@ -16,10 +16,15 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', hand: { skin: '#e9b48c', nails: '#f4ddd3' }, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
-if (loaded && typeof loaded === 'object') Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), hand: Object.assign({}, S.hand, loaded.hand || {}) });
+if (loaded && typeof loaded === 'object') {
+  // Version 0.2.0 hat das Aussehen der Hand versehentlich in S.hand (die Ausbaustufe) geschrieben: hier reparieren
+  const oldStyle = loaded.hand && typeof loaded.hand === 'object' ? loaded.hand : {};
+  Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), handStyle: Object.assign({}, S.handStyle, oldStyle, loaded.handStyle || {}) });
+  if (typeof S.hand !== 'number' || !isFinite(S.hand) || S.hand < 1) S.hand = 1;
+}
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
 const passive = () => 0.06 * S.temple;
 const cap = () => 4 + 3 * S.houses;
@@ -607,7 +612,14 @@ function makeHand(gltf) {
   model.rotation.x = .18; g.add(model);
   model.traverse(o => {
     if (o.isBone) { bones[o.name] = o; rest[o.name] = o.quaternion.clone(); }
-    if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; for (const m of [].concat(o.material)) { mats[m.name] = m; m.roughness = m.name === 'Nails' ? .3 : .55; m.metalness = 0; m.emissive = new THREE.Color(m.name === 'Nails' ? 0x000000 : 0x3a1606); m.emissiveIntensity = .25; } }
+    if (o.isMesh) {
+      o.castShadow = true; o.frustumCulled = false;
+      for (const m of [].concat(o.material)) {
+        mats[m.name] = m; m.metalness = m.name === 'Trim' ? .35 : 0;
+        m.roughness = { Nails: .3, Trim: .35, Sleeve: .8, SleeveIn: 1 }[m.name] ?? .55;
+        if (m.name === 'Skin') { m.emissive = new THREE.Color(0x3a1606); m.emissiveIntensity = .25; } // warmer Schimmer, damit die Hand nicht blass wirkt
+      }
+    }
   });
   g.visible = false;
   return { g, bones, rest, mats, pose: Object.assign({}, HAND_POSES.relax), curl: .1, pos: new THREE.Vector3(0, 3, 0), prev: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(0, 2, 0) };
@@ -635,9 +647,10 @@ function poseHand(h, target, dt, t, speed = 14) {
     setBone(h, f + '3', (-62 * c - 4) * D);
   });
   setBone(h, 'Thumb0', -22 * P.thumb * D);
-  setBone(h, 'Thumb1', (-35 * P.thumb - 3) * D); setBone(h, 'Thumb2', (-45 * P.thumb - 4) * D); setBone(h, 'Thumb3', -40 * P.thumb * D);
+  setBone(h, 'Thumb1', (-40 * P.thumb - 3) * D); setBone(h, 'Thumb2', (-55 * P.thumb - 4) * D);
 }
-function styleHand(h) { if (h.mats.Skin) h.mats.Skin.color.set(S.hand.skin); if (h.mats.Nails) h.mats.Nails.color.set(S.hand.nails); }
+// Aussehen aus dem Spielstand: Haut, Nägel, Ärmel, Saum (Materialnamen aus GodHand.blend)
+function styleHand(h) { const st = S.handStyle, M = h.mats; if (M.Skin) M.Skin.color.set(st.skin); if (M.Nails) M.Nails.color.set(st.nails); if (M.Sleeve) M.Sleeve.color.set(st.sleeve); if (M.Trim) M.Trim.color.set(st.trim); }
 const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
 
 // Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
@@ -1273,7 +1286,11 @@ function frame() {
       // am Stamm festhalten und zittern, je weiter der Baum nachgibt
       const tr = treeGrab.tr, j = treeGrab.prog * .05;
       hand.target.set(tr.x + rnd(j), heightAt(tr.x, tr.z) + .95 * tr.g * ST + treeGrab.prog * .25, tr.z + rnd(j));
-    } else hand.target.set(hit.x, Math.max(hit.y, 0) + lift, hit.z);
+    } else {
+      // um 'lift' über dem Boden, aber auf der Sichtlinie durch den Zeiger, damit die Hand genau unter ihm liegt
+      const d = ray.ray.direction, k = lift / Math.max(.2, -d.y);
+      hand.target.set(hit.x, Math.max(hit.y, 0), hit.z).addScaledVector(d, -k);
+    }
     hand.prev.copy(hand.g.position);
     hand.g.position.lerp(hand.target, 1 - Math.exp(-dt * 16));
     const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
