@@ -769,7 +769,7 @@ function updateVillager(v, dt, t) {
   switch (v.state) {
     case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
     case 'walk': if (stepTo(v, v.tx, v.tz, sp * dt)) arrive(v); break;
-    case 'chop': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
+    case 'chop': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
     case 'pray': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'flee': v.timer -= dt; if (stepTo(v, v.tx, v.tz, 2.2 * dt) || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
@@ -822,17 +822,25 @@ function updateFox(dt, t) {
     case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
+    case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; foxWalk(WELL.x - .9, WELL.z + .6, 'store'); } break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
-      else if (fox.next === 'store') { addHolz(6, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help'); }
+      else if (fox.next === 'store') {
+        // Baum ablegen: er liegt kurz am Brunnen und wird zu Holz
+        const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
+        addHolz(6, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
+      }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; }
     } break;
     case 'work': anim('attack'); fox.timer -= dt; if (fox.timer <= 0) {
       const tr = fox.tree; fox.tree = null;
       if (tr && tr.alive) {
         chopTree(tr);
-        if (fox.act === 'help') { fox.carry = true; foxWalk(WELL.x - .9, WELL.z + .6, 'store'); }
-        else {
+        if (fox.act === 'help') {
+          // Baum kippt um, dann senkt der Tiergeist den Kopf und hebt ihn auf
+          fallTree(tr, fox.x, fox.z, FALL_T + .85); fox.carryType = tr.type; fox.state = 'pickup'; fox.timer = FALL_T + .85;
+        } else {
+          fallTree(tr, fox.x, fox.z, 4.5);
           floatText(tr.x, surfaceAt(tr.x, tr.z) + 1.4, tr.z, 'Krach!', 'w');
           for (const v of villagers) { const dx = v.x - fox.x, dz = v.z - fox.z, d = Math.hypot(dx, dz); if (d < 4.5 && ['idle', 'walk', 'pray', 'chop'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 2; v.tx = v.x + dx / (d || 1) * 3; v.tz = v.z + dz / (d || 1) * 3; } }
           foxFinish('mischief');
@@ -856,6 +864,7 @@ function updateFox(dt, t) {
   foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
   foxPivot.rotation.y = fox.h;
   foxMixer.update(dt);
+  updateMouthTree();
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)
 const GLOW_T = 2.3; let glowT = 0;
@@ -957,7 +966,43 @@ function throwTree() {
   const k = clamp(hand.vel.length(), 0, 12) / (hand.vel.length() || 1);
   heldTree.flying = true; heldTree.vel.set(hand.vel.x * k, hand.vel.y * .4 * k + 2, hand.vel.z * k); heldTree.spin = rnd(3);
 }
+// Gefällte Bäume kippen vom Fäller weg um, bleiben kurz liegen und verschwinden (Stumpf bleibt stehen).
+const fallen = []; // { o, t, dir, x, z, s, life }
+const FALL_T = .7;
+function fallTree(tr, fromX, fromZ, life, lying = false) {
+  if (fallen.length >= 12) { const f = fallen.shift(); scene.remove(f.o); }
+  const o = shadowify((tr.type ? gTreeB : gTreeA).scene.clone(true)); scene.add(o);
+  fallen.push({ o, t: lying ? FALL_T : 0, dir: Math.atan2(tr.x - fromX, tr.z - fromZ), x: tr.x, z: tr.z, s: ST * (tr.g ?? 1), life });
+}
+const fallQ = new THREE.Quaternion(), fallE = new THREE.Euler();
+function updateFallen(dt) {
+  for (let i = fallen.length - 1; i >= 0; i--) {
+    const f = fallen[i]; f.t += dt;
+    if (f.t >= f.life) { scene.remove(f.o); fallen.splice(i, 1); continue; }
+    const k = Math.min(1, f.t / FALL_T), tilt = k * k * Math.PI / 2 * .97 + (k >= 1 ? Math.sin(Math.min(1, (f.t - FALL_T) / .25) * Math.PI) * .06 : 0);
+    f.o.position.set(f.x, heightAt(f.x, f.z), f.z); f.o.quaternion.setFromEuler(fallE.set(tilt, f.dir, 0, 'YXZ'));
+    f.o.scale.setScalar(f.s * Math.min(1, (f.life - f.t) / .4)); // am Ende einsinken
+  }
+}
+// Der Tiergeist trägt einen Baum quer im Maul (wie einen Stock); hängt an der Kopfposition des Modells.
+const mouthTrees = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
+const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2), mouthV = new THREE.Vector3(), mouthF = new THREE.Vector3();
+function updateMouthTree() {
+  mouthTrees.forEach(o => o.visible = false);
+  if (!fox.carry || !foxModel) return;
+  const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
+  if (!head) return;
+  const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
+  head.getWorldPosition(mouthV); mouthF.set(Math.sin(fox.h), 0, Math.cos(fox.h));
+  mouthV.addScaledVector(mouthF, C.h * .17).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
+  mouthQ.copy(foxPivot.quaternion).multiply(mouthZ);                   // Stamm quer zur Laufrichtung
+  o.quaternion.copy(mouthQ); o.scale.setScalar(s);
+  o.position.copy(mouthV).addScaledVector(mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), TREE_H * s * .3); // Stamm etwa im unteren Drittel gepackt
+  o.visible = true;
+}
+const mouthTmp = new THREE.Vector3();
 function updateTrees(dt, t) {
+  updateFallen(dt);
   if (treeGrab) {
     if (!treeGrab.tr.alive) treeGrab = null;
     else {
@@ -1179,13 +1224,14 @@ $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button da
 function foxDoing() {
   switch (fox.state) {
     case 'walk':
-      if (fox.next === 'store') return 'trägt Holz zum Brunnen';
+      if (fox.next === 'store') return 'trägt einen Baum im Maul zum Brunnen';
       if (fox.next === 'play') return 'läuft zum Dorfplatz, um zu spielen';
       return fox.act === 'help' ? 'läuft zu einem Baum, um Holz zu holen' : 'schleicht zu einem Baum und führt etwas im Schilde';
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
     case 'play': return 'tollt über den Dorfplatz';
     case 'rest': return 'hat sich hingelegt und döst';
     case 'cast': return 'wirkt mit dir ein Wunder';
+    case 'pickup': return 'hebt den gefällten Baum auf';
     default: return fox.idleA === 'eat' ? 'schnuppert am Boden' : 'schaut sich um';
   }
 }
