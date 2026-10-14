@@ -41,6 +41,13 @@ Ja → Hand. Nein (Wetter, Zeit, Geist, Natur beeinflussen) → Wunder.
 | Fischzug (Idee) | ruft einen Schwarm an eine Küstenstelle | mittel |
 | Wildlocken (Idee) | lockt Wild an einen Ort | mittel |
 
+## Aussehen der Hand
+
+- **Styling durch den Spieler:** heute Haut, Nägel, Ärmel, Saum (`S.handStyle`); ausbauen um Muster, Schmuck, Leuchten.
+- **Veränderung mit Gut/Böse:** über dem Styling legt sich je nach Waage ein heller, goldener Schimmer (gut) oder
+  aschfahle Haut, Krallen und Rauch (böse). Details in `gut-und-boese.md`.
+- **Böse Taten mit der Hand** (Bewohner werfen, Felder zertrampeln, Bäume ohne Not ausreißen) zählen auf die Waage.
+
 ## Folgen für die Kreatur
 
 - Hand-Aktionen lernt sie durch **Vormachen mit der Hand** (siehe `kreatur-lernen.md`).
