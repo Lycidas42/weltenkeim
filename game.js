@@ -141,13 +141,14 @@ const loader = new GLTFLoader();
 const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, res, undefined, e => rej(new Error(f + ' konnte nicht geladen werden'))));
 $('loadSt').textContent = 'Lade Modelle …';
 // Ruun kann verschiedene Gestalten annehmen (S.creature). Modelle: Quaternius Animated Animal Pack (CC0).
-// h = Zielhöhe in Welteinheiten, walk/run = Geschwindigkeit, ws = Zeitfaktor der Lauf-Animation.
+// h = Zielhöhe in Welteinheiten, walk/run = Geschwindigkeit, ws = Zeitfaktor der Lauf-Animation,
+// rest = Liegepose aus POSES (nur Tiere mit Quaternius-AnimalArmature).
 const CREATURES = {
-  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1 },
-  wolf: { label: 'Wolf', spirit: 'Wolfsgeist', file: 'Wolf', h: 1.75, walk: 2, run: 3.8, ws: 1 },
-  stag: { label: 'Hirsch', spirit: 'Hirschgeist', file: 'Stag', h: 3.1, walk: 2, run: 3.8, ws: .9 },
-  bull: { label: 'Stier', spirit: 'Stiergeist', file: 'Bull', h: 1.95, walk: 1.7, run: 3.4, ws: .9 },
-  alpaca: { label: 'Alpaka', spirit: 'Alpakageist', file: 'Alpaca', h: 2.5, walk: 1.8, run: 3.4, ws: 1 },
+  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1, rest: 'paw' },
+  wolf: { label: 'Wolf', spirit: 'Wolfsgeist', file: 'Wolf', h: 1.75, walk: 2, run: 3.8, ws: 1, rest: 'paw' },
+  stag: { label: 'Hirsch', spirit: 'Hirschgeist', file: 'Stag', h: 3.1, walk: 2, run: 3.8, ws: .9, rest: 'hoof' },
+  bull: { label: 'Stier', spirit: 'Stiergeist', file: 'Bull', h: 1.95, walk: 1.7, run: 3.4, ws: .9, rest: 'hoof' },
+  alpaca: { label: 'Alpaka', spirit: 'Alpakageist', file: 'Alpaca', h: 2.5, walk: 1.8, run: 3.4, ws: 1, rest: 'hoof' },
   // Katze aus Quaternius Animal Pack Vol.2: nur Idle/Walk, keine Augen – Augen werden am Kopfknochen ergänzt
   cat: { label: 'Katze', spirit: 'Katzengeist', file: 'Cat', h: 1.35, walk: 1.9, run: 3.6, ws: 1.2, head: 'Bone003', eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },
 };
@@ -318,12 +319,76 @@ function useCreature(id, gltf) {
   for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) foxActs[k] = foxMixer.clipAction(clip); }
   for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!foxActs[k] && foxActs[f]) { foxActs[k] = foxMixer.clipAction(foxActs[f].getClip().clone()); foxActs[k].timeScale = ts; }
   if (foxActs.walk) foxActs.walk.timeScale = C.ws;
-  for (const k of ['hit', 'jump']) if (foxActs[k]) { foxActs[k].setLoop(THREE.LoopOnce); foxActs[k].clampWhenFinished = true; }
+  if (C.rest && foxActs.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, foxActs.idle.getClip(), C.rest))) foxActs[k] = foxMixer.clipAction(clip);
+  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast']) if (foxActs[k]) { foxActs[k].setLoop(THREE.LoopOnce); foxActs[k].clampWhenFinished = true; }
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && foxActs.idle && !model.userData.eyes) { model.userData.eyes = true; foxActs.idle.reset().play(); foxMixer.update(0); addEyes(model, head, C.eyes); foxActs.idle.stop(); }
   foxPivot.add(model);
   fox.kind = id; fox.cur = null; fox.once = 0;
   foxAnim('idle');
+}
+// Zusätzliche Posen für das Quaternius-Skelett (AnimalArmature), im Code gebaut.
+// rot: Winkel in Grad im Raum des Tiers (x: Nicken, positiv = vorn nach unten; y: Drehen; z: Kippen),
+// wirkt auf den Knochen samt Kindern. pos: Verschiebung in Fuchs-Einheiten, skaliert über die Beckenhöhe.
+// Füße und Unterbeine hängen an den IK-Knochen, die deshalb mitbewegt werden.
+const POSES = {
+  // Hinlegen wie ein Hund (Sphinx-Haltung, Vorderpfoten nach vorn)
+  paw: {
+    rot: { Back: [8, 0, 0], FrontShoulderL: [-65, 0, 0], FrontShoulderR: [-65, 0, 0], FrontLowerLegL: [-15, 0, 0], FrontLowerLegR: [-15, 0, 0], BackLegL: [-75, 0, -12], BackLegR: [-75, 0, 12], BackLowerLegL: [-45, 0, 0], BackLowerLegR: [-45, 0, 0], Neck1: [-22, 0, 0], Head: [10, 0, 0], Tail1: [-28, 0, 0], Tail2: [-10, 15, 0], Tail3: [0, 20, 0], Tail5: [0, 25, 0], Tail7: [0, 25, 0] },
+    pos: { Body: [0, -.47, 0], IKBackLegL: [.04, 0, .25], IKBackLegR: [-.04, 0, .25], IKFrontLegL: [.02, 0, .45], IKFrontLegR: [-.02, 0, .45] },
+  },
+  // Hinlegen wie Huftiere (Beine untergeschlagen)
+  hoof: {
+    rot: { Back: [-4, 0, 0], FrontUpperLegL: [-70, 0, 0], FrontUpperLegR: [-70, 0, 0], FrontLowerLegL: [150, 0, 0], FrontLowerLegR: [150, 0, 0], BackLegL: [-70, 0, 0], BackLegR: [-70, 0, 0], BackLowerLegL: [-45, 0, 0], BackLowerLegR: [-45, 0, 0], Neck1: [-8, 0, 0], Head: [6, 0, 0] },
+    pos: { Body: [0, -.47, 0], IKBackLegL: [.04, 0, .25], IKBackLegR: [-.04, 0, .25], IKFrontLegL: [.03, 0, -.3], IKFrontLegR: [-.03, 0, -.3] },
+  },
+  // Aufbäumen zum Wunderwirken, Blick zum Himmel
+  rear: {
+    rot: { Back: [-55, 0, 0], FrontShoulderL: [-10, 0, 0], FrontShoulderR: [-10, 0, 0], FrontLowerLegL: [60, 0, 0], FrontLowerLegR: [60, 0, 0], Neck1: [10, 0, 0], Head: [-20, 0, 0], BackLegL: [15, 0, 0], BackLegR: [15, 0, 0], Tail1: [-20, 0, 0] },
+    pos: { Body: [0, 0, -.1], IKFrontLegL: [0, .75, -.35], IKFrontLegR: [0, .75, -.35] },
+  },
+};
+const FOX_HIP = 1.07; // Beckenhöhe des Fuchses, auf die sich pos bezieht
+const NO_POSE = { rot: {}, pos: {} };
+const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.pos });
+// keys: [{ t, pose }] -> AnimationClip, ausgehend von der ersten Frame der Basis-Animation
+function poseClip(model, baseClip, name, keys) {
+  model.traverse(o => { if (o.isSkinnedMesh) o.skeleton.pose(); });
+  const mixer = new THREE.AnimationMixer(model), act = mixer.clipAction(baseClip); act.play(); mixer.update(0);
+  model.updateMatrixWorld(true);
+  const space = model.parent ? model.parent.matrixWorld.clone().invert() : new THREE.Matrix4(), spaceQ = new THREE.Quaternion().setFromRotationMatrix(space);
+  const bones = []; model.traverse(o => { if (o.isBone) bones.push(o); });
+  const hip = model.getObjectByName('Back'), k = hip ? hip.getWorldPosition(new THREE.Vector3()).applyMatrix4(space).y / FOX_HIP : 1;
+  const base = bones.map(b => {
+    const pw = b.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(spaceQ);
+    const toLocal = new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().multiplyMatrices(space, b.parent.matrixWorld).invert());
+    return { b, q: b.quaternion.clone(), p: b.position.clone(), pw, pwInv: pw.clone().invert(), toLocal };
+  });
+  act.stop(); mixer.uncacheRoot(model);
+  const times = keys.map(x => x.t), D = Math.PI / 180, R = new THREE.Quaternion(), e = new THREE.Euler(), tracks = [];
+  for (const B of base) {
+    const n = B.b.name, qv = [], pv = []; let moved = false;
+    for (const { pose } of keys) {
+      const r = pose.rot[n], d = pose.pos[n];
+      const q = r ? B.pwInv.clone().multiply(R.setFromEuler(e.set(r[0] * D, r[1] * D, r[2] * D, 'YXZ'))).multiply(B.pw).multiply(B.q) : B.q;
+      qv.push(q.x, q.y, q.z, q.w);
+      const p = B.p.clone(); if (d) { moved = true; p.add(new THREE.Vector3(d[0] * k, d[1] * k, d[2] * k).applyMatrix3(B.toLocal)); }
+      pv.push(p.x, p.y, p.z);
+    }
+    tracks.push(new THREE.QuaternionKeyframeTrack(n + '.quaternion', times, qv));
+    if (moved) tracks.push(new THREE.VectorKeyframeTrack(n + '.position', times, pv));
+  }
+  return new THREE.AnimationClip(name, times[times.length - 1], tracks);
+}
+// Hinlegen, Liegen (mit leichtem Kopfdrehen), Aufstehen und Wunderwirken für ein Tier bauen
+function buildPoseClips(model, baseClip, rest) {
+  const L = POSES[rest], R = POSES.rear;
+  return {
+    lieDown: poseClip(model, baseClip, 'lieDown', [{ t: 0, pose: NO_POSE }, { t: .9, pose: L }]),
+    lie: poseClip(model, baseClip, 'lie', [{ t: 0, pose: L }, { t: 2.5, pose: withPose(L, { Head: [L.rot.Head[0] + 4, 14, 0] }) }, { t: 4, pose: withPose(L, { Head: [L.rot.Head[0] - 2, -10, 0] }) }, { t: 6, pose: L }]),
+    standUp: poseClip(model, baseClip, 'standUp', [{ t: 0, pose: L }, { t: .7, pose: NO_POSE }]),
+    cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [-28, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [-28, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
+  };
 }
 // Augen (Lederhaut, Iris, Pupille) in Modellkoordinaten setzen und an den Kopfknochen hängen
 function addEyes(model, head, e) {
@@ -461,6 +526,8 @@ function foxFinish(a) {
   renderFox();
 }
 function foxChoose() {
+  // ab und zu hinlegen und ausruhen
+  if (foxActs.lie && Math.random() < .25) { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); return; }
   const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
   let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
   if (a !== 'play') {
@@ -478,6 +545,8 @@ function updateFox(dt, t) {
   if (fox.once > 0) fox.once -= dt;
   switch (fox.state) {
     case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
+    case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.6); } break;
+    case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') { addHolz(6, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help'); }
@@ -504,12 +573,29 @@ function updateFox(dt, t) {
     } break;
   }
   if (fox.hop > 0) fox.hop = Math.max(0, fox.hop - dt);
+  if (glowT > 0) {
+    glowT = Math.max(0, glowT - dt); const k = 1 - glowT / GLOW_T, a = Math.sin(Math.min(1, k * 1.3) * Math.PI);
+    foxGlow.intensity = a * 6; foxRing.material.opacity = a * .7; foxRing.scale.setScalar(.4 + k * 1.6 * C.h);
+    foxRing.position.set(fox.x, surfaceAt(fox.x, fox.z) + .08, fox.z);
+  }
   foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
   foxPivot.rotation.y = fox.h;
   foxMixer.update(dt);
 }
+// Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)
+const GLOW_T = 2.3; let glowT = 0;
+const foxGlow = new THREE.PointLight(0xffd27a, 0, 9, 1.6); foxGlow.position.y = 1.4; foxPivot.add(foxGlow); // immer in der Szene, sonst kompiliert Three.js die Shader neu
+const foxRing = new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false }));
+scene.add(foxRing);
+function foxCast(x, z) {
+  if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && fox.next === 'store')) return;
+  if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
+  fox.h = Math.atan2(x - fox.x, z - fox.z); glowT = GLOW_T;
+  if (foxActs.cast) { fox.state = 'cast'; fox.timer = foxActs.cast.getClip().duration; foxOnce('cast'); } else { fox.hop = .5; foxIdle(1.5); }
+}
 function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
+  if (fox.state === 'rest') foxIdle(2); // aus dem Liegen aufspringen
   const top = CREATURES[fox.kind].h + .5;
   if (kind === 'pet') { foxOnce('jump'); floatText(fox.x, top, fox.z, '♥', 'love'); } else { foxOnce('hit'); fox.hop = .5; floatText(fox.x, top, fox.z, '!', 'w'); }
   if (a && t - fox.lastT < 25) {
@@ -542,6 +628,7 @@ function tryMiracle(p) {
   if (S.glaube < m.cost) { toast(`${m.label} kostet ${m.cost} Glaube. Deine Bewohner beten noch.`); return; }
   S.glaube -= m.cost;
   if (miracle === 'rain') castRain(p.x, p.z); else castHaste(p.x, p.z);
+  foxCast(p.x, p.z);
 }
 
 /* ------------------------------------------------------------------ input */
