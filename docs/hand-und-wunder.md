@@ -43,6 +43,25 @@ Ja → Hand. Nein (Wetter, Zeit, Geist, Natur beeinflussen) → Wunder.
 | Fischzug (Idee) | ruft einen Schwarm an eine Küstenstelle | mittel |
 | Wildlocken (Idee) | lockt Wild an einen Ort | mittel |
 
+## Hand stärken (Schrein)
+
+Heute erhöht „Hand stärken“ am Schrein (`S.hand`, Kosten `handCost`) nur Reichweite und Kraft beim Formen.
+Künftig soll jede Stufe die **Hand insgesamt** stärker machen:
+
+| Bereich | pro Stufe (Vorschlag) |
+|---|---|
+| Formen | Reichweite und Kraft +35 % (wie heute) |
+| Tragen / große Transporte | mehr auf einmal (z. B. Stufe 1: 6 Stück, jede Stufe +4) |
+| Waren von Hütten ins Lager | statt allem Wartenden bis zu einer Menge je Stufe; höhere Stufen leeren auch Nachbarhütten |
+| Felder | Stufe 1: ein Feld je Tipp; ab Stufe 2 auch die angrenzenden Felder (säen/ernten in einem Zug) |
+| Vieh füttern | ab höherer Stufe beide Koppeln und Hühner zugleich |
+| Fische greifen | mehr Fische pro Griff (kleiner Schwarm) |
+| Bäume ausreißen | schneller, auch große Bäume; ab hoher Stufe zwei auf einmal |
+| Bewohner packen | mehrere Bewohner auf einmal tragen/absetzen |
+
+- Der Beschreibungstext im Schrein-Panel (`desc` des Eintrags `hand`) nennt dann die konkreten Verbesserungen der nächsten Stufe.
+- Die Kreatur lernt nur, was die Hand ihr vormacht – eine starke Hand zeigt ihr also auch größere Arbeit.
+
 ## Aussehen der Hand
 
 - **Styling durch den Spieler:** heute Haut, Nägel, Ärmel, Saum (`S.handStyle`); ausbauen um Muster, Schmuck, Leuchten.

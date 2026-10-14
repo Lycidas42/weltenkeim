@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0, hof: 0, muehle: 0, baeckerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0, farmer: 0, miller: 0, baker: 0 }, logs: 0, meat: 0, fish: 0, veg: 0, milk: 0, eggs: 0, grain: 0, flour: 0, bread: 0, fields: [], hutGoods: [], hutInp: [], paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0, hof: 0, muehle: 0, baeckerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0, farmer: 0, miller: 0, baker: 0 }, logs: 0, meat: 0, fish: 0, veg: 0, milk: 0, eggs: 0, grain: 0, flour: 0, bread: 0, fields: [], hutGoods: [], hutInp: [], paths: [], terrain: [], terrainN: 0, weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -425,6 +425,10 @@ function terrainColor(h, jit, k = -1) {
   tc.lerp(C.snow, smooth(4.9, 5.5, h));
   return tc;
 }
+// Vom Spieler geformtes Gelände: gespeichert als Abweichung von der erzeugten Insel (Punkt, Höhe in cm), hier wieder aufgetragen
+const BASE_H = H.slice();
+if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d)) H[k] = clamp(H[k] + d, -3, 8.5); }
+function saveTerrain() { const out = []; for (let k = 0; k < N * N; k++) { const d = Math.round((H[k] - BASE_H[k]) * 100); if (Math.abs(d) >= 2) out.push(k, d); } S.terrain = out; S.terrainN = N; }
 const tGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG).rotateX(-Math.PI / 2);
 const tPos = tGeo.attributes.position;
 const tCol = new THREE.BufferAttribute(new Float32Array(N * N * 3), 3);
@@ -4190,7 +4194,7 @@ $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data
     setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube${h > 0 ? `, +${fmt(h)} Bretter` : ''}${l > 0 ? `, +${fmt(l)} Stämme` : ''}.`, 5), 900);
   }
 }
-function save() { if (skipSave) return; savePaths(); S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); S.hutGoods = huts.map(h => h.goods); S.hutInp = huts.map(h => h.inp | 0); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function save() { if (skipSave) return; savePaths(); saveTerrain(); S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); S.hutGoods = huts.map(h => h.goods); S.hutInp = huts.map(h => h.inp | 0); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('pagehide', save); addEventListener('wk-save', save); // vor dem Neuladen (Update) speichern
