@@ -543,7 +543,7 @@ function addHut(role, site) {
   e.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
   e.role = role; e.H = H; e.saw = role === 'sawyer' ? e.o.getObjectByName('building_lumbermill_saw_blue') : null; e.sawing = 0;
   e.logs = 0; e.planks = 0; // Vorrat an der Säge: Träger bringen Stämme und holen Bretter
-  if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); }
+  if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
   if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(gTreeA, p.x, p.z, Math.random() * 6, ST * .2); }
   huts.push(e); return e;
 }
@@ -572,6 +572,147 @@ for (let tries = 0; tries < 2000 && rocks.length < 34; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
   if (h < .2 || Math.hypot(x, z) < 7 || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2)) continue; // Werkstatt-Bauplätze frei halten
   rocks.push({ x, z, type: rocks.length % 2, s: 1.6 + Math.random() * 2.2, r: Math.random() * 6.28 });
+}
+
+/* ------------------------------------------------------------------ Wegfindung */
+// Raster über die ganze Insel (NAV_C Einheiten je Feld). Belegt sind Gebäude (gedrehte Rechtecke aus den Modellmaßen),
+// Felsen, Baumstämme und Wasser. Es gibt zwei Raster: eins für Bewohner und eins mit mehr Abstand für den Tiergeist.
+// Das Raster wird jede Sekunde neu gestempelt (Bäume wachsen und fallen, Häuser entstehen, das Gelände wird geformt).
+const NAV_C = .25, NAV_N = Math.round(SIZE / NAV_C), NAV_SZ = NAV_N * NAV_N;
+const navV = { m: .12, g: new Uint8Array(NAV_SZ) }, navF = { m: .3, g: new Uint8Array(NAV_SZ) };
+const navWater = new Uint8Array(NAV_SZ);
+const navCell = (x, z) => { const i = Math.floor((x + HALF) / NAV_C), j = Math.floor((z + HALF) / NAV_C); return i < 0 || j < 0 || i >= NAV_N || j >= NAV_N ? -1 : j * NAV_N + i; };
+const cellX = c => -HALF + (c % NAV_N + .5) * NAV_C, cellZ = c => -HALF + (Math.floor(c / NAV_N) + .5) * NAV_C;
+const ROCK_R = [gRockA, gRockC].map(g => { const sz = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3()); return Math.max(sz.x, sz.z) / 2 * .8; });
+// Grundrisse im Modellraum: Mitte (cx, cz) und halbe Ausdehnung (hx, hz)
+const FOOT = { homeA: [0, -.04, .4, .43], homeB: [0, .01, .44, .55], sawmill: [0, .055, .69, .52] };
+function navObstacles() {
+  const rects = [], circles = [];
+  const rect = (e, f) => { const k = e.o.scale.x, p = localPt(e, f[0], f[1]); rects.push({ x: p.x, z: p.z, ry: e.o.rotation.y, hx: f[2] * k, hz: f[3] * k }); };
+  for (const h of houses) rect(h, h.b ? FOOT.homeB : FOOT.homeA);
+  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
+  rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
+  circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.02 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: -3.8, z: -1.2, r: .8 });
+  if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
+  for (const r of rocks) circles.push({ x: r.x, z: r.z, r: ROCK_R[r.type] * r.s });
+  for (const t of trees) if (t.alive && !t.gone && t.g > .25) circles.push({ x: t.x, z: t.z, r: .12 });
+  return { rects, circles };
+}
+function stampNav(nav, obs) {
+  const g = nav.g, m = nav.m; g.set(navWater);
+  for (const c of obs.circles) {
+    const R = c.r + m, i0 = Math.max(0, Math.floor((c.x - R + HALF) / NAV_C)), i1 = Math.min(NAV_N - 1, Math.floor((c.x + R + HALF) / NAV_C));
+    const j0 = Math.max(0, Math.floor((c.z - R + HALF) / NAV_C)), j1 = Math.min(NAV_N - 1, Math.floor((c.z + R + HALF) / NAV_C));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const x = -HALF + (i + .5) * NAV_C, z = -HALF + (j + .5) * NAV_C; if ((x - c.x) ** 2 + (z - c.z) ** 2 < R * R) g[j * NAV_N + i] = 1; }
+  }
+  for (const r of obs.rects) {
+    const hx = r.hx + m, hz = r.hz + m, R = Math.hypot(hx, hz), co = Math.cos(r.ry), si = Math.sin(r.ry);
+    const i0 = Math.max(0, Math.floor((r.x - R + HALF) / NAV_C)), i1 = Math.min(NAV_N - 1, Math.floor((r.x + R + HALF) / NAV_C));
+    const j0 = Math.max(0, Math.floor((r.z - R + HALF) / NAV_C)), j1 = Math.min(NAV_N - 1, Math.floor((r.z + R + HALF) / NAV_C));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const dx = -HALF + (i + .5) * NAV_C - r.x, dz = -HALF + (j + .5) * NAV_C - r.z;
+      if (Math.abs(dx * co - dz * si) < hx && Math.abs(dx * si + dz * co) < hz) g[j * NAV_N + i] = 1;
+    }
+  }
+}
+let navReady = false, navT = 0, navBudget = 0;
+function buildNav() {
+  for (let c = 0; c < NAV_SZ; c++) navWater[c] = heightAt(cellX(c), cellZ(c)) < -.05 ? 1 : 0;
+  const obs = navObstacles();
+  navF.m = clamp(CREATURES[fox.kind || S.creature].h * .15, .22, .42); // großer Hirsch braucht mehr Platz als die Katze
+  stampNav(navV, obs); stampNav(navF, obs); navReady = true;
+}
+const blockedAt = (nav, x, z) => { const c = navCell(x, z); return c < 0 || nav.g[c] === 1; };
+// freie Sicht auf dem Raster (Strecke in kleinen Schritten abtasten)
+function navLos(g, ax, az, bx, bz) {
+  const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / (NAV_C * .45));
+  for (let k = 1; k < n; k++) { const c = navCell(ax + (bx - ax) * k / n, az + (bz - az) * k / n); if (c < 0 || g[c]) return false; }
+  return true;
+}
+// nächstes freies Feld (ringförmig suchen)
+function nearestFree(g, c, maxR = 14) {
+  const ci = c % NAV_N, cj = Math.floor(c / NAV_N);
+  for (let r = 1; r <= maxR; r++) {
+    let best = -1, bd = 1e9;
+    for (let j = cj - r; j <= cj + r; j++) for (let i = ci - r; i <= ci + r; i++) {
+      if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r || i < 0 || j < 0 || i >= NAV_N || j >= NAV_N) continue;
+      const k = j * NAV_N + i; if (g[k]) continue; const d = (i - ci) ** 2 + (j - cj) ** 2; if (d < bd) { bd = d; best = k; }
+    }
+    if (best >= 0) return best;
+  }
+  return -1;
+}
+// A* mit 8 Nachbarn (keine Ecken schneiden), danach Wegpunkte glätten
+const aG = new Float32Array(NAV_SZ), aFrom = new Int32Array(NAV_SZ), aSeen = new Uint32Array(NAV_SZ), aShut = new Uint32Array(NAV_SZ);
+const hIdx = new Int32Array(NAV_SZ), hF = new Float32Array(NAV_SZ); let aStamp = 0;
+const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+function findPath(nav, sx, sz, tx, tz) {
+  const g = nav.g, end = { x: tx, z: tz };
+  let s = navCell(sx, sz); const t0 = navCell(tx, tz);
+  if (s < 0 || t0 < 0) return [end];
+  const pts = [];
+  if (g[s]) { s = nearestFree(g, s); if (s < 0) return [end]; pts.push({ x: cellX(s), z: cellZ(s) }); } // erst aus dem Hindernis heraus
+  const t = g[t0] ? nearestFree(g, t0) : t0; if (t < 0) return [end];
+  const ox = pts.length ? pts[0].x : sx, oz = pts.length ? pts[0].z : sz;
+  if (s === t || navLos(g, ox, oz, cellX(t), cellZ(t))) { if (t !== t0) pts.push({ x: cellX(t), z: cellZ(t) }); pts.push(end); return pts; }
+  if (++aStamp > 4e9) { aStamp = 1; aSeen.fill(0); aShut.fill(0); }
+  const st = aStamp, ti = t % NAV_N, tj = Math.floor(t / NAV_N);
+  const hEst = c => { const dx = Math.abs(c % NAV_N - ti), dz = Math.abs(Math.floor(c / NAV_N) - tj); return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz); };
+  let hn = 0;
+  const push = (c, f) => { let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (hF[p] <= f) break; hIdx[k] = hIdx[p]; hF[k] = hF[p]; k = p; } hIdx[k] = c; hF[k] = f; };
+  const pop = () => {
+    const top = hIdx[0], lc = hIdx[--hn], lf = hF[hn]; let k = 0;
+    while (true) { let ch = 2 * k + 1; if (ch >= hn) break; if (ch + 1 < hn && hF[ch + 1] < hF[ch]) ch++; if (hF[ch] >= lf) break; hIdx[k] = hIdx[ch]; hF[k] = hF[ch]; k = ch; }
+    hIdx[k] = lc; hF[k] = lf; return top;
+  };
+  aG[s] = 0; aSeen[s] = st; aFrom[s] = -1; push(s, hEst(s));
+  let found = false, n = 0;
+  while (hn > 0) {
+    const c = pop(); if (aShut[c] === st) continue; aShut[c] = st;
+    if (c === t) { found = true; break; }
+    if (++n > 24000) break;
+    const ci = c % NAV_N, cj = Math.floor(c / NAV_N);
+    for (const [di, dj, w] of NB) {
+      const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= NAV_N || j >= NAV_N) continue;
+      const k = j * NAV_N + i; if (g[k] || aShut[k] === st) continue;
+      if (di && dj && (g[cj * NAV_N + i] || g[j * NAV_N + ci])) continue;
+      const ng = aG[c] + w;
+      if (aSeen[k] !== st || ng < aG[k]) { aSeen[k] = st; aG[k] = ng; aFrom[k] = c; push(k, ng + hEst(k)); }
+    }
+  }
+  navBudget -= n;
+  if (!found) { pts.push(end); return pts; } // kein Weg (z. B. eingeschlossen): direkt hin
+  const cells = []; for (let c = t; c !== -1; c = aFrom[c]) cells.push(c); cells.reverse();
+  // glätten: vom aktuellen Punkt aus so weit wie möglich geradeaus
+  let cx = ox, cz = oz, i = 0;
+  while (i < cells.length - 1) {
+    let j = i + 1; while (j + 1 < cells.length && navLos(g, cx, cz, cellX(cells[j + 1]), cellZ(cells[j + 1]))) j++;
+    cx = cellX(cells[j]); cz = cellZ(cells[j]); pts.push({ x: cx, z: cz }); i = j;
+  }
+  pts.push(end); return pts;
+}
+// Laufen entlang des Wegs; der Weg wird erst berechnet, wenn im Frame noch Rechenzeit frei ist
+function setGoal(o, x, z, nav) { o.tx = x; o.tz = z; o.path = null; o.pi = 0; o.nav = nav; }
+function followPath(o, d) {
+  if (!o.path) {
+    if (!navReady) buildNav();
+    if (navBudget <= 0) return false; // diesen Frame warten, die Wegsuche ist für jetzt ausgelastet
+    o.path = findPath(o.nav || navV, o.x, o.z, o.tx, o.tz); o.pi = 0;
+  }
+  while (o.pi < o.path.length) {
+    const w = o.path[o.pi];
+    if (!stepTo(o, w.x, w.z, d)) return false;
+    o.pi++; d = 0; // Rest des Schritts verfällt, der nächste Wegpunkt kommt im nächsten Frame
+    if (o.pi < o.path.length) return false;
+  }
+  return true;
+}
+// freie Bewegung (Flucht, Spielen): nur weiter, wenn das Ziel des Schritts frei ist
+function moveFree(o, tx, tz, d, nav) {
+  const dx = tx - o.x, dz = tz - o.z, dist = Math.hypot(dx, dz); if (dist < 1e-4) return true;
+  const k = Math.min(1, d / dist), nx = o.x + dx * k, nz = o.z + dz * k;
+  if (blockedAt(nav, nx, nz) && !blockedAt(nav, o.x, o.z)) return false;
+  return stepTo(o, tx, tz, d);
 }
 
 /* ------------------------------------------------------------------ clouds & effects */
@@ -634,7 +775,11 @@ const vParts = {
   ],
   beard: vMesh(new THREE.SphereGeometry(.076, 8, 5, Math.PI * .1, Math.PI * .8, Math.PI * .5, Math.PI * .38).translate(0, HEAD_Y + .004, .004), 0xffffff, .95),
 };
-const vWood = vMesh(new THREE.BoxGeometry(.26, .07, .07).translate(0, .21, .13), 0x8a5a33, .9);
+// runder Stamm: Rinde und helle Schnittflächen an den Enden
+const vWood = [
+  vMesh(new THREE.CylinderGeometry(.037, .04, .27, 9, 1, true).rotateZ(Math.PI / 2).translate(0, .21, .13), 0x7a4f2c, .95),
+  vMesh(mergeGeometries([-1, 1].map(sd => new THREE.CircleGeometry(.036, 9).rotateY(sd * Math.PI / 2).translate(sd * .135, .21, .13))), 0xd9b47c, .9),
+];
 const vAxe = [
   vMesh(new THREE.CylinderGeometry(.011, .013, .25, 6).translate(0, -.185, 0), 0x7a5230, .9),
   vMesh(mergeGeometries([
@@ -671,7 +816,7 @@ const vHats = {
   forester: vMesh(mergeGeometries([new THREE.CylinderGeometry(.125, .125, .012, 12).translate(0, HEAD_Y + .035, 0), new THREE.CylinderGeometry(.06, .078, .075, 10).translate(0, HEAD_Y + .075, 0)]), 0x3f6b2a, .95),
   sawyer: vMesh(mergeGeometries([new THREE.SphereGeometry(.083, 10, 6, 0, Math.PI * 2, 0, Math.PI * .45).scale(1, .8, 1).translate(0, HEAD_Y + .02, -.004), new THREE.BoxGeometry(.1, .01, .05).translate(0, HEAD_Y + .03, .085)]), 0x6b4a2e, .95),
 };
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats)];
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats)];
 // Lichtschein nachts: Lichthöfe um Laternen (zur Kamera gedreht) und warme Lichtflecken am Boden vor Türen und unter Laternen
 const glowMat = c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
 const haloMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(0xffb85c), VCAP);
@@ -1218,7 +1363,7 @@ function reconcileJobs() {
 function roleCount(r) { return villagers.filter(v => v.role === r).length; }
 
 /* ------------------------------------------------------------------ villager AI */
-function walk(v, x, z, next) { v.state = 'walk'; v.tx = x; v.tz = z; v.next = next; }
+function walk(v, x, z, next) { v.state = 'walk'; v.next = next; setGoal(v, x, z, navV); }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
 function goLunch(v) { const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * 1.1; walk(v, WELL.x + Math.cos(a) * r, WELL.z + Math.sin(a) * r, 'lunch'); }
 function goHome(v) {
@@ -1337,7 +1482,7 @@ function updateVillager(v, dt, t) {
   const sp = .95 * (v.haste > 0 ? 2.3 : 1);
   switch (v.state) {
     case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
-    case 'walk': addWear(v.x, v.z, dt); if (stepTo(v, v.tx, v.tz, sp * dt)) arrive(v); break;
+    case 'walk': addWear(v.x, v.z, dt); if (followPath(v, sp * dt)) arrive(v); break;
     case 'chop': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
       const tr = v.tree, now = v.cp % 1;
@@ -1374,7 +1519,7 @@ function updateVillager(v, dt, t) {
       break;
     }
     case 'sleep': if (S.hour >= v.wake && S.hour < BED) idle(v, .2 + Math.random()); break;
-    case 'flee': v.timer -= dt; if (stepTo(v, v.tx, v.tz, 2.2 * dt) || v.timer <= 0) idle(v, .6); break;
+    case 'flee': v.timer -= dt; if (moveFree(v, v.tx, v.tz, 2.2 * dt, navV) === true || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
     case 'grabbed': return;
     case 'falling': {
@@ -1394,7 +1539,7 @@ function updateVillager(v, dt, t) {
 
 /* ------------------------------------------------------------------ fox AI */
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
-function foxWalk(x, z, next) { fox.state = 'walk'; fox.tx = x; fox.tz = z; fox.next = next; }
+function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
 function foxFinish(a) {
   fox.last = a; fox.lastT = clock.elapsedTime; foxIdle(5 + Math.random() * 4); fox.act = null;
   toast(`${S.name} hat ${ACT_DESC[a]}. Lob oder Tadel?`, 4.5);
@@ -1412,7 +1557,14 @@ function foxChoose() {
     if (!best) a = 'play'; else { fox.tree = best; best.reserved = 'fox'; const ang = Math.atan2(fox.x - best.x, fox.z - best.z); foxWalk(best.x + Math.sin(ang) * .9, best.z + Math.cos(ang) * .9, 'tree'); }
   }
   fox.act = a;
-  if (a === 'play') foxWalk(CENTER.x - 1.8, CENTER.z, 'play');
+  if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); }
+}
+// freier Spielplatz: ein Kreis (Radius 1,6) nahe der Dorfmitte, auf dem nichts im Weg steht
+function playSpot() {
+  if (!navReady) buildNav();
+  const free = (x, z) => { for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; if (blockedAt(navF, x + Math.cos(a) * 1.6, z + Math.sin(a) * 1.6)) return false; } return true; };
+  for (let r = 0; r < 9; r += .75) for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2 + r, x = CENTER.x + Math.cos(a) * r, z = CENTER.z + Math.sin(a) * r; if (free(x, z)) return { x, z }; }
+  return CENTER;
 }
 function updateFox(dt, t) {
   const C = CREATURES[fox.kind], spd = C.walk;
@@ -1426,14 +1578,14 @@ function updateFox(dt, t) {
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); } break;
-    case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
+    case 'walk': anim('walk'); if (followPath(fox, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') {
         // Baum ablegen: er liegt kurz vor dem Lager und wird zu Stämmen
         const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
         addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
       }
-      else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; }
+      else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); }
     } break;
     case 'work': anim('attack'); fox.timer -= dt; if (fox.timer <= 0) {
       const tr = fox.tree; fox.tree = null;
@@ -1452,8 +1604,9 @@ function updateFox(dt, t) {
     } break;
     case 'play': {
       anim('run'); fox.playT += dt;
-      const a = fox.playT * 1.9, px = CENTER.x + Math.cos(a) * 1.8, pz = CENTER.z + Math.sin(a) * 1.8;
-      stepTo(fox, px, pz, C.run * 1.6 * dt);
+      // im Kreis um einen freien Platz; was im Weg steht, wird nicht durchlaufen
+      fox.playA += dt * 1.9; const pc = fox.pc || CENTER, px = pc.x + Math.cos(fox.playA) * 1.6, pz = pc.z + Math.sin(fox.playA) * 1.6;
+      moveFree(fox, px, pz, C.run * 1.6 * dt, navF);
       if (Math.floor(fox.playT) !== Math.floor(fox.playT - dt)) addGlaube(1.5, fox.x, 1.4, fox.z);
       if (fox.playT > 5) foxFinish('play');
     } break;
@@ -1954,6 +2107,8 @@ function frame() {
   } }
   for (const h of huts) if (h.saw) { h.sawing = Math.max(0, h.sawing - dt); if (h.sawing > 0) h.saw.rotation.x += dt * 14; }
 
+  navT -= dt; if (navT <= 0 || !navReady) { navT = 1; buildNav(); }
+  navBudget = 30000;
   updateDay(dt, t);
   zzzT -= dt;
   if (zzzT <= 0) { zzzT = 2.2 + Math.random() * 1.5; const sl = villagers.filter(v => v.state === 'sleep' && v.home); if (sl.length) { const hs = sl[Math.floor(Math.random() * sl.length)].home; floatText(hs.x + rnd(.2), heightAt(hs.x, hs.z) + 1.9, hs.z + rnd(.2), 'Zzz', 'w'); } }
@@ -2027,7 +2182,7 @@ function frame() {
     vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
     vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
     vParts.beard.setMatrixAt(i, L.beard ? M : zero);
-    vWood.setMatrixAt(i, v.carry === 1 ? M : zero); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
+    vWood.forEach(m => m.setMatrixAt(i, v.carry === 1 ? M : zero)); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
     for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
     // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
     if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
