@@ -398,8 +398,8 @@ depTex.magFilter = depTex.minFilter = THREE.LinearFilter;
 function updateDepth() {
   // Priority Flood: von Rand und Meer aus wird das Gelände „geflutet“; wo Wasser nicht abfließen kann, entsteht eine Mulde.
   // DEPTH = Wasserstand bis zum Überlaufen minus Geländehöhe. Kleine Unebenheiten (unter 2 cm) zählen nicht.
-  // Mikrorelief (wenige Zentimeter): echter Boden hat kleine Senken, das glatte Gelände sonst kaum
-  const Hm = new Float32Array(N * N); for (let k = 0; k < N * N; k++) { const x = -HALF + (k % N) * CELL, z = -HALF + ((k / N) | 0) * CELL; Hm[k] = H[k] + noise(x * .5 + 17, z * .5 - 4) * .07 + noise(x * 1.3 - 9, z * 1.3 + 2) * .025; }
+  // leichtes Relief (wenige Zentimeter, großflächig): echter Boden hat Senken, das glatte Gelände sonst kaum
+  const Hm = new Float32Array(N * N); for (let k = 0; k < N * N; k++) { const x = -HALF + (k % N) * CELL, z = -HALF + ((k / N) | 0) * CELL; Hm[k] = H[k] + noise(x * .2 + 17, z * .2 - 4) * .09; } // großflächig: wenige, dafür größere Senken mit je einer Pfütze
   const filled = new Float32Array(N * N), done = new Uint8Array(N * N), heap = [], hv = [];
   const push = (k, v) => { let i = heap.length; heap.push(k); hv.push(v); while (i > 0) { const p = (i - 1) >> 1; if (hv[p] <= v) break; heap[i] = heap[p]; hv[i] = hv[p]; i = p; } heap[i] = k; hv[i] = v; };
   const pop = () => { const top = heap[0], lk = heap.pop(), lv = hv.pop(); if (heap.length) { let i = 0; while (true) { let c = 2 * i + 1; if (c >= heap.length) break; if (c + 1 < heap.length && hv[c + 1] < hv[c]) c++; if (hv[c] >= lv) break; heap[i] = heap[c]; hv[i] = hv[c]; i = c; } heap[i] = lk; hv[i] = lv; } return top; };
@@ -1383,6 +1383,133 @@ function updateSnowfall(dt, t) {
 }
 // Pfützen: Wasserstand in den Mulden des Geländes (siehe Gelände-Shader und updateDepth). Hier nur die Werte je Frame.
 function updatePuddles(dt, t) { terrainU.uWet.value = weather.wet; terrainU.uRain.value = smooth(.3, .9, weather.rain); terrainU.uT.value = t; }
+/* ------------------------------------------------------------------ Wildtiere */
+// Rehe und Hasen leben außerhalb des Dorfes, Fische im flachen Wasser rund um die Insel. Später sollen Jäger und Angler
+// sie nutzen: `wild` (Rehe, Hasen) und `fish` stehen dafür bereit.
+const wild = [], fish = [];
+const animalMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: .9, flatShading: true });
+function makeDeer() {
+  const g = new THREE.Group(), fur = animalMat(0x9a6a40), light = animalMat(0xd9c3a2), dark = animalMat(0x3a2a20), white = animalMat(0xf2ede4);
+  const add = (geo, m, x, y, z, par = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.noSnow = true; par.add(o); return o; };
+  add(new THREE.SphereGeometry(1, 10, 7).scale(.14, .13, .27), fur, 0, .42, 0);
+  add(new THREE.SphereGeometry(1, 8, 5).scale(.115, .06, .22), light, 0, .35, .01);              // helle Unterseite
+  add(new THREE.SphereGeometry(.045, 6, 4), white, 0, .45, -.27);                                 // weißer Spiegel
+  const neck = new THREE.Group(); neck.position.set(0, .5, .2); g.add(neck);
+  add(new THREE.CylinderGeometry(.04, .055, .2, 6).translate(0, .1, 0), fur, 0, 0, 0, neck).rotation.x = .45;
+  const head = new THREE.Group(); head.position.set(0, .17, .09); neck.add(head);
+  add(new THREE.SphereGeometry(1, 8, 6).scale(.045, .05, .1), fur, 0, 0, .04, head);
+  add(new THREE.SphereGeometry(.018, 5, 4), dark, 0, -.01, .14, head);                         // Nase
+  for (const sx of [-1, 1]) { const e = add(new THREE.ConeGeometry(.025, .09, 4), fur, sx * .04, .05, -.01, head); e.rotation.z = -sx * .7; }
+  const legs = [];
+  for (const [x, z] of [[.075, .17], [-.075, .17], [.075, -.17], [-.075, -.17]]) {
+    const L = new THREE.Group(); L.position.set(x, .36, z); g.add(L);
+    add(new THREE.CylinderGeometry(.022, .014, .34, 6).translate(0, -.17, 0), fur, 0, 0, 0, L); add(new THREE.CylinderGeometry(.015, .018, .035, 5), dark, 0, -.34, 0, L);
+    legs.push(L);
+  }
+  g.scale.setScalar(.8); scene.add(g); return { g, legs, neck, head }; // etwas kleiner als ein Bewohner
+}
+function makeHare() {
+  const g = new THREE.Group(), fur = animalMat(0x8f7b62), light = animalMat(0xcdbba0), white = animalMat(0xf4efe6), dark = animalMat(0x2a211b);
+  const add = (geo, m, x, y, z, par = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.noSnow = true; par.add(o); return o; };
+  const body = new THREE.Group(); g.add(body);
+  add(new THREE.SphereGeometry(1, 8, 6).scale(.065, .06, .1), fur, 0, .08, 0, body);
+  add(new THREE.SphereGeometry(1, 6, 4).scale(.045, .045, .06), fur, 0, .055, -.06, body);      // Hinterläufe
+  add(new THREE.SphereGeometry(.03, 6, 4), white, 0, .1, -.1, body);                              // Blume (Schwanz)
+  const head = new THREE.Group(); head.position.set(0, .14, .08); body.add(head);
+  add(new THREE.SphereGeometry(1, 7, 5).scale(.035, .035, .045), fur, 0, 0, 0, head);
+  add(new THREE.SphereGeometry(.008, 4, 3), dark, 0, .005, .045, head);
+  const ears = [];
+  for (const sx of [-1, 1]) { const e = new THREE.Group(); e.position.set(sx * .015, .03, -.01); head.add(e); add(new THREE.SphereGeometry(1, 5, 4).scale(.01, .055, .02).translate(0, .05, 0), light, 0, 0, 0, e); e.rotation.set(-.3, 0, sx * .2); ears.push(e); }
+  g.scale.setScalar(.95); scene.add(g); return { g, body, head, ears };
+}
+// Lebensraum: offenes Land und Waldrand außerhalb des Dorfes
+function wildSpot(x0, z0, r) {
+  for (let k = 0; k < 30; k++) {
+    const a = Math.random() * 6.28, d = r * (.3 + Math.random() * .7), x = x0 + Math.cos(a) * d, z = z0 + Math.sin(a) * d, h = heightAt(x, z);
+    if (h > .5 && h < 2.8 && Math.hypot(x, z) > 9.5 && Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) > 3.5 && (!navReady || !blockedAt(navV, x, z))) return { x, z };
+  }
+  return null;
+}
+for (let k = 0; k < 13; k++) {
+  const deer = k < 5, at = wildSpot(0, 0, 22); if (!at) continue;
+  wild.push({ kind: deer ? 'reh' : 'hase', ...at, h: Math.random() * 6.28, state: 'idle', timer: Math.random() * 4, ph: Math.random() * 6.28, sp: 0, m: deer ? makeDeer() : makeHare(), threatT: 0 });
+}
+// Fische: kleine Schwärme im flachen Wasser, ab und zu springt einer (mit Spritzer und Wellenring)
+const fishGeo = mergeGeometries([
+  paint(new THREE.SphereGeometry(1, 8, 5).scale(.028, .035, .1), (x, y, z, ny, c) => c.set(y > .005 ? 0x4c6a78 : 0xc9d6dc)),
+  paint(new THREE.ConeGeometry(.035, .06, 4).rotateX(-Math.PI / 2).scale(.3, 1, 1).translate(0, 0, -.12), (x, y, z, ny, c) => c.set(0x5b7987)),
+]);
+const FISH_N = 36, fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .4, metalness: .2 }), FISH_N);
+fishMesh.frustumCulled = false; fishMesh.userData.noSnow = true; scene.add(fishMesh);
+const waterDepthAt = (x, z) => -.02 - heightAt(x, z);
+{
+  let tries = 0;
+  for (let sch = 0; sch < 6 && tries < 2000; tries++) { // sechs Schwärme
+    const a = Math.random() * 6.28, r = 12 + Math.random() * 12, cx = Math.cos(a) * r, cz = Math.sin(a) * r, d = waterDepthAt(cx, cz);
+    if (d < .35 || d > 1.6) continue;
+    sch++; const hd = Math.random() * 6.28;
+    for (let k = 0; k < 6; k++) fish.push({ x: cx + rnd(.6), z: cz + rnd(.6), h: hd + rnd(.4), sp: .35 + Math.random() * .2, ph: Math.random() * 6.28, jump: 0, s: .85 + Math.random() * .4 });
+  }
+}
+const RIPPLE_N = 8, ripples = [], rippleMesh = new THREE.InstancedMesh(new THREE.RingGeometry(.8, 1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xe8f4ff, transparent: true, opacity: .6, depthWrite: false }), RIPPLE_N);
+rippleMesh.frustumCulled = false; rippleMesh.count = 0; rippleMesh.userData.noSnow = true; scene.add(rippleMesh);
+const splash = (x, z) => { if (ripples.length >= RIPPLE_N) ripples.shift(); ripples.push({ x, z, t: 0 }); spawnChips(x, .05, z, Math.random() * 6.28); };
+let fishJumpT = 3;
+function updateFish(dt, t) {
+  fishJumpT -= dt;
+  if (fishJumpT <= 0) { fishJumpT = 2.5 + Math.random() * 5; const f = fish[Math.floor(Math.random() * fish.length)]; if (f && !f.jump) { f.jump = .001; splash(f.x, f.z); } }
+  fish.forEach((f, i) => {
+    if (f.jump > 0) { // Sprung: Bogen aus dem Wasser, Kopf voran
+      f.jump += dt / .9; f.x += Math.sin(f.h) * dt * 1.4; f.z += Math.cos(f.h) * dt * 1.4;
+      if (f.jump >= 1) { f.jump = 0; splash(f.x, f.z); }
+    } else {
+      f.h += Math.sin(t * .7 + f.ph) * dt * .6;
+      const nx = f.x + Math.sin(f.h) * f.sp * dt, nz = f.z + Math.cos(f.h) * f.sp * dt, d = waterDepthAt(nx, nz);
+      if (d < .3 || d > 1.8) f.h += dt * 2.5; else { f.x = nx; f.z = nz; }        // im flachen Wasser bleiben
+    }
+    const j = f.jump, y = j > 0 ? -.05 + Math.sin(j * Math.PI) * .55 : -.2 - .04 * Math.sin(t * 2 + f.ph);
+    dummy.position.set(f.x, y, f.z); dummy.rotation.set(j > 0 ? -Math.cos(j * Math.PI) * 1.1 : 0, f.h, Math.sin(t * 9 + f.ph) * .15, 'YXZ'); dummy.scale.setScalar(f.s * 1.3); dummy.updateMatrix(); fishMesh.setMatrixAt(i, dummy.matrix);
+  });
+  fishMesh.count = fish.length; fishMesh.instanceMatrix.needsUpdate = true;
+  for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt / 1.6; if (ripples[i].t >= 1) ripples.splice(i, 1); }
+  ripples.forEach((r, i) => { dummy.position.set(r.x, .02, r.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(.15 + r.t * .9); dummy.updateMatrix(); rippleMesh.setMatrixAt(i, dummy.matrix); });
+  rippleMesh.count = ripples.length; rippleMesh.material.opacity = ripples.length ? .5 : 0; rippleMesh.instanceMatrix.needsUpdate = true;
+}
+// Rehe und Hasen: äsen bzw. sitzen, ziehen umher, fliehen vor Bewohnern, dem Tiergeist und der Hand
+function updateWild(dt, t) {
+  for (const a of wild) {
+    const deer = a.kind === 'reh';
+    a.threatT -= dt;
+    if (a.threatT <= 0) { // Gefahr prüfen
+      a.threatT = .3; let tx = 0, tz = 0, n = 0;
+      const near = (x, z, r) => { const d = Math.hypot(a.x - x, a.z - z); if (d < r) { tx += (a.x - x) / (d || 1); tz += (a.z - z) / (d || 1); n++; } };
+      for (const v of villagers) if (v.state !== 'sleep') near(v.x, v.z, deer ? 3 : 2.2);
+      near(fox.x, fox.z, deer ? 5 : 4);
+      if (hand.g.visible) near(hand.g.position.x, hand.g.position.z, 3);
+      if (n && a.state !== 'flee') {
+        const l = Math.hypot(tx, tz) || 1, run = deer ? 6 : 4, px = a.x + tx / l * run + rnd(1.5), pz = a.z + tz / l * run + rnd(1.5);
+        a.state = 'flee'; setGoal(a, px, pz, navV); a.sp = deer ? 3.2 : 3.6; a.timer = 4;
+      }
+    }
+    if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; } }
+    else { a.timer -= dt; if (followPath(a, a.sp * dt) || (a.state === 'flee' && a.timer <= 0)) { a.state = 'idle'; a.timer = 3 + Math.random() * 6; } }
+    const y = heightAt(a.x, a.z), M = a.m, moving = a.state !== 'idle', fast = a.state === 'flee';
+    if (deer) {
+      const cyc = t * (fast ? 11 : 6) + a.ph, sw = moving ? Math.sin(cyc) * (fast ? .7 : .35) : 0;
+      M.legs.forEach((L, k) => { L.rotation.x = (k === 0 || k === 3 ? sw : -sw); });
+      const graze = !moving ? smooth(.2, .8, Math.sin(t * .4 + a.ph) * .5 + .5) : 0;   // Kopf zum Gras
+      M.neck.rotation.x = graze * 1.5 - (fast ? .2 : 0); M.head.rotation.x = graze * -.4;
+      M.g.position.set(a.x, y + (fast ? Math.abs(Math.sin(cyc)) * .12 : 0), a.z);
+    } else {
+      const hop = moving ? Math.abs(Math.sin(t * (fast ? 13 : 8) + a.ph)) : 0;
+      M.body.position.y = hop * (fast ? .16 : .08); M.body.rotation.x = moving ? -Math.cos(t * (fast ? 13 : 8) + a.ph) * .25 : 0;
+      M.ears.forEach((e, k) => { e.rotation.x = -.3 + (moving ? .4 : Math.max(0, Math.sin(t * 3 + a.ph + k)) ** 8 * .5); });
+      M.head.rotation.y = !moving ? Math.sin(t * .8 + a.ph) * .4 : 0;
+      M.g.position.set(a.x, y, a.z);
+    }
+    M.g.rotation.y = a.h;
+  }
+}
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
 const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4, transparent: true, opacity: .55, depthWrite: false })); // halb durchsichtig, damit man sieht, wo es regnet
 rainCloud.castShadow = true; rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
@@ -2919,7 +3046,7 @@ let snowScanT = 0;
 function scanSnow() {
   snowSkip.add(waterMat); for (const m of vAll) snowSkip.add(m.material);
   hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
-  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell) [].concat(o.material).forEach(snowify); });
+  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell && !o.userData.noSnow) [].concat(o.material).forEach(snowify); });
 }
 function frame() {
   const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
@@ -3073,6 +3200,7 @@ function frame() {
   if (millFan) millFan.rotation.z += dt * 1.4;
 
   updateFox(dt, t);
+  updateWild(dt, t); updateFish(dt, t);
   updateTrees(dt, t);
 
   // hand
@@ -3184,7 +3312,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
