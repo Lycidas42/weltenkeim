@@ -187,9 +187,11 @@ const WEATHER = {
   heiter: { cover: .3, rain: 0, wind: .38, p: .38, label: 'heiter' },
   bewoelkt: { cover: .72, rain: 0, wind: .58, p: .25, label: 'bewölkt' },
   regen: { cover: .97, rain: 1, wind: .85, p: .15, label: 'Regen' },
+  // Schnee: vorerst nur von Hand (p = 0), später je nach Jahreszeit
+  schnee: { cover: .88, rain: 0, snow: 1, wind: .3, p: 0, label: 'Schnee' },
 };
 if (!WEATHER[S.weather]) S.weather = 'heiter';
-const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, wind: WEATHER[S.weather].wind, wet: WEATHER[S.weather].rain, dir: Math.random() * 6.28, lastH: S.hour };
+const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, snow: WEATHER[S.weather].snow || 0, snowCover: WEATHER[S.weather].snow || 0, wind: WEATHER[S.weather].wind, wet: WEATHER[S.weather].rain, dir: Math.random() * 6.28, lastH: S.hour };
 function rollWeather() { let r = Math.random(); for (const k in WEATHER) { r -= WEATHER[k].p; if (r <= 0) return k; } return 'heiter'; }
 function setWeather(k) { if (WEATHER[k]) S.weather = k; }
 function updateWeather(dt, t) {
@@ -200,11 +202,39 @@ function updateWeather(dt, t) {
   }
   const W = WEATHER[S.weather], k = Math.min(1, dt * .06);                            // Übergang über einige Sekunden
   weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
+  weather.snow += ((W.snow || 0) - weather.snow) * k * 1.5;
+  // Schneedecke: wächst bei Schneefall in gut einer halben Minute, taut bei Sonne langsam, bei Regen schneller
+  if (weather.snow > .3) weather.snowCover = Math.min(1, weather.snowCover + dt * weather.snow / 40);
+  else weather.snowCover = Math.max(0, weather.snowCover - dt * ((1 - weather.cover) * (1 - sky.night) / 90 + weather.rain / 25 + 1 / 600));
+  snowU.uSnow.value = weather.snowCover;
   weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
   // Nässe: in etwa einer halben Minute Regen voll, bei Sonne in gut einer Minute trocken
   if (weather.rain > .3) weather.wet = Math.min(1, weather.wet + dt * weather.rain / 30);
   else weather.wet = Math.max(0, weather.wet - dt * ((1 - weather.cover) * (1 - sky.night) / 70 + 1 / 500));
   terrainU.uWet.value = weather.wet;
+}
+// Schnee auf allem, was nach oben zeigt: wird in die Standard-Materialien eingeschleust (snowify), stärker auf flachen
+// Flächen, fleckig an den Rändern, nur oberhalb des Meeres.
+const snowU = { uSnow: { value: 0 } };
+const SNOW_GLSL = `
+  if (uSnow > .001) {
+    vec3 snWN = normalize((vec4(normal, 0.) * viewMatrix).xyz), snWP = (inverse(viewMatrix) * vec4(-vViewPosition, 1.)).xyz;
+    float snN = fract(sin(dot(floor(snWP.xz * 6.), vec2(12.9898, 78.233))) * 43758.5453) * .25;
+    float sn = smoothstep(.35 + .3 * (1. - uSnow) - snN * .3, .8, snWN.y) * smoothstep(.04, .12, snWP.y) * smoothstep(0., .6, uSnow + snN * .2 - .1);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.92, .95, 1.), sn); roughnessFactor = mix(roughnessFactor, .75, sn);
+  }
+`;
+const snowSkip = new WeakSet(), snowDone = new WeakSet();
+function snowify(m) {
+  if (!m || !m.isMeshStandardMaterial || snowDone.has(m) || snowSkip.has(m)) return;
+  snowDone.add(m); const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev.call(m, sh, r);
+    sh.uniforms.uSnow = snowU.uSnow;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uSnow;').replace('#include <lights_physical_fragment>', SNOW_GLSL + '#include <lights_physical_fragment>');
+  };
+  m.customProgramCacheKey = () => prevKey() + '|schnee' + (prev ? prev.toString().length : 0);
+  m.needsUpdate = true;
 }
 // Himmelsfarben je Wetter: strahlend blau, wenn klar; grau und trüb bei Bewölkung und Regen
 const SKY_CLEAR = { top: new THREE.Color('#2f86d4'), mid: new THREE.Color('#86c3ec'), hor: new THREE.Color('#d3eaf3') };
@@ -1330,6 +1360,26 @@ function updateWeatherRain(dt) {
     wrainPos.set([ax, d.y, az, ax - wx * .4, d.y + .45, az - wz * .4], i * 6);
   }
   wrainGeo.attributes.position.needsUpdate = true;
+}
+// Schneefall: weiche Flocken, die um den Blickpunkt trudeln
+const SNOW_N = 2200, snowPos = new Float32Array(SNOW_N * 3), flakes = [];
+for (let i = 0; i < SNOW_N; i++) flakes.push({ x: rnd(18), z: rnd(18), y: Math.random() * 12, ph: Math.random() * 6.28, sp: .8 + Math.random() * .6 });
+const snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snowPts = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: .17, map: glowTex, transparent: true, opacity: 0, depthWrite: false }));
+snowPts.frustumCulled = false; snowPts.visible = false; scene.add(snowPts);
+function updateSnowfall(dt, t) {
+  const k = smooth(.15, .7, weather.snow); snowPts.visible = k > .01; if (!snowPts.visible) return;
+  snowPts.material.opacity = .9 * k;
+  const cx = controls.target.x, cz = controls.target.z, wx = Math.cos(weather.dir) * weather.wind * .6, wz = Math.sin(weather.dir) * weather.wind * .6, n = Math.floor(SNOW_N * k);
+  for (let i = 0; i < SNOW_N; i++) {
+    const f = flakes[i];
+    if (i >= n) { snowPos.set([0, -50, 0], i * 3); continue; }
+    f.y -= dt * f.sp * 1.2; f.x += (wx + Math.sin(t * 1.3 + f.ph) * .35) * dt; f.z += (wz + Math.cos(t * 1.1 + f.ph) * .35) * dt;
+    let ax = cx + f.x, az = cz + f.z; const g = surfaceAt(ax, az);
+    if (f.y < g || Math.abs(f.x) > 18 || Math.abs(f.z) > 18) { f.x = rnd(18); f.z = rnd(18); f.y = g + 8 + Math.random() * 5; ax = cx + f.x; az = cz + f.z; }
+    snowPos.set([ax, f.y, az], i * 3);
+  }
+  snowGeo.attributes.position.needsUpdate = true;
 }
 // Pfützen: Wasserstand in den Mulden des Geländes (siehe Gelände-Shader und updateDepth). Hier nur die Werte je Frame.
 function updatePuddles(dt, t) { terrainU.uWet.value = weather.wet; terrainU.uRain.value = smooth(.3, .9, weather.rain); terrainU.uT.value = t; }
@@ -2744,6 +2794,7 @@ const WX_ICON = {
   heiter: '<circle cx="9" cy="8.5" r="3.4"/><path d="M9 2.6v1.4M3.1 8.5h1.4M4.8 4.3l1 1M13.2 4.3l-1 1"/><path d="M8 19.5a3.5 3.5 0 0 1 .5-7 4.5 4.5 0 0 1 8.6 1.3 2.9 2.9 0 0 1-.1 5.7z"/>',
   bewoelkt: '<path d="M6.5 18a4 4 0 0 1 .6-7.95A5.2 5.2 0 0 1 17 10.8a3.6 3.6 0 0 1 .3 7.2z"/>',
   regen: '<path d="M6.5 14.5a4 4 0 0 1 .6-7.95A5.2 5.2 0 0 1 17 7.3a3.6 3.6 0 0 1 .3 7.2z"/><path d="M8 17.5l-1 2.5M12 17.5l-1 2.5M16 17.5l-1 2.5"/>',
+  schnee: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M10 4.5l2 1.5 2-1.5M10 19.5l2-1.5 2 1.5M4.6 10.2l2.2-.7-.5-2.3M17.7 16.5l-.5-2.3 2.2-.7M4.6 13.8l2.2.7-.5 2.3M17.7 7.5l-.5 2.3 2.2.7"/>',
 };
 const wxMenu = $('wxMenu');
 $('wxOpts').innerHTML = Object.keys(WEATHER).map(k => `<button role="menuitemradio" data-wx="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${WX_ICON[k]}</svg><span>${WEATHER[k].label[0].toUpperCase() + WEATHER[k].label.slice(1)}</span></button>`).join('');
@@ -2756,7 +2807,7 @@ function openWxMenu() {
   wxMenu.style.top = `${r.bottom + 6}px`; wxMenu.style.left = `${clamp(r.right - w, 16, innerWidth - w - 16)}px`;
 }
 $('btnWx').addEventListener('click', () => (wxMenu.hidden ? openWxMenu() : closeWxMenu()));
-$('wxOpts').addEventListener('click', e => { const b = e.target.closest('[data-wx]'); if (!b) return; setWeather(b.dataset.wx); toast(`Das Wetter wird ${WEATHER[b.dataset.wx].label === 'Regen' ? 'regnerisch' : WEATHER[b.dataset.wx].label}.`, 2); save(); closeWxMenu(); });
+$('wxOpts').addEventListener('click', e => { const b = e.target.closest('[data-wx]'); if (!b) return; setWeather(b.dataset.wx); toast({ regen: 'Es fängt an zu regnen.', schnee: 'Es fängt an zu schneien.' }[b.dataset.wx] || `Das Wetter wird ${WEATHER[b.dataset.wx].label}.`, 2); save(); closeWxMenu(); });
 $('wxLock').addEventListener('click', () => { S.weatherLocked = !S.weatherLocked; toast(S.weatherLocked ? 'Das Wetter bleibt, wie es ist.' : 'Das Wetter wechselt wieder von selbst.', 2); save(); closeWxMenu(); });
 addEventListener('pointerdown', e => { if (!wxMenu.hidden && !wxMenu.contains(e.target) && !$('btnWx').contains(e.target)) closeWxMenu(); });
 addEventListener('keydown', e => { if (e.key === 'Escape') closeWxMenu(); });
@@ -2864,6 +2915,12 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 addEventListener('resize', resize); resize();
 setTool('hand'); renderName();
 
+let snowScanT = 0;
+function scanSnow() {
+  snowSkip.add(waterMat); for (const m of vAll) snowSkip.add(m.material);
+  hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
+  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell) [].concat(o.material).forEach(snowify); });
+}
 function frame() {
   const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
 
@@ -3062,7 +3119,8 @@ function frame() {
     if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; }
   }
   if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
-  updateClouds(dt); updateWeatherRain(dt); updatePuddles(dt, t);
+  updateClouds(dt); updateWeatherRain(dt); updateSnowfall(dt, t); updatePuddles(dt, t);
+  if ((snowScanT -= dt) <= 0) { snowScanT = 2; scanSnow(); } // neue Gebäude und Bäume bekommen auch Schnee
   // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
   waterU.uT.value = t; waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
   updateTerrain(dt);
@@ -3126,7 +3184,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, forestAlert, depData, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
