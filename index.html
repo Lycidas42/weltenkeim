@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14292b">
+<meta name="description" content="Idle-Gottspiel: Eine Insel, ein Dorf, deine Hand und ein Fuchsgeist, der von dir lernt.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Weltenkeim">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Weltenkeim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: Vollbild-3D-Welt; HUD floats at the edges (resources top, tools bottom, sheets above the dock).
+   Single-theme by choice: the HUD sits on a sunlit world, so it keeps one dark-glass look in every viewer theme. */
+:root{
+  color-scheme: dark;
+  --ink:#f4efe1;
+  --ink-dim:#c4c9bd;
+  --panel:rgba(18,38,40,.84);
+  --panel-solid:#14292b;
+  --line:rgba(244,239,225,.16);
+  --glaube:#f3c04d;
+  --holz:#d89c64;
+  --soul:#a5d8c9;
+  --warn:#ee8a72;
+  --sky:#a8d3e2;
+  --f-display:"Grenze Gotisch", "UnifrakturMaguntia", Georgia, serif;
+  --f-body:"Alegreya Sans", "Trebuchet MS", system-ui, sans-serif;
+}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+#app.sheet-open .hint,#app.sheet-open .ctx{display:none!important}
+body{background:var(--sky);color:var(--ink);font-family:var(--f-body);font-size:15px;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#app{position:fixed;inset:0}
+#c{display:block;width:100%;height:100%;touch-action:none;outline:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
+
+/* top bar */
+.top{position:absolute;top:0;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 10px);
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));pointer-events:none}
+.top > *{pointer-events:auto}
+.res{display:flex;gap:6px;flex-wrap:wrap}
+.stat{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:5px 11px 6px;display:grid;line-height:1.1;min-width:64px}
+.stat .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+.stat b{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat small{font-size:11px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.stat.glaube b{color:var(--glaube)}
+.stat.holz b{color:var(--holz)}
+.stat.pop b{color:var(--soul)}
+.top-actions{display:flex;gap:6px}
+.chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
+.chip.round{width:38px;padding:8px 0;font-family:var(--f-display);font-size:18px;line-height:1}
+.chip.pulse{border-color:var(--glaube);box-shadow:0 0 0 0 rgba(243,192,77,.7);animation:pulse 1.4s ease-out infinite}
+@keyframes pulse{to{box-shadow:0 0 0 12px rgba(243,192,77,0)}}
+
+#toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 76px);transform:translateX(-50%);max-width:min(420px, calc(100% - 32px));
+  background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:14px;text-align:center;opacity:0;transition:opacity .35s;pointer-events:none;text-wrap:balance}
+#toast.show{opacity:1}
+
+/* floating world text */
+#fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ft{position:absolute;left:0;top:0;font-weight:800;font-size:15px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.55),0 0 8px rgba(0,0,0,.25);will-change:transform,opacity}
+.ft.g{color:var(--glaube)} .ft.h{color:var(--holz)} .ft.s{color:var(--soul)} .ft.w{color:var(--ink)} .ft.love{color:#ff9bb0;font-size:22px}
+
+/* dock */
+.dock{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));pointer-events:none}
+.dock > *{pointer-events:auto}
+.hint{font-size:13px;color:var(--ink);background:rgba(18,38,40,.6);border-radius:8px;padding:4px 10px;text-align:center;max-width:440px;text-wrap:balance;pointer-events:none}
+.ctx{display:flex;gap:6px}
+.ctx button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;display:flex;gap:6px;align-items:center}
+.ctx button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
+.ctx button .cost{font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
+.ctx button.poor .cost{color:var(--warn)}
+.ctx button[aria-pressed="true"].poor .cost{color:#7a1d0c}
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:min(440px,100%);background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:5px}
+.tools button{background:transparent;border:1px solid transparent;border-radius:12px;padding:6px 4px 7px;display:grid;justify-items:center;gap:1px}
+.tools button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tools button span{font-size:13px;font-weight:700}
+.tools button[aria-pressed="true"]{background:rgba(243,192,77,.16);border-color:rgba(243,192,77,.55);color:var(--glaube)}
+
+/* sheets */
+.sheet{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 92px);width:min(440px, calc(100% - 32px));
+  max-height:min(62%, 520px);overflow:auto;background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;padding:14px 16px 16px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.sheet header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.sheet h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;line-height:1;color:var(--glaube);text-wrap:balance}
+.sheet .sub{color:var(--ink-dim);font-size:13.5px;margin:0 0 10px;line-height:1.35}
+.x{background:none;border:1px solid var(--line);border-radius:999px;width:32px;height:32px;font-size:18px;line-height:1}
+.items{display:grid;gap:8px}
+.item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:9px}
+.item h3{margin:0;font-size:16px}
+.item p{margin:2px 0 0;font-size:13px;color:var(--ink-dim);line-height:1.3}
+.buy{background:var(--glaube);color:#2a1d05;border:0;border-radius:10px;padding:8px 12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.buy:disabled{background:rgba(244,239,225,.12);color:var(--ink-dim);cursor:default}
+.bars{display:grid;gap:7px;margin:4px 0 12px}
+.bar{display:grid;grid-template-columns:7.5em 1fr 3em;gap:8px;align-items:center;font-size:13.5px}
+.bar .track{height:9px;background:rgba(244,239,225,.12);border-radius:9px;overflow:hidden}
+.bar .fill{height:100%;border-radius:9px;transition:width .5s}
+.bar .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim)}
+.last{font-size:14px;background:rgba(244,239,225,.06);border-radius:10px;padding:8px 10px;margin-bottom:10px;line-height:1.35}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.act{flex:1;min-width:110px;border-radius:10px;padding:10px 12px;font-weight:800;border:1px solid var(--line);background:rgba(244,239,225,.06)}
+.act.pet{background:#f1a7b5;color:#3a0f18;border-color:#f1a7b5}
+.credits{font-size:13px;line-height:1.45;color:var(--ink-dim)}
+.credits b{color:var(--ink)}
+.credits a{color:var(--soul)}
+.credits ul{padding-left:18px;margin:6px 0}
+
+#loading{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;background:linear-gradient(#78b6d4,#d9ead8);color:#17312f;transition:opacity .6s}
+#loading h1{font-family:var(--f-display);font-weight:700;font-size:clamp(44px,12vw,84px);margin:0;line-height:.9;color:#17312f}
+#loading p{margin:0;font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+#loading .st{max-width:min(90vw,440px);overflow-wrap:anywhere;text-align:center;font-weight:500;letter-spacing:0;text-transform:none;font-size:14px;opacity:.75}
+#loading.gone{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion: reduce){.chip.pulse{animation:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c" tabindex="0" aria-label="Spielwelt"></canvas>
+  <div id="fx"></div>
+
+  <header class="top">
+    <div class="res">
+      <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
+      <div class="stat holz"><span class="lbl">Holz</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
+      <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
+    </div>
+    <div class="top-actions">
+      <button class="chip" id="btnShrine">Schrein</button>
+      <button class="chip" id="btnFox">Ruun</button>
+      <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
+    </div>
+  </header>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <section class="sheet" id="sheetShrine" hidden aria-label="Schrein">
+    <header><h2>Schrein</h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <p class="sub">Glaube fließt aus Gebeten am Tempel. Investiere ihn in dein Dorf und deine Macht.</p>
+    <div class="items" id="shrineItems"></div>
+  </section>
+
+  <section class="sheet" id="sheetFox" hidden aria-label="Ruun">
+    <header><h2>Ruun</h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <p class="sub">Dein Fuchsgeist handelt selbstständig. Was du nach einer Tat lobst, tut er öfter. Was du tadelst, seltener.</p>
+    <div class="bars" id="foxBars"></div>
+    <div class="last" id="foxLast"></div>
+    <div class="row">
+      <button class="act pet" id="btnPet">Streicheln</button>
+      <button class="act" id="btnSlap">Klaps</button>
+      <button class="act" id="btnFocus">Zu Ruun</button>
+    </div>
+  </section>
+
+  <section class="sheet" id="sheetInfo" hidden aria-label="Info">
+    <header><h2>Weltenkeim</h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <div class="credits">
+      <p>Prototyp: Idle-Dorf trifft Gottspiel. Bewohner fällen Holz, beten am Tempel und erzeugen so Glauben, auch während du fort bist (bis 8 Stunden, halbe Rate).</p>
+      <ul>
+        <li><b>Hand</b>: Bewohner packen und werfen. Ruun antippen, um ihn zu erziehen.</li>
+        <li><b>Formen</b>: Land heben oder senken.</li>
+        <li><b>Wunder</b>: Regen lässt Wälder wachsen, Eile beschleunigt Bewohner.</li>
+        <li><b>Blick</b>: Drehen. Zwei Finger verschieben und zoomen.</li>
+      </ul>
+      <p><b>Assets</b></p>
+      <ul>
+        <li>Gebäude, Bäume, Felsen, Wolken: KayKit Medieval Hexagon Pack von Kay Lousberg (kaylousberg.com), CC0.</li>
+        <li>Fuchs: Modell von PixelMannen (CC0), Rigging und Animation von tomkranis (CC BY 4.0), glTF-Konvertierung von AsoboStudio und scurest (CC BY 4.0), via Khronos glTF Sample Assets.</li>
+        <li>Terrain, Wasser, Bewohner und Hand sind im Code erzeugt.</li>
+      </ul>
+      <div class="row"><button class="act" id="btnReset">Spielstand zurücksetzen</button></div>
+    </div>
+  </section>
+
+  <footer class="dock">
+    <div class="hint" id="hint"></div>
+    <div class="ctx" id="ctxSculpt" hidden>
+      <button data-dir="1" aria-pressed="true">Heben</button>
+      <button data-dir="-1" aria-pressed="false">Senken</button>
+    </div>
+    <div class="ctx" id="ctxMiracle" hidden>
+      <button data-m="rain" aria-pressed="true">Regen <span class="cost">20 ✦</span></button>
+      <button data-m="haste" aria-pressed="false">Eile <span class="cost">12 ✦</span></button>
+    </div>
+    <nav class="tools" aria-label="Werkzeuge">
+      <button data-tool="blick" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Blick</span></button>
+      <button data-tool="hand" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V10m0-5.5a1.5 1.5 0 0 1 3 0V10m0-4a1.5 1.5 0 0 1 3 0v5m0-3a1.5 1.5 0 0 1 3 0v6.5A6.5 6.5 0 0 1 12.5 21h-.8a6 6 0 0 1-4.6-2.2L4 15a1.6 1.6 0 0 1 2.4-2.1L7 13.5"/></svg><span>Hand</span></button>
+      <button data-tool="sculpt" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M2 19l6-8 4 5 3-4 7 7z"/><path d="M15 5v5m-2.5-2.5L15 5l2.5 2.5"/></svg><span>Formen</span></button>
+      <button data-tool="miracle" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.8 2.8M16.2 16.2 19 19M5 19l2.8-2.8M16.2 7.8 19 5"/><circle cx="12" cy="12" r="3"/></svg><span>Wunder</span></button>
+    </nav>
+  </footer>
+
+  <div id="loading"><p>Prototyp</p><h1>Weltenkeim</h1><p class="st" id="loadSt">Die Welt keimt …</p></div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"./vendor/three-0.170.0/build/three.module.js","three/addons/":"./vendor/three-0.170.0/examples/jsm/"}}
+</script>
+<script type="module" src="game.js"></script>
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
