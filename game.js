@@ -1396,22 +1396,32 @@ function updateFarm(dt, t) {
         for (let k = 0; k < 10 && !ok; k++) { tx = (feed ? FARM.trough[0] - 1.9 : a.lx) + rnd(1.2); tz = (feed ? FARM.pen.z1 + .1 : a.lz) + rnd(feed ? .2 : 1.2); ok = yardOk(tx, tz) && [.25, .5, .75].every(u => yardOk(a.lx + (tx - a.lx) * u, a.lz + (tz - a.lz) * u)); }
         if (ok) { a.tx = tx; a.tz = tz; a.moving = true; } else a.timer = 1;
       } else {
-        const Z = stockZone(a.kind), trough = FARM.troughs[a.kind === 'kuh' ? 0 : 1];
-        if (feed) { a.tx = clamp(trough[0] + rnd(trough[1] / 2 - .1), Z.x0, Z.x1); a.tz = Z.z1; }
-        else { a.tx = clamp(a.lx + rnd(1.6), Z.x0, Z.x1); a.tz = clamp(a.lz + rnd(1.6), Z.z0, Z.z1); }
-        a.moving = true;
+        const Z = stockZone(a.kind), trough = FARM.troughs[a.kind === 'kuh' ? 0 : 1], mates = stock.filter(b => b.F === F && b.kind === a.kind), i = mates.indexOf(a);
+        if (feed) { a.tx = clamp(trough[0] + (i - (mates.length - 1) / 2) * (a.kind === 'kuh' ? .42 : .34), Z.x0, Z.x1); a.tz = Z.z1; a.atTrough = true; } // feste Plätze nebeneinander am Trog
+        else { // freien Fleck suchen, nicht dort, wo ein anderes Tier steht oder hinwill
+          a.atTrough = false;
+          for (let k = 0; k < 8; k++) { a.tx = clamp(a.lx + rnd(1.6), Z.x0, Z.x1); a.tz = clamp(a.lz + rnd(1.6), Z.z0, Z.z1); if (mates.every(b => b === a || (Math.hypot(b.lx - a.tx, b.lz - a.tz) > .75 && Math.hypot(b.tx - a.tx, b.tz - a.tz) > .75))) break; }
+        }
+        a.moving = true; a.stuckT = 0; a.lastD = 1e9;
       }
     }
     const sp = a.kind === 'kuh' ? .3 : a.kind === 'schwein' ? .4 : .55;
     if (a.moving) {
       const dx = a.tx - a.lx, dz = a.tz - a.lz, d = Math.hypot(dx, dz);
-      if (d < .05) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); if (chick && (S.hour >= 19.2 || S.hour < a.wake)) a.timer = 0; }
+      // kommt es nicht voran (ein anderes Tier steht im Weg), bleibt es stehen und versucht es später anderswo
+      if (!chick) { a.stuckT = d < (a.lastD ?? 1e9) - .002 ? 0 : (a.stuckT || 0) + dt; a.lastD = Math.min(a.lastD ?? 1e9, d); }
+      if (d < .05 || (!chick && a.stuckT > 1.2)) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); if (chick && (S.hour >= 19.2 || S.hour < a.wake)) a.timer = 0; }
       else { const st = Math.min(d, sp * dt); a.lx += dx / d * st; a.lz += dz / d * st; let dh = Math.atan2(dx, dz) - a.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); a.h += dh * Math.min(1, dt * 5); }
     }
     if (!chick) { // Abstand zu den anderen Tieren der Koppel halten
-      const Z = stockZone(a.kind), R = a.kind === 'kuh' ? .5 : .36;
-      for (const b of stock) if (b !== a && b.F === F && b.kind === a.kind) { const dx = a.lx - b.lx, dz = a.lz - b.lz, d = Math.hypot(dx, dz); if (d < R && d > 1e-4) { const k = (R - d) * .5; a.lx += dx / d * k; a.lz += dz / d * k; } }
+      // Körper sind länglich: Abstand längs größer als seitlich (nebeneinander am Trog ist Platz, Kopf an Kopf nicht)
+      const Z = stockZone(a.kind), RL = a.kind === 'kuh' ? .72 : .5, RS = a.kind === 'kuh' ? .34 : .25, sh = Math.sin(a.h), ch = Math.cos(a.h);
+      for (const b of stock) if (b !== a && b.F === F && b.kind === a.kind) {
+        const dx = a.lx - b.lx, dz = a.lz - b.lz, d = Math.hypot(dx, dz), e = Math.hypot((dx * sh + dz * ch) / RL, (dx * ch - dz * sh) / RS);
+        if (e < 1 && d > 1e-4) { const k = Math.min(.03, (1 - e) * .5 * Math.min(RL, RS)); a.lx += dx / d * k; a.lz += dz / d * k; }
+      }
       a.lx = clamp(a.lx, Z.x0, Z.x1); a.lz = clamp(a.lz, Z.z0, Z.z1);
+      if (!a.moving && a.atTrough && F.feedT > 0) { let dh = -a.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); a.h += dh * Math.min(1, dt * 3); } // zum Trog drehen
     }
     const M = a.m, p = farmPt(F, a.lx, a.lz), y = heightAt(p.x, p.z), cyc = t * (chick ? 16 : 7) + a.ph, sw = a.moving ? Math.sin(cyc) * .5 : 0;
     M.legs.forEach((L, k) => { L.rotation.x = (k === 0 || k === 3 ? sw : -sw); });
