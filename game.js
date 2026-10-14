@@ -2239,7 +2239,7 @@ function updateWild(dt, t) {
       M.head.rotation.y = !moving ? Math.sin(t * .8 + a.ph) * .4 : 0;
       M.g.position.set(a.x, y, a.z);
     }
-    M.g.rotation.y = a.h;
+    M.g.rotation.y = smoothH(a, dt, a.state === 'flee' ? 12 : 7, a.state === 'flee' ? 9 : 5);
   }
 }
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
@@ -3155,6 +3155,13 @@ function startProc(v) {
 function startSaw(v) {
   const hs = v.hut, sw = localPt(hs, .28, .12); v.h = Math.atan2(sw.x - v.x, sw.z - v.z);
   if (hs.logs >= 1) { hs.logs--; v.carry = 1; v.state = 'saw'; v.timer = 2.4; } else idle(v, 1); // wartet auf Stämme
+}
+// sichtbare Blickrichtung folgt o.h weich (zeitbasiert, mit Höchstgeschwindigkeit in rad/s), damit Figuren an Wegecken nicht springen
+function smoothH(o, dt, k = 9, max = 7) {
+  if (o.vh === undefined) o.vh = o.h;
+  const d = Math.atan2(Math.sin(o.h - o.vh), Math.cos(o.h - o.vh));
+  o.vh += Math.sign(d) * Math.min(Math.abs(d) * (1 - Math.exp(-dt * k)), dt * max);
+  return o.vh;
 }
 function stepTo(o, tx, tz, d) {
   const dx = tx - o.x, dz = tz - o.z, dist = Math.hypot(dx, dz);
@@ -4303,7 +4310,8 @@ function frame() {
     else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
     const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
     const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
-    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
+    const vh = v.state === 'grabbed' || v.state === 'falling' ? (v.vh = v.h) : smoothH(v, dt);
+    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
     const M = dummy.matrix;
     const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
     // Laterne in der linken Hand (nicht beim Hacken, Beten, Tragen: dann steht sie neben dem Bewohner)
@@ -4330,8 +4338,8 @@ function frame() {
         part(vLantern, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA), Math.sin(t * 5.5 + v.ph) * (v.state === 'walk' ? .25 : .05), 0, -ca * Math.sin(armA));
       } else if (v.carry) part(vLantern, .15, .19, Math.sin(t * 5.5 + v.ph) * .2, 0, .13); // hängt am Holzbündel
       else { // steht neben dem Bewohner am Boden
-        const c = Math.cos(v.h), sn = Math.sin(v.h), ox = .24, oz = .06, s2 = VS * L.s;
-        vTmp.makeRotationY(v.h).setPosition(v.x + ox * c + oz * sn, groundAt(v.x + ox * c + oz * sn, v.z - ox * sn + oz * c) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
+        const c = Math.cos(vh), sn = Math.sin(vh), ox = .24, oz = .06, s2 = VS * L.s;
+        vTmp.makeRotationY(vh).setPosition(v.x + ox * c + oz * sn, groundAt(v.x + ox * c + oz * sn, v.z - ox * sn + oz * c) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
         vLantern.setMatrixAt(i, vOut);
       }
       vLanternGlass.setMatrixAt(i, vOut);
