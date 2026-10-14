@@ -1,0 +1,56 @@
+# Veröffentlicht Weltenkeim auf GitHub Pages, sobald main gepusht wird.
+# Es werden nur die Dateien ausgeliefert, die das Spiel zur Laufzeit braucht (Liste unten);
+# Blender-Quellen, Dev-Seiten und Doku bleiben im Repo, aber nicht auf der Seite.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Spieldateien zusammenstellen
+        run: |
+          mkdir -p _site/assets
+          cp index.html game.js sw.js manifest.webmanifest _site/
+          cp -r icons vendor _site/
+          cp -r assets/models _site/assets/
+          cp assets/CREDITS.md _site/assets/
+
+      - name: Offline-Liste aus sw.js prüfen
+        # Fehlt eine Datei der APP-Liste, scheitert die Installation des Service Workers auf der Live-Seite.
+        run: |
+          missing=0
+          for f in $(grep -oE "'\./[^']+'" sw.js | tr -d "'" | sed 's|^\./||'); do
+            if [ ! -e "_site/$f" ]; then echo "::error::Fehlt im Paket: $f"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
