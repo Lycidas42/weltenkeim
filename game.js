@@ -187,7 +187,7 @@ const WEATHER = {
   regen: { cover: .97, rain: 1, wind: .85, p: .15, label: 'Regen' },
 };
 if (!WEATHER[S.weather]) S.weather = 'heiter';
-const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, wind: WEATHER[S.weather].wind, dir: Math.random() * 6.28, lastH: S.hour };
+const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, wind: WEATHER[S.weather].wind, wet: WEATHER[S.weather].rain, dir: Math.random() * 6.28, lastH: S.hour };
 function rollWeather() { let r = Math.random(); for (const k in WEATHER) { r -= WEATHER[k].p; if (r <= 0) return k; } return 'heiter'; }
 function setWeather(k) { if (WEATHER[k]) S.weather = k; }
 function updateWeather(dt, t) {
@@ -199,6 +199,10 @@ function updateWeather(dt, t) {
   const W = WEATHER[S.weather], k = Math.min(1, dt * .06);                            // Übergang über einige Sekunden
   weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
   weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
+  // Nässe: in etwa einer halben Minute Regen voll, bei Sonne in gut einer Minute trocken
+  if (weather.rain > .3) weather.wet = Math.min(1, weather.wet + dt * weather.rain / 30);
+  else weather.wet = Math.max(0, weather.wet - dt * ((1 - weather.cover) * (1 - sky.night) / 70 + 1 / 500));
+  terrainU.uWet.value = weather.wet;
 }
 // Himmelsfarben je Wetter: strahlend blau, wenn klar; grau und trüb bei Bewölkung und Regen
 const SKY_CLEAR = { top: new THREE.Color('#2f86d4'), mid: new THREE.Color('#86c3ec'), hor: new THREE.Color('#d3eaf3') };
@@ -324,11 +328,13 @@ tGeo.computeVertexNormals();
 const NOISE_GLSL = `float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vns(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hsh(i), hsh(i + vec2(1., 0.)), f.x), mix(hsh(i + vec2(0., 1.)), hsh(i + vec2(1., 1.)), f.x), f.y); }`;
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 });
+const terrainU = { uWet: { value: 0 } };
 terrainMat.onBeforeCompile = sh => {
+  sh.uniforms.uWet = terrainU.uWet;
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.)).xyz;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\n' + NOISE_GLSL)
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nuniform float uWet;\n' + NOISE_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
-      { float n = vns(vWP.xz * 1.3) * .45 + vns(vWP.xz * 4.3) * .33 + vns(vWP.xz * 12.) * .22; diffuseColor.rgb *= .86 + n * .28; }`);
+      { float n = vns(vWP.xz * 1.3) * .45 + vns(vWP.xz * 4.3) * .33 + vns(vWP.xz * 12.) * .22; diffuseColor.rgb *= (.86 + n * .28) * (1. - .2 * uWet * step(.05, vWP.y)); } // nass: dunkler`);
 };
 const terrain = new THREE.Mesh(tGeo, terrainMat);
 terrain.receiveShadow = true; terrain.castShadow = true; terrain.frustumCulled = false;
@@ -1282,6 +1288,60 @@ function updateWeatherRain(dt) {
     wrainPos.set([ax, d.y, az, ax - wx * .4, d.y + .45, az - wz * .4], i * 6);
   }
   wrainGeo.attributes.position.needsUpdate = true;
+}
+// Pfützen: an tieferen Stellen im Gelände und in Senken auf Wegen, Gassen und dem Dorfplatz. Sie wachsen mit der Nässe
+// von der tiefsten Stelle aus (unregelmäßiger Rand), spiegeln den Himmel und zeigen bei Regen Tropfenringe.
+const puddles = [];
+{
+  const blur = (x, z, r) => { let s0 = 0; for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; s0 += heightAt(x + Math.cos(a) * r, z + Math.sin(a) * r); } return s0 / 8; };
+  const cand = [];
+  for (let x = -HALF * .9; x < HALF * .9; x += .55) for (let z = -HALF * .9; z < HALF * .9; z += .55) {
+    const px = x + rnd(.2), pz = z + rnd(.2), h = heightAt(px, pz); if (h < .35 || h > 3.2) continue;
+    const dip = blur(px, pz, 1.3) - h;                                              // Mulde: tiefer als die Umgebung
+    const way = sacredDist(px, pz) < .5 || laneDist(px, pz) < .45 || Math.hypot(px, pz) < PLAZA.r - .2;
+    const score = dip * 20 + (way ? .35 + noise(px * 1.7, pz * 1.7) * .5 : 0);
+    if (score > .25) cand.push({ x: px, z: pz, score, way });
+  }
+  cand.sort((a, b) => b.score - a.score);
+  // bis zu 22 Plätze für Wege und Dorfplatz, der Rest für Mulden im Gelände
+  const pick = (list, max) => { let n = 0; for (const c of list) { if (n >= max || puddles.length >= 70) break; if (puddles.some(q => Math.hypot(q.x - c.x, q.z - c.z) < 1.4)) continue; n++;
+    puddles.push({ x: c.x, z: c.z, s: .55 + Math.min(.7, c.score * .35) + Math.random() * .25, r: Math.random() * 6.28, fill: .55 + Math.min(.45, c.score * .3) }); } };
+  pick(cand.filter(c => c.way), 22);
+  for (const c of cand) { if (puddles.length >= 70) break; if (puddles.some(q => Math.hypot(q.x - c.x, q.z - c.z) < 1.4)) continue; puddles.push({ x: c.x, z: c.z, s: .55 + Math.min(.7, c.score * .35) + Math.random() * .25, r: Math.random() * 6.28, fill: .55 + Math.min(.45, c.score * .3) }); }
+}
+const puddleU = { uWet: { value: 0 }, uRain: { value: 0 }, uT: { value: 0 }, uSkyH: { value: sky.hor } };
+const puddleTex = (() => { // unregelmäßiger Fleck: innen hell, nach außen dunkel; der Rand ist die Schwelle
+  const S0 = 64, cv = document.createElement('canvas'); cv.width = cv.height = S0; const g = cv.getContext('2d'), img = g.createImageData(S0, S0);
+  for (let j = 0; j < S0; j++) for (let i = 0; i < S0; i++) { const x = i / S0 * 2 - 1, y = j / S0 * 2 - 1, a = Math.atan2(y, x), r = Math.hypot(x, y) / (.72 + .2 * noise(Math.cos(a) * 1.6 + 3, Math.sin(a) * 1.6) + .08 * Math.sin(a * 3)), v = clamp(1 - r, 0, 1) * 255, k = (j * S0 + i) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255; }
+  g.putImageData(img, 0, 0); return new THREE.CanvasTexture(cv);
+})();
+const puddleMat = new THREE.MeshStandardMaterial({ color: 0x1d262d, roughness: .18, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+puddleMat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, puddleU); sh.uniforms.uTex = { value: puddleTex };
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vPU; varying vec3 vWP2;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvPU = uv; vWP2 = (modelMatrix * instanceMatrix * vec4(transformed, 1.)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uWet, uRain, uT; uniform vec3 uSkyH; uniform sampler2D uTex; varying vec2 vPU; varying vec3 vWP2;\n' + NOISE_GLSL)
+    .replace('#include <color_fragment>', `
+      float pv = texture2D(uTex, vPU).r, thr = 1. - uWet;            // je nasser, desto weiter reicht die Pfütze
+      float pa = smoothstep(thr, thr + .1, pv);
+      if (pa < .01) discard;
+      vec2 rp = vWP2.xz * 5.; vec2 ri = floor(rp), rf = fract(rp) - .5; float rh = hsh(ri), rt = fract(uT * .8 + rh);
+      float ring = smoothstep(.05, 0., abs(length(rf + (rh - .5) * .3) - rt * .45)) * (1. - rt) * uRain; // Tropfenringe
+      diffuseColor.rgb += ring * .35; float rim = 1. - smoothstep(thr + .02, thr + .16, pv); diffuseColor.rgb *= 1. - rim * .35; diffuseColor.a = pa * .88; // dunkler, nasser Rand`)
+    .replace('#include <opaque_fragment>', `{ float fres = .12 + .45 * pow(1. - max(dot(normal, normalize(vViewPosition)), 0.), 3.); outgoingLight = mix(outgoingLight, uSkyH * .55, fres); }
+      #include <opaque_fragment>`);
+};
+const puddleMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), puddleMat, Math.max(1, puddles.length));
+puddleMesh.receiveShadow = true; puddleMesh.frustumCulled = false; puddleMesh.renderOrder = 1; puddleMesh.visible = false; scene.add(puddleMesh);
+let puddleT = 0;
+function updatePuddles(dt, t) {
+  const w = weather.wet; puddleU.uWet.value = w; puddleU.uRain.value = smooth(.3, .9, weather.rain); puddleU.uT.value = t;
+  puddleMesh.visible = w > .03; if (!puddleMesh.visible || (puddleT -= dt) > 0) return; puddleT = .5;
+  puddles.forEach((q, i) => { // nicht unter Gebäuden, Bäumen und Felsen; Höhe folgt dem Gelände
+    const blocked = navReady && blockedAt(navV, q.x, q.z);
+    const paved = sacredDist(q.x, q.z) < .62 || Math.hypot(q.x - PLAZA.x, q.z - PLAZA.z) < PLAZA.r + .05; // auf Pflaster über den Platten
+    dummy.position.set(q.x, heightAt(q.x, q.z) + (paved ? .045 : .012), q.z); dummy.rotation.set(0, q.r, 0); dummy.scale.set(blocked ? 0 : q.s * 2 * q.fill, 1, blocked ? 0 : q.s * 1.6 * q.fill); dummy.updateMatrix(); puddleMesh.setMatrixAt(i, dummy.matrix);
+  });
+  puddleMesh.count = puddles.length; puddleMesh.instanceMatrix.needsUpdate = true;
 }
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
 const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4, transparent: true, opacity: .55, depthWrite: false })); // halb durchsichtig, damit man sieht, wo es regnet
@@ -3007,7 +3067,7 @@ function frame() {
     if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; }
   }
   if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
-  updateClouds(dt); updateWeatherRain(dt);
+  updateClouds(dt); updateWeatherRain(dt); updatePuddles(dt, t);
   // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
   waterU.uT.value = t; waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
   updateTerrain(dt);
@@ -3071,7 +3131,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, forestAlert, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, forestAlert, puddles, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
