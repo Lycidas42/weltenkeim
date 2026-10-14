@@ -647,8 +647,15 @@ function renderFox() {
   $('foxKind').textContent = `Dein ${CREATURES[fox.kind].spirit}`;
   renderForms();
 }
+// Buttons nur einmal anlegen und danach aktualisieren: renderFox läuft alle 0,25 s,
+// ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
+$('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}">${c.label}</button>`).join('');
 function renderForms() {
-  $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}" aria-pressed="${id === fox.kind}"${creatureLoading ? ' disabled' : ''}>${creatureLoading === id ? 'Lädt …' : c.label}</button>`).join('');
+  for (const b of $('foxForms').children) {
+    const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : CREATURES[id].label;
+    b.setAttribute('aria-pressed', id === fox.kind); b.disabled = !!creatureLoading;
+    if (b.textContent !== label) b.textContent = label;
+  }
 }
 $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
 
