@@ -29,7 +29,8 @@ if (loaded && typeof loaded === 'object') {
 }
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
 const passive = () => 0.06 * S.temple;
-const cap = () => 4 + 3 * S.houses;
+const MAX_POP = 40; // vorerst höchstens so viele Bewohner (Übersicht und Leistung auf dem Handy)
+const cap = () => Math.min(MAX_POP, 4 + 3 * S.houses);
 const houseCost = () => 12 + 6 * Math.max(0, S.houses - 2);
 const templeCost = () => Math.round(30 * Math.pow(1.7, S.temple - 1));
 const handCost = () => Math.round(40 * Math.pow(1.8, S.hand - 1));
@@ -814,6 +815,7 @@ function freeSite() { return sites.find(s => !s.used && heightAt(s.x, s.z) > 0.2
 function nextBuild() {
   const want = wantRoles();
   for (const r in ROLES) if (want[r] > hutCap(r)) { const site = hutSite(r); if (site) return { role: r, label: ROLES[r].hut, cost: ROLES[r].cost(S.huts[r]), site }; }
+  if (4 + 3 * houses.length >= MAX_POP) return null; // genug Häuser für die Höchstzahl an Bewohnern
   const site = freeSite(); return site ? { role: null, label: 'Haus', cost: houseCost(), site } : null;
 }
 function addHouse(site) {
@@ -2656,7 +2658,7 @@ let skipSave = false;
 
 const SHRINE = [
   { id: 'temple', title: () => `Schrein weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Schrein strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },
-  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : 'Kein Platz. Aus Brettern entstehen neue Häuser, sobald genug im Lager sind.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
+  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : cap() >= MAX_POP ? `Das Dorf hat seine volle Größe von ${MAX_POP} Seelen erreicht.` : 'Kein Platz. Aus Brettern entstehen neue Häuser, sobald genug im Lager sind.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
   { id: 'hand', title: () => `Hand stärken (Stufe ${S.hand + 1})`, desc: () => 'Formen wirkt 35 % weiter und kräftiger.', cost: handCost, buy: () => { S.hand++; } }
 ];
 function renderShrine() {
