@@ -257,6 +257,10 @@ const SIZE = 48, SEG = 127, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2;
 // Der Prozessionsweg führt vom Rand des Dorfplatzes (Inselmitte) den Hügel hinauf.
 var SHRINE_AT = { x: 4.4, z: -7.8 };
 var SACRED_SEG = (() => { const d = Math.hypot(SHRINE_AT.x, SHRINE_AT.z), ux = SHRINE_AT.x / d, uz = SHRINE_AT.z / d; return { ax: ux * 2.95, az: uz * 2.95, bx: SHRINE_AT.x - ux * 2.2, bz: SHRINE_AT.z - uz * 2.2, ux, uz, len: d - 5.15 }; })();
+// Wohnsiedlung: drei Gassen führen strahlenförmig vom Dorfplatz weg (abseits von Schreinweg, Lager und Windmühle);
+// die Häuser stehen zu beiden Seiten, die Tür zur Gasse. Winkel in Grad (x = cos, z = sin).
+var LANES = [80, 150, 220].map(d => { const a = d * Math.PI / 180; return { ux: Math.cos(a), uz: Math.sin(a), s0: 3, s1: 9.7 }; });
+function laneDist(x, z) { let best = 1e9; for (const L of LANES) { const t = clamp(x * L.ux + z * L.uz, L.s0, L.s1); best = Math.min(best, Math.hypot(x - L.ux * t, z - L.uz * t)); } return best; }
 // Abstand zum Weg (Strecke vom Dorfplatz zum Schreinplatz); Breite des Wegs ±0,6
 function sacredDist(x, z) { const S0 = SACRED_SEG, t = clamp(((x - S0.ax) * S0.ux + (z - S0.az) * S0.uz) / S0.len, 0, 1); return Math.hypot(x - (S0.ax + S0.ux * S0.len * t), z - (S0.az + S0.uz * S0.len * t)); }
 const H = new Float32Array(N * N), J = new Float32Array(N * N), DRY = new Float32Array(N * N), BARE = new Float32Array(N * N);
@@ -299,7 +303,7 @@ function terrainColor(h, jit, k = -1) {
   const sg = .3 + (jit - .5) * .14; tc.lerp(tg, smooth(sg, sg + .14, h));   // unregelmäßige Grenze Sand/Gras
   if (k >= 0) { // erdiger Boden unter Weg, Dorfplatz und Schreinplatz (Fugen zwischen den Platten)
     const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL;
-    tc.lerp(C.bare, Math.max(smooth(.95, .5, sacredDist(x, z)), smooth(3.3, 2.9, Math.hypot(x, z)), smooth(2.6, 2.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z))) * .85);
+    tc.lerp(C.bare, Math.max(smooth(.95, .5, sacredDist(x, z)), smooth(3.3, 2.9, Math.hypot(x, z)), smooth(2.6, 2.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z)), smooth(.75, .4, laneDist(x, z)) * .8) * .85);
   }
   if (k >= 0) { // Wiese: trockene Flecken und kahle Erdstellen
     const gw = smooth(.45, .6, h) * (1 - smooth(2.5, 2.9, h));
@@ -794,10 +798,12 @@ const mill = place(gMill, MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_
 let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o; });
 
 const sites = [];
-for (const [r, n, off] of [[4.4, 8, .3], [6.2, 10, 0], [7.9, 12, .2]]) for (let i = 0; i < n; i++) {
-  const a = off + i / n * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < PLAZA.r + .9 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 || onSacred(x, z, 1.5)) continue;
-  sites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false });
+// je Gasse und Seite ein Haus alle 1,6 Einheiten; gebaut wird von innen nach außen, Gassen und Seiten abwechselnd
+for (const s0 of [4, 5.6, 7.2, 8.8]) for (const side of [1, -1]) for (const L of LANES) {
+  const px = -L.uz * side, pz = L.ux * side, x = L.ux * s0 + px * 1.5, z = L.uz * s0 + pz * 1.5, h = heightAt(x, z);
+  let slope = 0; for (const [dx, dz] of [[.8, 0], [-.8, 0], [0, .8], [0, -.8]]) slope = Math.max(slope, Math.abs(heightAt(x + dx, z + dz) - h));
+  if (h < .3 || slope > .45 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 4.6 || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.9 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.6 || onSacred(x, z, 1.5)) continue;
+  sites.push({ x, z, ry: Math.atan2(-px, -pz), used: false }); // Tür (+z des Modells) zur Gasse
 }
 const houses = [];
 // Nachts leuchten die Fenster: die Scheiben liegen im Texturatlas (8×4 Felder) in Spalte 6, Zeile 1
@@ -818,9 +824,28 @@ function nextBuild() {
   if (4 + 3 * houses.length >= MAX_POP) return null; // genug Häuser für die Höchstzahl an Bewohnern
   const site = freeSite(); return site ? { role: null, label: 'Haus', cost: houseCost(), site } : null;
 }
+// Hausgarten: Holzzaun, dunkle Beete mit Kohl, Möhren und Tomaten (eine Geometrie für alle Gärten)
+const gardenGeo = (() => {
+  const parts = [], W = 1.1, D = .74, woodC = 0x8a5f3a, B = (w, h, d, x, y, z, c) => parts.push(paint(new THREE.BoxGeometry(w, h, d).translate(x, y, z), (px, py, pz, ny, cc) => cc.set(c).multiplyScalar(ny > .5 ? 1 : .82)));
+  for (const x of [-W / 2, -W / 6, W / 6, W / 2]) for (const z of [-D / 2, D / 2]) B(.035, .2, .035, x, .1, z, woodC);
+  for (const z of [-D / 2, D / 2]) for (const y of [.08, .16]) B(W, .022, .018, 0, y, z, woodC);
+  for (const x of [-W / 2, W / 2]) { B(.035, .2, .035, x, .1, 0, woodC); for (const y of [.08, .16]) B(.018, .022, D, x, y, 0, woodC); }
+  B(W - .1, .04, D - .1, 0, .02, 0, 0x5c4330);
+  for (let k = 0; k < 6; k++) { // Kohl
+    const x = -.42 + k * .17; parts.push(paint(new THREE.IcosahedronGeometry(.055, 1).scale(1, .75, 1).translate(x, .07, -.2), (px, py, pz, ny, c) => c.set(0x77a84f).lerp(COL2.set(0xb7d98a), smooth(.03, .1, py) * .6)));
+  }
+  for (let k = 0; k < 8; k++) { const x = -.44 + k * .125; parts.push(paint(new THREE.ConeGeometry(.025, .09, 4).translate(x, .085, 0), (px, py, pz, ny, c) => c.set(0x4f9a3a))); parts.push(paint(new THREE.ConeGeometry(.015, .03, 4).rotateX(Math.PI).translate(x, .05, 0), (px, py, pz, ny, c) => c.set(0xe2802c))); }
+  for (let k = 0; k < 5; k++) { // Tomatenstauden
+    const x = -.38 + k * .19; parts.push(paint(new THREE.IcosahedronGeometry(.06, 0).scale(.8, 1.3, .8).translate(x, .1, .2), (px, py, pz, ny, c) => c.set(0x3f7f2e)));
+    for (const [dx, dy] of [[.04, .1], [-.03, .14], [.01, .06]]) parts.push(paint(new THREE.IcosahedronGeometry(.017, 0).translate(x + dx, dy, .24), (px, py, pz, ny, c) => c.set(0xd8352a)));
+  }
+  return mergeGeometries(parts);
+})();
 function addHouse(site) {
   site.used = true; const b = houses.length % 2, h = place(b ? gHomeB : gHomeA, site.x, site.z, site.ry, SB); h.b = b;
   h.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
+  const back = 1.45, gx = site.x - Math.sin(site.ry) * back, gz = site.z - Math.cos(site.ry) * back; // hinter dem Haus
+  if (heightAt(gx, gz) > .3) { const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
   houses.push(h); return h;
 }
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
@@ -911,14 +936,14 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || onSacred(x, z, .9) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
+  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
 worldReady = true;
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 // Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
-const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
+const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
@@ -1043,7 +1068,7 @@ function refreshCover(budget) {
     for (let i = i0; i < i1; i++) {
       const it = K.items[i], h = heightAt(it.x, it.z);
       const wi = Math.round((it.x + HALF) / CELL), wj = Math.round((it.z + HALF) / CELL), w = wi >= 0 && wj >= 0 && wi < N && wj < N ? WEAR[wj * N + wi] : 0;
-      let vis = h > K.hmin && h < K.hmax && w < 7 && !onSacred(it.x, it.z, .15) && Math.hypot(it.x - SHRINE_POS.x, it.z - SHRINE_POS.z) > 2.35 && Math.hypot(it.x - PLAZA.x, it.z - PLAZA.z) > PLAZA.r;
+      let vis = h > K.hmin && h < K.hmax && w < 7 && !onSacred(it.x, it.z, .15) && laneDist(it.x, it.z) > .45 && Math.hypot(it.x - SHRINE_POS.x, it.z - SHRINE_POS.z) > 2.35 && Math.hypot(it.x - PLAZA.x, it.z - PLAZA.z) > PLAZA.r;
       if (vis && navReady) { const c = navCell(it.x, it.z); vis = c >= 0 && !navV.g[c] || (K.hmin < 0 && navWater[c] === 1 && h > K.hmin); }
       if (!vis) { m.setMatrixAt(i, zero); continue; }
       dummy.position.set(it.x, h - K.sink * it.s, it.z); dummy.rotation.set(0, it.r, 0); dummy.scale.setScalar(it.s); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix);
@@ -1069,7 +1094,7 @@ const FOOT = { homeA: [0, -.04, .4, .43], homeB: [0, .01, .44, .55], sawmill: [0
 function navObstacles() {
   const rects = [], circles = [];
   const rect = (e, f) => { const k = e.o.scale.x, p = localPt(e, f[0], f[1]); rects.push({ x: p.x, z: p.z, ry: e.o.rotation.y, hx: f[2] * k, hz: f[3] * k }); };
-  for (const h of houses) rect(h, h.b ? FOOT.homeB : FOOT.homeA);
+  for (const h of houses) { rect(h, h.b ? FOOT.homeB : FOOT.homeA); if (h.garden) rects.push({ x: h.garden.x, z: h.garden.z, ry: h.garden.ry, hx: .58, hz: .4 }); }
   for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
   circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: MILL_POS.x, z: MILL_POS.z, r: .8 }, ...sacredProps.obstacles);
@@ -1259,7 +1284,7 @@ function updateWeatherRain(dt) {
   wrainGeo.attributes.position.needsUpdate = true;
 }
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
-const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4 }));
+const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4, transparent: true, opacity: .55, depthWrite: false })); // halb durchsichtig, damit man sieht, wo es regnet
 rainCloud.castShadow = true; rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
 const RAIN_N = 450;
 const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAIN_N * 3), 3));
@@ -2277,6 +2302,46 @@ function placeWishUI() {
   B.style.transform = `translate(${clamp(tA.x - r.left - bw / 2, 8, r.width - bw - 8)}px, ${clamp(tA.y - r.top - bh, 120, r.height - bh - 120)}px)`;
 }
 
+/* ------------------------------------------------------------------ Wald-Warnung der Holzfäller */
+// Gibt es im Umkreis einer bewohnten Holzfällerhütte kaum noch schlagreife Bäume, meldet sich der Holzfäller:
+// Schild über der Hütte, Ring auf der Lichtung. Regen dort lässt den Wald nachwachsen und löst die Warnung auf.
+const FOREST_R = 9, FOREST_LOW = 5;
+const forestAlert = { hut: null, at: null, checkT: 0, cool: 20 };
+const forestAround = h => trees.reduce((n, t) => n + (t.alive && !t.gone && t.g >= .7 && (t.x - h.x) ** 2 + (t.z - h.z) ** 2 < FOREST_R * FOREST_R ? 1 : 0), 0);
+function forestSpot(h) { // Mitte der Stümpfe und leeren Plätze im Umkreis, sonst ein Stück hinter der Hütte
+  let sx = 0, sz = 0, n = 0;
+  for (const t of trees) if (!t.gone && !t.alive && (t.x - h.x) ** 2 + (t.z - h.z) ** 2 < FOREST_R * FOREST_R) { sx += t.x; sz += t.z; n++; }
+  if (n) return { x: sx / n, z: sz / n };
+  const d = Math.hypot(h.x, h.z) || 1; return { x: h.x + h.x / d * 3, z: h.z + h.z / d * 3 };
+}
+const alertRing = new THREE.Mesh(new THREE.RingGeometry(4.6, 5, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fd6ff, transparent: true, opacity: 0, depthWrite: false }));
+alertRing.visible = false; scene.add(alertRing);
+function updateForestAlert(dt, t) {
+  const A = forestAlert;
+  alertRing.visible = !!A.hut && tool === 'miracle';
+  if (alertRing.visible) { alertRing.position.set(A.at.x, Math.max(heightAt(A.at.x, A.at.z), 0) + .12, A.at.z); alertRing.material.opacity = .35 + .25 * Math.sin(t * 3); alertRing.scale.setScalar(1 + .03 * Math.sin(t * 3)); }
+  if ((A.checkT -= dt) > 0) return; A.checkT = 2; A.cool -= 2;
+  if (A.hut) { if (!huts.includes(A.hut) || forestAround(A.hut) >= FOREST_LOW + 2) A.hut = null; return; }
+  if (A.cool > 0) return;
+  for (const h of huts) if (h.role === 'lumber' && villagers.some(v => v.hut === h) && forestAround(h) < FOREST_LOW) {
+    A.hut = h; A.at = forestSpot(h); toast('Ein Holzfäller meldet: Sein Wald geht zur Neige. Regen dort lässt ihn nachwachsen.', 4.5); break;
+  }
+}
+function forestHelped(x, z) { // nach einem Regen
+  const A = forestAlert; if (!A.hut || Math.hypot(x - A.at.x, z - A.at.z) > 6) return;
+  addGlaube(10, A.hut.x, heightAt(A.hut.x, A.hut.z) + 1.4, A.hut.z); floatText(A.hut.x, heightAt(A.hut.x, A.hut.z) + 2, A.hut.z, 'Danke!', 's');
+  toast('Der Holzfäller dankt dir: Sein Wald wächst nach.', 3); A.hut = null; A.cool = 60;
+}
+function placeForestUI() {
+  const B = $('forestAlert'), A = forestAlert;
+  B.hidden = !A.hut || $('app').classList.contains('sheet-open');
+  if (B.hidden) return;
+  const r = canvas.getBoundingClientRect(); toScreen(A.hut.x, heightAt(A.hut.x, A.hut.z) + 2.2, A.hut.z, tA);
+  const bw = B.offsetWidth, bh = B.offsetHeight, off = tA.x < r.left || tA.x > r.right || tA.y < r.top || tA.y > r.bottom;
+  B.classList.toggle('edge', off); // außerhalb des Bildes: am Rand festhalten
+  B.style.transform = `translate(${clamp(tA.x - r.left - bw / 2, 8, r.width - bw - 8)}px, ${clamp(tA.y - r.top - bh, 120, r.height - bh - 120)}px)`;
+}
+
 /* ------------------------------------------------------------------ miracles */
 function castRain(x, z) {
   rain.t = 5.5; rain.x = x; rain.z = z; rainPts.visible = true; rainCloud.visible = true;
@@ -2288,6 +2353,7 @@ function castRain(x, z) {
     if (h < .4 || h > 3.4 || Math.hypot(tx, tz) < 5.5 || treeNear(tx, tz, .8)) continue; if (addTree(tx, tz, .15)) n++; }
   floatText(x, surfaceAt(x, z) + 2, z, n ? `${n} neue Setzlinge` : 'Der Wald trinkt', 's');
   if (n + rev > 0 || trees.some(t => t.alive && !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < 25)) wishDone('rain');
+  forestHelped(x, z);
 }
 function castHaste(x, z) {
   ringT = 1.4; ring.position.set(x, surfaceAt(x, z) + .15, z);
@@ -2556,6 +2622,13 @@ document.querySelectorAll('.tools button').forEach(b => b.addEventListener('clic
 document.querySelectorAll('#ctxSculpt button').forEach(b => b.addEventListener('click', () => { sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
 function chooseMiracle(m) { miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); }
 document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener('click', () => chooseMiracle(b.dataset.m)));
+$('forestAlert').addEventListener('click', () => {
+  const A = forestAlert; if (!A.hut) return;
+  setTool('miracle'); chooseMiracle('rain');
+  // Kamera zur Lichtung schwenken (Blickwinkel bleibt)
+  const dx = A.at.x - controls.target.x, dz = A.at.z - controls.target.z; controls.target.x += dx; controls.target.z += dz; camera.position.x += dx; camera.position.z += dz; follow = false;
+  toast('Tippe in den Ring, um dort Regen zu wirken.', 3);
+});
 $('wish').addEventListener('click', () => { if (!wish.kind) return; setTool('miracle'); chooseMiracle(wish.kind); toast(wish.kind === 'rain' ? 'Tippe auf den Wald, um Regen zu wirken.' : 'Tippe dorthin, wo die Bewohner arbeiten, um ihnen Eile zu schenken.', 3); });
 
 /* ------------------------------------------------------------------ sheets */
@@ -2760,7 +2833,7 @@ function frame() {
   navT -= dt; if (navT <= 0 || !navReady) { navT = 1; buildNav(); }
   navBudget = 30000;
   updateDay(dt, t);
-  updateWish(dt);
+  updateWish(dt); updateForestAlert(dt, t);
   zzzT -= dt;
   if (zzzT <= 0) { zzzT = 2.2 + Math.random() * 1.5; const sl = villagers.filter(v => v.state === 'sleep' && v.home); if (sl.length) { const hs = sl[Math.floor(Math.random() * sl.length)].home; floatText(hs.x + rnd(.2), heightAt(hs.x, hs.z) + 1.9, hs.z + rnd(.2), 'Zzz', 'w'); } }
 
@@ -2950,7 +3023,7 @@ function frame() {
   // Tiergeist: Hand schwebt darüber (Maus) -> Einblendung; Kreismenü mitführen
   hoverFox = tool === 'hand' && handShown && primary === null && !grabbed && !heldTree.on && foxUnder(pointerXY.x, pointerXY.y);
   placeFoxUI(dt);
-  placeWishUI();
+  placeWishUI(); placeForestUI();
 
   // floating texts
   const rect = canvas.getBoundingClientRect();
@@ -2998,7 +3071,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, villagers, trees, fox, setTool, forestAlert, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
