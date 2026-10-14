@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -209,20 +210,73 @@ const ring = new THREE.Mesh(new THREE.RingGeometry(5.4, 6, 64).rotateX(-Math.PI 
 scene.add(ring); let ringT = 0;
 
 /* ------------------------------------------------------------------ villagers */
+// Jeder Bewohner besteht aus instanzierten Einzelteilen (Beine, Rumpf, Arme, Kopf, Augen, Frisur, Bart).
+// Aussehen (Haut, Haar, Frisur, Kleidung, Größe) wird pro Platz deterministisch gewürfelt, bleibt also nach dem Neuladen gleich.
 const VCAP = 300, VS = 1.15;
-const vBody = new THREE.InstancedMesh(new THREE.CylinderGeometry(.05, .12, .27, 7).translate(0, .135, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .85, flatShading: true }), VCAP);
-const vHead = new THREE.InstancedMesh(new THREE.SphereGeometry(.075, 8, 6).translate(0, .33, 0), new THREE.MeshStandardMaterial({ color: 0xf0c49b, roughness: .8, flatShading: true }), VCAP);
-const vWood = new THREE.InstancedMesh(new THREE.BoxGeometry(.26, .07, .07).translate(0, .22, .11), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: .9 }), VCAP);
-for (const m of [vBody, vHead, vWood]) { m.castShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); }
+const SKINS = [0xf7d9bf, 0xefc6a0, 0xe0ac82, 0xc98f60, 0xa8724a, 0x845535, 0x5f3b22];
+const HAIRS = [0x1d1814, 0x3a2719, 0x5c3a20, 0x8b5a2b, 0xc89b55, 0xe6cb87, 0xa5422a, 0xb9b3a9];
 const ROBES = [0xc2553d, 0x3d7cc2, 0xd9a441, 0x6b9b4a, 0x8c5fb3, 0xe07a5f, 0x4aa3a0, 0xd8d0c0];
-const white = new THREE.Color(1, 1, 1); for (let i = 0; i < VCAP; i++) vBody.setColorAt(i, white);
+const PANTS = [0x5b4636, 0x3e4a5c, 0x6a5a45, 0x4a3b30, 0x6b6156];
+const HIP_Y = .1, SHO_Y = .245, HEAD_Y = .33;
+const vMesh = (geo, color, rough = .85) => {
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), VCAP);
+  m.castShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m);
+  if (color === 0xffffff) { const w = new THREE.Color(1, 1, 1); for (let i = 0; i < VCAP; i++) m.setColorAt(i, w); }
+  return m;
+};
+const hairCap = () => new THREE.SphereGeometry(.078, 10, 6, 0, Math.PI * 2, 0, Math.PI * .56).rotateX(-.62).translate(0, HEAD_Y + .006, -.006);
+const vParts = {
+  legL: vMesh(new THREE.CylinderGeometry(.03, .026, HIP_Y, 6).translate(0, -HIP_Y / 2, 0), 0xffffff),
+  legR: vMesh(new THREE.CylinderGeometry(.03, .026, HIP_Y, 6).translate(0, -HIP_Y / 2, 0), 0xffffff),
+  body: vMesh(mergeGeometries([
+    new THREE.CylinderGeometry(.06, .1, .17, 8).translate(0, .175, 0),
+    new THREE.SphereGeometry(.06, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .5, 1).translate(0, .26, 0),
+  ]), 0xffffff),
+  armL: vMesh(new THREE.CylinderGeometry(.022, .019, .13, 6).translate(0, -.065, 0), 0xffffff),
+  armR: vMesh(new THREE.CylinderGeometry(.022, .019, .13, 6).translate(0, -.065, 0), 0xffffff),
+  head: vMesh(mergeGeometries([
+    new THREE.SphereGeometry(.07, 10, 8).translate(0, HEAD_Y, 0),
+    new THREE.SphereGeometry(.014, 5, 4).translate(0, HEAD_Y - .008, .07),
+    new THREE.CylinderGeometry(.025, .03, .03, 6).translate(0, HEAD_Y - .075, 0),
+  ]), 0xffffff, .7),
+  eyes: vMesh(mergeGeometries([
+    new THREE.SphereGeometry(.011, 5, 4).translate(-.025, HEAD_Y + .012, .062),
+    new THREE.SphereGeometry(.011, 5, 4).translate(.025, HEAD_Y + .012, .062),
+  ]), 0x1a1410, .4),
+  hair: [
+    // kurz
+    vMesh(hairCap(), 0xffffff, .95),
+    // lang, über den Rücken
+    vMesh(mergeGeometries([hairCap(), new THREE.CylinderGeometry(.068, .058, .12, 8, 1, false, Math.PI * .6, Math.PI * .8).translate(0, HEAD_Y - .045, -.008)]), 0xffffff, .95),
+    // Dutt
+    vMesh(mergeGeometries([hairCap(), new THREE.SphereGeometry(.036, 7, 5).translate(0, HEAD_Y + .07, -.045)]), 0xffffff, .95),
+    // Pferdeschwanz
+    vMesh(mergeGeometries([hairCap(), new THREE.CylinderGeometry(.022, .012, .11, 6).rotateX(.35).translate(0, HEAD_Y - .02, -.09)]), 0xffffff, .95),
+  ],
+  beard: vMesh(new THREE.SphereGeometry(.076, 8, 5, Math.PI * .1, Math.PI * .8, Math.PI * .5, Math.PI * .38).translate(0, HEAD_Y + .004, .004), 0xffffff, .95),
+};
+const vWood = vMesh(new THREE.BoxGeometry(.26, .07, .07).translate(0, .21, .13), 0x8a5a33, .9);
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood];
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function dressVillager(i) {
+  const r = mulberry(i * 7919 + 13), pick = a => a[Math.floor(r() * a.length)];
+  const skin = new THREE.Color(pick(SKINS)).offsetHSL(0, 0, (r() - .5) * .04);
+  const old = r() < .15, hairC = new THREE.Color(old ? pick([0xb9b3a9, 0xdedad2, 0x8f8a84]) : pick(HAIRS)).offsetHSL(0, 0, (r() - .5) * .05);
+  const robe = new THREE.Color(pick(ROBES)), pants = new THREE.Color(pick(PANTS));
+  const look = { hair: r() < .08 ? -1 : Math.floor(r() * vParts.hair.length), beard: r() < .25, s: .9 + r() * .2, w: .92 + r() * .16 };
+  for (const m of [vParts.legL, vParts.legR]) m.setColorAt(i, pants);
+  for (const m of [vParts.body, vParts.armL, vParts.armR]) m.setColorAt(i, robe);
+  vParts.head.setColorAt(i, skin);
+  for (const m of [...vParts.hair, vParts.beard]) m.setColorAt(i, hairC);
+  for (const m of vAll) if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  return look;
+}
 const villagers = [];
 function spawnVillager(x, z) {
   if (villagers.length >= VCAP) return null;
   const v = { x, z, y: surfaceAt(x, z), h: Math.random() * 6.28, state: 'idle', timer: .3 + Math.random() * 2, tx: x, tz: z, next: null, carry: 0, tree: null, vx: 0, vy: 0, vz: 0, haste: 0, ph: Math.random() * 6.28 };
+  v.look = dressVillager(villagers.length);
   villagers.push(v);
-  vBody.setColorAt(villagers.length - 1, new THREE.Color(ROBES[Math.floor(Math.random() * ROBES.length)]));
-  vBody.instanceColor.needsUpdate = true;
   return v;
 }
 const homeSpot = () => { const h = houses[Math.floor(Math.random() * houses.length)] || { x: 0, z: 0 }; return { x: h.x + rnd(1), z: h.z + rnd(1) }; };
@@ -545,6 +599,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) save(
 /* ------------------------------------------------------------------ loop */
 const clock = new THREE.Clock();
 const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
 let uiT = 0, secT = 0, birthT = 0;
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
@@ -567,18 +622,32 @@ function frame() {
   // villagers
   for (const v of villagers) updateVillager(v, dt, t);
   if (grabbed) { grabbed.x = hand.g.position.x; grabbed.z = hand.g.position.z + .05; grabbed.y = hand.g.position.y - .62; }
-  vBody.count = vHead.count = vWood.count = villagers.length;
+  for (const m of vAll) m.count = villagers.length;
   villagers.forEach((v, i) => {
-    let bob = 0, tilt = 0, roll = 0;
-    if (v.state === 'walk' || v.state === 'flee') bob = Math.abs(Math.sin(t * (v.haste > 0 ? 18 : 11) + v.ph)) * .05;
-    else if (v.state === 'chop') tilt = Math.max(0, Math.sin(t * 9 + v.ph)) * .45;
-    else if (v.state === 'pray') tilt = .45 + Math.sin(t * 2 + v.ph) * .1;
-    else if (v.state === 'grabbed') roll = Math.sin(t * 7 + v.ph) * .5;
-    else if (v.state === 'falling') roll = t * 10;
-    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.setScalar(VS); dummy.updateMatrix();
-    vBody.setMatrixAt(i, dummy.matrix); vHead.setMatrixAt(i, dummy.matrix); vWood.setMatrixAt(i, v.carry ? dummy.matrix : zero);
+    const L = v.look;
+    let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25;
+    if (v.state === 'walk' || v.state === 'flee') {
+      const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
+      bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
+      if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
+    } else if (v.state === 'chop') { const c = Math.max(0, Math.sin(t * 9 + v.ph)); tilt = c * .3; armA = armB = -2.5 + c * 1.6; splay = .1; }
+    else if (v.state === 'pray') { tilt = .35 + Math.sin(t * 2 + v.ph) * .08; armA = armB = -1.35; splay = -.12; }
+    else if (v.state === 'grabbed' || v.state === 'falling') {
+      const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
+      leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
+    } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
+    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling') { armA = armB = -1.1; splay = .12; }
+    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
+    const M = dummy.matrix;
+    const part = (mesh, x, y, a, z) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, 0); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
+    part(vParts.legL, .038, HIP_Y, leg, 0); part(vParts.legR, -.038, HIP_Y, -leg, 0);
+    part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay);
+    vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
+    vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
+    vParts.beard.setMatrixAt(i, L.beard ? M : zero);
+    vWood.setMatrixAt(i, v.carry ? M : zero);
   });
-  vBody.instanceMatrix.needsUpdate = vHead.instanceMatrix.needsUpdate = vWood.instanceMatrix.needsUpdate = true;
+  for (const m of vAll) m.instanceMatrix.needsUpdate = true;
 
   // trees
   const tc2 = [0, 0]; let sc = 0;
