@@ -2219,6 +2219,7 @@ function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidd
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
 $('btnWork').addEventListener('click', () => openSheet('sheetWork'));
+$('btnStore').addEventListener('click', () => openSheet('sheetWork'));
 // Arbeits-Panel: Aufbau einmal, danach nur Texte aktualisieren (sonst gehen Klicks verloren)
 $('workItems').innerHTML = Object.entries(WORKS).map(([id, W]) => `<div class="work" data-work="${id}">
   <div class="whead"><div><h3>${W.label}</h3><p class="min">mindestens ${W.min} Bewohner</p></div>
@@ -2596,7 +2597,9 @@ function frame() {
   if (uiT <= 0) {
     uiT = .25;
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
-    $('vH').textContent = fmt(S.holz); { const nb = construction ? null : nextBuild(); $('vHn').textContent = construction ? `${construction.role ? 'Hütte' : 'Haus'} im Bau` : nb ? `${nb.role ? 'Hütte' : 'Haus'} ab ${nb.cost}` : 'Dorf voll'; }
+    // Lager: alle Rohstoffe und was als Nächstes gebaut wird
+    $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz);
+    { const nb = construction ? null : nextBuild(); $('sBuild').textContent = construction ? `${construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);

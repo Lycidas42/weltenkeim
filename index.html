@@ -48,13 +48,23 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   padding-top:calc(env(safe-area-inset-top,0px) + 10px);
   padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));pointer-events:none}
 .top > *{pointer-events:auto}
-.res{display:flex;gap:6px;flex-wrap:wrap}
+.res{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.tiles{display:flex;gap:6px;flex-wrap:wrap}
+.store{display:flex;align-items:center;gap:12px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:5px 11px;font:inherit;color:inherit;cursor:pointer;max-width:100%;flex-wrap:wrap}
+.store .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+.store .sitem{display:flex;align-items:center;gap:5px}
+.store .sitem b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.store .sitem .nm{font-size:12px;color:var(--ink-dim)}
+.store svg{width:18px;height:18px;fill:currentColor}
+.store .logs{color:#c88a55}.store .logs .ring{fill:#f0cf98}
+.store .planks{color:#e2b77c}
+.store small{font-size:11.5px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.store:active{transform:scale(.98)}
 .stat{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:5px 11px 6px;display:grid;line-height:1.1;min-width:64px}
 .stat .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
 .stat b{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
 .stat small{font-size:11px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
 .stat.glaube b{color:var(--glaube)}
-.stat.holz b{color:var(--holz)}
 .stat.pop b{color:var(--soul)}
 .stat.zeit{grid-template-columns:auto auto;column-gap:6px;text-align:left;font:inherit;color:inherit;cursor:pointer}
 .stat.zeit .lbl{grid-column:1/-1}
@@ -78,7 +88,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #tmSkip{color:var(--sky)}
 #tmPause[aria-checked="false"] .i-play,#tmPause[aria-checked="true"] .i-pause{display:none}
 #tmPause[aria-checked="true"]{color:var(--glaube)}
-@media (max-width:420px){.res{gap:4px}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
+@media (max-width:420px){.res,.tiles{gap:4px}.store .sitem .nm{display:none}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
 .chip.round{width:38px;padding:8px 0;font-family:var(--f-display);font-size:18px;line-height:1}
@@ -204,8 +214,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 
   <header class="top">
     <div class="res">
+     <div class="tiles">
       <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
-      <div class="stat holz"><span class="lbl">Bretter</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
       <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
       <button class="stat zeit" id="btnTime" aria-label="Uhrzeit, tippen für Zeitmenü" aria-haspopup="menu" aria-expanded="false">
         <span class="lbl">Uhrzeit</span>
@@ -213,6 +223,14 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
           <g id="tBody" transform="translate(18 4)"><circle class="sun" r="3.6"/><g class="moon"><circle r="3.4"/><circle class="cut" r="3" cx="1.8" cy="-1.2"/></g></g></svg>
         <b id="vT">8:00</b><small id="vTs">Morgen</small>
       </button>
+     </div>
+     <!-- Lager: alle vorrätigen Rohstoffe; weitere (Stein, Erz) kommen als weitere .sitem dazu -->
+     <button class="store" id="btnStore" aria-label="Lager, tippen für Arbeit">
+       <span class="lbl">Lager</span>
+       <span class="sitem logs" title="Stämme"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="6" width="14" height="8" rx="2"/><ellipse cx="16" cy="10" rx="2.6" ry="4"/><ellipse cx="16" cy="10" rx="1.1" ry="1.8" class="ring"/></svg><b id="sLogs">0</b><span class="nm">Stämme</span></span>
+       <span class="sitem planks" title="Bretter"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="3.4" rx=".8"/><rect x="3.5" y="8.3" width="15" height="3.4" rx=".8"/><rect x="2" y="12.6" width="16" height="3.4" rx=".8"/></svg><b id="sPlanks">0</b><span class="nm">Bretter</span></span>
+       <small id="sBuild">Haus ab 0</small>
+     </button>
     </div>
     <div class="top-actions">
       <button class="chip" id="btnWork">Arbeit</button>
