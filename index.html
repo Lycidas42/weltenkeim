@@ -411,7 +411,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 <script>
 // Service Worker: offline spielen. Neue Versionen übernimmt er sofort. Ob die laufende Seite älter ist als der
 // Service Worker, erfährt sie per Nachricht (Versionsnummer); nur dann erscheint der Hinweis mit „Neu laden“.
-// Läuft das Spiel lange offen (z. B. auf dem Handy), wird jede Minute und beim Zurückkehren nach Updates gesucht.
+// Läuft das Spiel lange offen (z. B. auf dem Handy), wird alle 5 Minuten und beim Zurückkehren nach Updates gesucht.
 if ('serviceWorker' in navigator) addEventListener('load', () => {
   const SW = navigator.serviceWorker, box = document.getElementById('update'), PAGE_V = document.querySelector('meta[name="wk-version"]').content;
   const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
@@ -420,7 +420,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => {
   SW.addEventListener('controllerchange', ask);
   SW.register('sw.js').then(reg => {
     const check = () => reg.update().then(ask).catch(() => {});
-    setInterval(check, 60 * 1000);
+    setInterval(check, 5 * 60 * 1000); // alle 5 Minuten (in der Entwicklungsphase; später seltener)
     document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
     addEventListener('focus', check); addEventListener('online', check);
     ask();
