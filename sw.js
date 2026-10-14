@@ -52,16 +52,8 @@ const APP = [
   './assets/models/cloud_big.bin',
   './assets/models/cloud_big.gltf',
   './assets/models/hexagons_medieval.png',
-  './assets/models/rock_single_A.bin',
-  './assets/models/rock_single_A.gltf',
-  './assets/models/rock_single_C.bin',
-  './assets/models/rock_single_C.gltf',
-  './assets/models/tree_single_A.bin',
-  './assets/models/tree_single_A.gltf',
   './assets/models/tree_single_A_cut.bin',
   './assets/models/tree_single_A_cut.gltf',
-  './assets/models/tree_single_B.bin',
-  './assets/models/tree_single_B.gltf',
 ];
 
 self.addEventListener('install', e => {

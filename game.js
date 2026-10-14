@@ -217,7 +217,9 @@ const dayPhase = h => h < WAKE || h >= 21 ? 'Nachtruhe' : h < 8 ? 'Morgen' : h <
 
 /* ------------------------------------------------------------------ terrain */
 const SIZE = 48, SEG = 127, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2;
-const H = new Float32Array(N * N), J = new Float32Array(N * N);
+const H = new Float32Array(N * N), J = new Float32Array(N * N), DRY = new Float32Array(N * N), BARE = new Float32Array(N * N);
+// Strand: knapp über und unter dem Wasser wird das Gelände flacher, so entstehen ein breiter Sandstreifen und flaches, helles Ufer
+const beach = h => h >= 0 ? (h < 1 ? h * (.42 + .58 * smooth(.25, 1, h)) : h) : h * (.45 + .55 * smooth(-.2, -1.6, h));
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const x = -HALF + i * CELL, z = -HALF + j * CELL, k = j * N + i;
   const d = Math.hypot(x, z) / HALF + fbm(x * .05 + 9, z * .05 - 4) * .28;
@@ -225,8 +227,9 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   const mask = smooth(0.92, 0.5, d);
   let h = mask * (1.5 + n * 2.6 + Math.max(0, n) * 5.2) + (1 - mask) * -2.4;
   const vb = smooth(8.5, 4.5, Math.hypot(x, z));
-  h = h * (1 - vb) + 1.25 * vb;
+  h = beach(h * (1 - vb) + 1.25 * vb);
   H[k] = h; J[k] = clamp(.5 + noise(x * .35, z * .35) * .8, 0, 1);
+  DRY[k] = fbm(x * .13 + 21, z * .13 - 9); BARE[k] = fbm(x * .21 - 5, z * .21 + 14) + noise(x * .9, z * .9) * .12;
 }
 function heightAt(x, z) {
   const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
@@ -235,12 +238,19 @@ function heightAt(x, z) {
   return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + N] * (1 - u) + H[k + N + 1] * u) * v;
 }
 const surfaceAt = (x, z) => Math.max(heightAt(x, z), -0.12);
-const C = { deep: new THREE.Color(0xb39c68), sand: new THREE.Color(0xe3cf92), g1: new THREE.Color(0x82b047), g2: new THREE.Color(0x5a8d36), rock: new THREE.Color(0x8e8476), snow: new THREE.Color(0xf2f1ea) };
+const C = { deep: new THREE.Color(0xb7a06a), wet: new THREE.Color(0xc8ad74), sand: new THREE.Color(0xecd9a0), g1: new THREE.Color(0x82b047), g2: new THREE.Color(0x5a8d36),
+  dry: new THREE.Color(0xa6ad52), bare: new THREE.Color(0x8f7a54), rock: new THREE.Color(0x8e8476), snow: new THREE.Color(0xf2f1ea) };
 const tc = new THREE.Color(), tg = new THREE.Color();
-function terrainColor(h, jit) {
+function terrainColor(h, jit, k = -1) {
   tg.copy(C.g1).lerp(C.g2, jit);
-  if (h < 0.05) return tc.copy(C.deep).lerp(C.sand, smooth(-1.6, 0.05, h));
-  tc.copy(C.sand).lerp(tg, smooth(0.22, 0.5, h));
+  if (h < -.02) return tc.copy(C.deep).lerp(C.wet, smooth(-1.4, -.02, h));
+  tc.copy(C.wet).lerp(C.sand, smooth(-.02, .1, h));                         // nasser Sand an der Wasserlinie
+  const sg = .3 + (jit - .5) * .14; tc.lerp(tg, smooth(sg, sg + .14, h));   // unregelmäßige Grenze Sand/Gras
+  if (k >= 0) { // Wiese: trockene Flecken und kahle Erdstellen
+    const gw = smooth(.45, .6, h) * (1 - smooth(2.5, 2.9, h));
+    tc.lerp(C.dry, smooth(.05, .35, DRY[k]) * .55 * gw);
+    tc.lerp(C.bare, smooth(.3, .42, BARE[k]) * .75 * gw);
+  }
   tc.lerp(C.rock, smooth(2.9 + jit * .5, 3.5 + jit * .5, h));
   tc.lerp(C.snow, smooth(4.9, 5.5, h));
   return tc;
@@ -249,15 +259,79 @@ const tGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG).rotateX(-Math.PI / 2)
 const tPos = tGeo.attributes.position;
 const tCol = new THREE.BufferAttribute(new Float32Array(N * N * 3), 3);
 tGeo.setAttribute('color', tCol);
-for (let k = 0; k < N * N; k++) { tPos.setY(k, H[k]); const c = terrainColor(H[k], J[k]); tCol.setXYZ(k, c.r, c.g, c.b); }
-const terrain = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: .95 }));
+for (let k = 0; k < N * N; k++) { tPos.setY(k, H[k]); const c = terrainColor(H[k], J[k], k); tCol.setXYZ(k, c.r, c.g, c.b); }
+tGeo.computeVertexNormals();
+// weich schattiert, dazu feines Rauschen in Weltkoordinaten: das Gelände wirkt nicht mehr grob aus großen Dreiecken
+const NOISE_GLSL = `float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vns(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hsh(i), hsh(i + vec2(1., 0.)), f.x), mix(hsh(i + vec2(0., 1.)), hsh(i + vec2(1., 1.)), f.x), f.y); }`;
+const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 });
+terrainMat.onBeforeCompile = sh => {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;\n' + NOISE_GLSL)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      { float n = vns(vWP.xz * 1.3) * .45 + vns(vWP.xz * 4.3) * .33 + vns(vWP.xz * 12.) * .22; diffuseColor.rgb *= .86 + n * .28; }`);
+};
+const terrain = new THREE.Mesh(tGeo, terrainMat);
 terrain.receiveShadow = true; terrain.castShadow = true; terrain.frustumCulled = false;
 scene.add(terrain);
 
-const wGeo = new THREE.PlaneGeometry(150, 150, 60, 60).rotateX(-Math.PI / 2);
-const wBase = Float32Array.from(wGeo.attributes.position.array);
-const water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x3aa6b8, transparent: true, opacity: .8, roughness: .2, metalness: .05, flatShading: true }));
-water.receiveShadow = true;
+// Höhen als Textur für das Wasser (Tiefe: Farbe, Brandung, flache Wellen am Ufer)
+const hTexData = new Uint8Array(N * N), hTex = new THREE.DataTexture(hTexData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+hTex.magFilter = hTex.minFilter = THREE.LinearFilter;
+function updateHTex() { for (let k = 0; k < N * N; k++) hTexData[k] = clamp(Math.round((H[k] + 3) / 5 * 255), 0, 255); hTex.needsUpdate = true; }
+updateHTex();
+let terrainDirty = false, terrainT = 0;
+function updateTerrain(dt) { terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); }
+// Wasser: Wellen und Brandung im Vertex-Shader, Kräuselung durch Wind (Böen ziehen als Flecken übers Wasser),
+// Farbe nach Tiefe (türkis im Flachen, tiefblau draußen), Schaum am Strand und bei starkem Wind Schaumkronen,
+// Spiegelung des Himmels am flachen Blickwinkel, Sonnenglitzern über die Lichtberechnung.
+const waterU = { uT: { value: 0 }, uWind: { value: .5 }, uH: { value: hTex }, uSkyH: { value: sky.hor } };
+const WATER_GLSL = `uniform float uT, uWind; uniform sampler2D uH; varying vec3 vWP;
+float hAt(vec2 xz) { vec2 uv = (xz + ${HALF.toFixed(1)}) / ${SIZE.toFixed(1)} * ${((N - 1) / N).toFixed(5)} + ${(.5 / N).toFixed(5)}; return texture2D(uH, uv).r * 5. - 3.; }
+vec3 waves(vec2 p, float a) {
+  vec3 r = vec3(0.); vec2 d; float ph;
+  d = normalize(vec2(1., .35));  ph = 1.1 * dot(d, p) - 1.3 * uT; r.x += a * sin(ph); r.yz += a * 1.1 * cos(ph) * d;
+  d = normalize(vec2(-.4, 1.));  ph = 1.7 * dot(d, p) - 1.7 * uT; r.x += a * .6 * sin(ph); r.yz += a * .6 * 1.7 * cos(ph) * d;
+  d = normalize(vec2(.7, -.8));  ph = 2.6 * dot(d, p) - 2.3 * uT; r.x += a * .35 * sin(ph); r.yz += a * .35 * 2.6 * cos(ph) * d;
+  return r;
+}
+float waveAmp(float depth) { return (.02 + .05 * uWind) * smoothstep(0., .7, depth); }
+` + NOISE_GLSL;
+const wGeo = new THREE.PlaneGeometry(150, 150, 220, 220).rotateX(-Math.PI / 2);
+const waterMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, roughness: .1, metalness: 0 });
+waterMat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, waterU);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + WATER_GLSL)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+      { vec2 wp = (modelMatrix * vec4(transformed, 1.)).xz; float depth = max(0., -.02 - hAt(wp));
+        float surge = (.015 + .045 * uWind) * sin(depth * 14. - uT * (1.7 + 1.1 * uWind)) * (1. - smoothstep(0., .7, depth)) * smoothstep(0., .04, depth); // Brandung, bei Wind höher und schneller
+        transformed.y += waves(wp, waveAmp(depth)).x + surge; }
+      vWP = (modelMatrix * vec4(transformed, 1.)).xyz;`);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSkyH;\n' + WATER_GLSL)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      float wDepth = max(0., -.02 - hAt(vWP.xz));
+      float gust = vns(vWP.xz * .07 + vec2(uT * .06, uT * .035));
+      vec3 wc = mix(vec3(.25, .72, .7), vec3(.03, .22, .38), smoothstep(0., 1.8, wDepth));
+      float fn = vns(vWP.xz * 3. + uT * .3), shore = 1. - smoothstep(0., .22 + .2 * uWind, wDepth); // Schaumstreifen am Ufer, bei Wind breiter
+      float lines = smoothstep(.62 - .12 * uWind, .95, sin(wDepth * 40. - uT * (1.9 + 1.4 * uWind) + fn * 3.) * .5 + .5) * shore;
+      float caps = smoothstep(.74, .9, vns(vWP.xz * 1.7 + uT * .45)) * smoothstep(.55, 1., uWind * (.55 + .9 * gust)) * smoothstep(.5, 1.5, wDepth);
+      float foam = clamp(shore * shore * .85 + lines * .75 + caps * .8, 0., 1.);
+      diffuseColor.rgb = mix(wc, vec3(.93, .97, 1.), foam);
+      diffuseColor.a = mix(.5 + .42 * smoothstep(0., 1.2, wDepth), .95, foam);`)
+    .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+      { vec3 w = waves(vWP.xz, waveAmp(wDepth));
+        float rip = (.4 + 1.1 * uWind) * (.45 + 1.1 * gust) * smoothstep(0., .25, wDepth); // Kräuselung, in Böen stärker
+        vec2 q = vWP.xz * 5. + vec2(uT * .9, uT * .55), q2 = vWP.xz * 12. - vec2(uT * 1.3, -uT * .8); float e = .06;
+        float a0 = vns(q), b0 = vns(q2);
+        vec2 g = vec2(vns(q + vec2(e, 0.)) - a0, vns(q + vec2(0., e)) - a0) / e * .05 + vec2(vns(q2 + vec2(e, 0.)) - b0, vns(q2 + vec2(0., e)) - b0) / e * .025;
+        vec3 wn = normalize(vec3(-w.y - g.x * rip, 1., -w.z - g.y * rip));
+        normal = normalize((viewMatrix * vec4(wn, 0.)).xyz); }`)
+    .replace('#include <opaque_fragment>', `{ float fres = pow(1. - max(dot(normal, normalize(vViewPosition)), 0.), 4.);
+        outgoingLight = mix(outgoingLight, uSkyH, fres * .35 * (1. - foam)); }
+      #include <opaque_fragment>`);
+};
+const water = new THREE.Mesh(wGeo, waterMat);
+water.position.y = -.03; water.receiveShadow = true; water.frustumCulled = false;
 scene.add(water);
 
 // Trampelpfade: jeder Geländepunkt zählt, wie lange dort gelaufen wurde (Sekunden, gedeckelt).
@@ -267,7 +341,7 @@ const WEAR = new Float32Array(N * N), WEAR_MAX = 40, wearDirty = new Set();
 const PATH_C = new THREE.Color(0xa88a5c), PATH_C2 = new THREE.Color(0x957548);
 if (Array.isArray(S.paths)) for (let i = 0; i + 1 < S.paths.length; i += 2) { const k = S.paths[i] | 0; if (k >= 0 && k < N * N) WEAR[k] = Math.min(WEAR_MAX, +S.paths[i + 1] || 0); }
 function vertexColor(k) {
-  const c = terrainColor(H[k], J[k]), w = WEAR[k];
+  const c = terrainColor(H[k], J[k], k), w = WEAR[k];
   if (w > 6 && H[k] > .15 && H[k] < 3.4) c.lerp(tg.copy(PATH_C).lerp(PATH_C2, J[k]), smooth(6, 30, w) * .92);
   return c;
 }
@@ -301,7 +375,7 @@ function sculpt(px, pz, dir, dt) {
     const k = j * N + i, h = clamp(H[k] + str * (1 + Math.cos(Math.PI * d)) / 2, -3, 8.5);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true;
+  tPos.needsUpdate = true; tCol.needsUpdate = true; terrainDirty = true;
 }
 // Bauplatz einebnen: innen ganz auf die Höhe der Mitte, zum Rand hin weich auslaufend
 function flattenAt(px, pz, R) {
@@ -314,7 +388,7 @@ function flattenAt(px, pz, R) {
     const k = j * N + i, h = H[k] + (target - H[k]) * smooth(1, .55, d);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true;
+  tPos.needsUpdate = true; tCol.needsUpdate = true; terrainDirty = true;
 }
 
 /* ------------------------------------------------------------------ assets */
@@ -336,11 +410,97 @@ const CREATURES = {
 };
 if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
-  'tree_single_A.gltf', 'tree_single_B.gltf', 'tree_single_A_cut.gltf', 'rock_single_A.gltf', 'rock_single_C.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
+  'tree_single_A_cut.gltf', 'cloud_big.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
   'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf'];
-const [gHomeA, gHomeB, gWell, gMill, gScaff, gTreeA, gTreeB, gStump, gRockA, gRockC, gCloud, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCloud, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
+/* ------------------------------------------------------------------ Pflanzen und Felsen (im Code erzeugt) */
+// Hilfen: Geometrie ohne Index mit einer Farbe je Dreieck (Verläufe, dunklere Unterseiten, leichte Streuung), leicht verbeult
+const COL = new THREE.Color(), COL2 = new THREE.Color();
+const jit = (x, y, z) => .9 + .2 * (((Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453) % 1 + 1) % 1);
+function paint(geo, fn) {
+  const g = geo.index ? geo.toNonIndexed() : geo; if (g.attributes.uv) g.deleteAttribute('uv'); g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, col = new Float32Array(p.count * 3);
+  for (let i = 0; i + 2 < p.count; i += 3) {
+    const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
+    fn(x, y, z, (n.getY(i) + n.getY(i + 1) + n.getY(i + 2)) / 3, COL);
+    for (let k = 0; k < 3; k++) col.set([COL.r, COL.g, COL.b], (i + k) * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+}
+function lumpy(geo, amt, f = 2.2, seed = Math.random() * 50) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + amt * noise(x * f + seed, z * f + y * f * 1.3 - seed); p.setXYZ(i, x * k, y * k, z * k); }
+  return geo;
+}
+// Laub: von dunkel (unten) nach hell (oben), Unterseiten im Schatten
+const fol = (y0, y1, dark, light) => (x, y, z, ny, c) => { c.set(dark).lerp(COL2.set(light), clamp(smooth(y0, y1, y) * .8 + (ny > .55 ? .2 : 0), 0, 1)); c.multiplyScalar((ny < -.25 ? .6 : ny < .2 ? .82 : 1) * jit(x, y, z)); };
+const bark = (h, c0, c1) => (x, y, z, ny, c) => c.set(c0).lerp(COL2.set(c1), clamp(y / h, 0, 1)).multiplyScalar(jit(x, y, z));
+const trunkGeo = (h, r0, r1, c0, c1, seg = 6) => paint(new THREE.CylinderGeometry(r1, r0, h, seg, 2).translate(0, h / 2, 0), bark(h, c0, c1));
+const blob = (x, y, z, r, sy = 1, amt = .25, det = 1) => lumpy(new THREE.IcosahedronGeometry(r, det), amt, 3).scale(1, sy, 1).translate(x, y, z);
+const plantMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: .88 });
+const kindOf = (name, parts) => { const geo = mergeGeometries(parts), sc = new THREE.Group(); sc.add(new THREE.Mesh(geo, plantMat)); return { name, geo, scene: sc }; };
+// Baumarten (Höhe etwa 1,1 im Modellraum, wie zuvor die KayKit-Bäume)
+function spruce(slim) {
+  const parts = [trunkGeo(.32, .055, .035, 0x4f3420, 0x6b4a2c)], n = slim ? 5 : 4;
+  for (let k = 0; k < n; k++) {
+    const r = (slim ? .27 : .37) * (1 - k / (n + .7)), h = slim ? .3 : .38, y = .15 + k * (slim ? .165 : .2);
+    parts.push(paint(lumpy(new THREE.ConeGeometry(r, h, 8, 1), .07, 4).rotateY(k * .7).translate(rnd(.015), y + h / 2, rnd(.015)), fol(.1, 1.1, slim ? 0x22503e : 0x275a2e, slim ? 0x4d8a68 : 0x579b45)));
+  }
+  return parts;
+}
+function oak() {
+  const parts = [trunkGeo(.52, .075, .045, 0x4a3322, 0x6a4a30)];
+  for (const [rz, ry] of [[.8, 0], [-.7, 1.4]]) parts.push(paint(new THREE.CylinderGeometry(.018, .03, .28, 5).translate(0, .14, 0).rotateZ(rz).rotateY(ry).translate(0, .36, 0), bark(.6, 0x4a3322, 0x6a4a30)));
+  for (const [x, y, z, r] of [[0, .8, 0, .3], [.2, .7, .1, .22], [-.2, .72, -.06, .23], [.04, .96, -.1, .2], [-.06, .68, .2, .2], [.12, .84, -.18, .18]])
+    parts.push(paint(blob(x, y, z, r, .9), fol(.5, 1.12, 0x3a7a2c, 0x8dc24f)));
+  return parts;
+}
+function birch() {
+  const h = .78, parts = [paint(new THREE.CylinderGeometry(.027, .042, h, 6, 6).translate(0, h / 2, 0), (x, y, z, ny, c) => c.set(Math.sin(y * 52 + x * 40) > .72 ? 0x3d3832 : 0xebe7dc).multiplyScalar(jit(x, y, z)))];
+  for (const [x, y, z, r, sy] of [[0, .88, 0, .16, 1.5], [.1, .72, .05, .13, 1.3], [-.09, .78, -.05, .14, 1.4], [0, 1.02, .03, .11, 1.3]])
+    parts.push(paint(blob(x, y, z, r, sy, .2), fol(.55, 1.15, 0x5f9a35, 0xb8da6c)));
+  return parts;
+}
+function fruit() {
+  const parts = [trunkGeo(.36, .065, .045, 0x4e3524, 0x6e4c32)];
+  for (const [x, y, z, r, sy] of [[0, .63, 0, .33, .8], [.18, .56, .1, .2, 1], [-.17, .6, -.08, .21, 1]]) parts.push(paint(blob(x, y, z, r, sy, .2), fol(.35, .9, 0x3f7f30, 0x86bd4c)));
+  for (let k = 0; k < 11; k++) { // Äpfel rundum, eher in der unteren Hälfte der Krone
+    const a = k / 11 * Math.PI * 2 + rnd(.3), e = -.5 + Math.random() * .8, x = Math.cos(a) * Math.cos(e) * .35, y = .63 + Math.sin(e) * .28, z = Math.sin(a) * Math.cos(e) * .35;
+    const red = Math.random() < .75; parts.push(paint(new THREE.IcosahedronGeometry(.036, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(red ? 0xc8322a : 0xe2a12f).lerp(COL2.set(0xffffff), ny > .6 ? .2 : 0)));
+  }
+  return parts;
+}
+const TK = [kindOf('Fichte', spruce(false)), kindOf('Tanne', spruce(true)), kindOf('Laubbaum', oak()), kindOf('Birke', birch()), kindOf('Obstbaum', fruit())];
+const TREE_FOREST = [0, 1, 2]; // Arten, unter denen Farne wachsen
+// Baumart je Ort: Nadelwald in der Höhe und in dunklen Hainen, Birkenhaine, sonst Laubwald; Obstbäume selten und nahe am Dorf
+function treeKindAt(x, z) {
+  const h = heightAt(x, z), n = noise(x * .09 + 40, z * .09 - 7), d = Math.hypot(x, z);
+  if (d < 13.5 && Math.random() < .09) return 4;
+  if (h > 1.9 || n > .25) return Math.random() < .6 ? 0 : 1;
+  if (n < -.28) return Math.random() < .6 ? 3 : 2;
+  return Math.random() < .7 ? 2 : Math.random() < .5 ? 0 : 3;
+}
+// Felsen: verbeulte, flach gedrückte Körper, grau mit hellerer Oberseite und Moos auf flachen Stellen
+const rockGeo = (seed, det = 1) => paint(lumpy(new THREE.IcosahedronGeometry(1, det), .32, 1.4, seed).scale(1, .62, 1), (x, y, z, ny, c) => {
+  c.set(0x76706a).lerp(COL2.set(0xa29c90), smooth(-.3, .6, y));
+  if (ny > .8 && noise(x * 3 + seed, z * 3) > .05) c.lerp(COL2.set(0x5f7d3c), .4);
+  c.multiplyScalar((ny < -.2 ? .7 : 1) * jit(x, y, z));
+});
+const ROCK_GEOS = [3, 17, 29, 41].map(sd => rockGeo(sd));
+// Büsche: drei Sorten (schlicht, blühend, mit Beeren)
+function bushGeo(v) {
+  const parts = [], n = 4 + v;
+  for (let k = 0; k < n; k++) parts.push(paint(blob(rnd(.13), .1 + Math.random() * .1, rnd(.13), .11 + Math.random() * .06, .85, .3), fol(0, .32, v === 2 ? 0x2a5c27 : 0x2f6a2a, v === 2 ? 0x5e9443 : 0x6fa648)));
+  if (v) for (let k = 0; k < 12; k++) {
+    const a = Math.random() * 6.28, e = Math.random() * 1.2, x = Math.cos(a) * Math.cos(e) * .2, y = .14 + Math.sin(e) * .14, z = Math.sin(a) * Math.cos(e) * .2;
+    const c0 = v === 1 ? (k % 3 ? 0xf2a5c6 : 0xffffff) : (k % 2 ? 0xc0302b : 0x3b3f8f);
+    parts.push(paint(new THREE.IcosahedronGeometry(v === 1 ? .022 : .018, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(c0)));
+  }
+  return mergeGeometries(parts);
+}
+const BUSH_GEOS = [0, 1, 2].map(bushGeo);
 class Swarm {
   constructor(p, cap) { this.meshes = p.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; }); }
   set(i, mat) { for (const m of this.meshes) m.setMatrixAt(i, mat); }
@@ -544,7 +704,7 @@ function addHut(role, site) {
   e.role = role; e.H = H; e.saw = role === 'sawyer' ? e.o.getObjectByName('building_lumbermill_saw_blue') : null; e.sawing = 0;
   e.logs = 0; e.planks = 0; // Vorrat an der Säge: Träger bringen Stämme und holen Bretter
   if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
-  if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(gTreeA, p.x, p.z, Math.random() * 6, ST * .2); }
+  if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(TK[Math.random() < .5 ? 0 : 2], p.x, p.z, Math.random() * 6, ST * .2); }
   huts.push(e); return e;
 }
 const hutDoor = (e, d = .25) => localPt(e, e.H.door.x, e.H.door.z + d / e.o.scale.x);
@@ -553,11 +713,11 @@ for (const r in ROLES) for (let i = 0; i < S.huts[r]; i++) { const st = hutSite(
 for (const r in ROLES) S.huts[r] = Math.max(1, huts.filter(h => h.role === r).length);
 
 /* ------------------------------------------------------------------ trees & rocks */
-const treeSwarms = [new Swarm(parts(gTreeA), 500), new Swarm(parts(gTreeB), 500)];
+const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
 const stumpSwarm = new Swarm(parts(gStump), 500);
 const trees = [];
 const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r);
-function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: Math.random() < .5 ? 0 : 1, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
+function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
   if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
@@ -566,13 +726,122 @@ for (let tries = 0; tries < 4000 && trees.length < 95; tries++) {
 worldReady = true;
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
-const rockSwarms = [new Swarm(parts(gRockA), 40), new Swarm(parts(gRockC), 40)];
+// Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
+const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
-for (let tries = 0; tries < 2000 && rocks.length < 34; tries++) {
-  const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .2 || Math.hypot(x, z) < 7 || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2)) continue; // Werkstatt-Bauplätze frei halten
-  rocks.push({ x, z, type: rocks.length % 2, s: 1.6 + Math.random() * 2.2, r: Math.random() * 6.28 });
+const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
+function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
+for (let tries = 0; tries < 3000 && rocks.length < 16; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
+for (let tries = 0; tries < 3000 && rocks.length < 56; tries++) { // mittlere Felsen, gern in Gruppen um die großen
+  const o = Math.random() < .55 ? rocks[Math.floor(Math.random() * 16)] : null, a = Math.random() * 6.28, r = o ? o.s + .4 + Math.random() * 1.2 : 0;
+  addRock(o ? o.x + Math.cos(a) * r : rnd(HALF * .88), o ? o.z + Math.sin(a) * r : rnd(HALF * .88), .2 + Math.random() * .3);
 }
+{ const cnt = ROCK_GEOS.map(() => 0); for (const r of rocks) rockMeshes[r.v].setColorAt(cnt[r.v]++, COL.setScalar(r.tint)); }
+// Büsche: gern am Waldrand, seltener auf offener Wiese
+const bushes = [];
+const bushMeshes = BUSH_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 120); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
+for (let tries = 0; tries < 6000 && bushes.length < 170; tries++) {
+  const x = rnd(HALF * .88), z = rnd(HALF * .88), h = heightAt(x, z);
+  if (h < .5 || h > 2.7 || keepFree(x, z) || treeNear(x, z, .6) || rocks.some(r => Math.hypot(r.x - x, r.z - z) < r.s + .3)) continue;
+  if (Math.random() > (treeNear(x, z, 2.2) ? .8 : .22)) continue;
+  bushes.push({ x, z, v: Math.random() < .55 ? 0 : Math.random() < .5 ? 1 : 2, s: .8 + Math.random() * .7, r: Math.random() * 6.28, tint: .85 + Math.random() * .3 });
+}
+{ const cnt = BUSH_GEOS.map(() => 0); for (const b of bushes) bushMeshes[b.v].setColorAt(cnt[b.v]++, COL.setScalar(b.tint)); }
+// Bodenbewuchs: Grasbüschel, Blumen, Farne, Kiesel, Muscheln, Treibholz. Viele kleine Teile, instanziert.
+// Höhe und Sichtbarkeit (nicht auf Pfaden, unter Gebäuden, Bäumen oder im Wasser) werden reihum aktualisiert.
+const grassU = { uT: { value: 0 } };
+function tuftGeo() {
+  const pos = [], col = [], nor = [];
+  for (let b = 0; b < 6; b++) {
+    const a = Math.random() * 6.28, r = Math.random() * .06, x = Math.cos(a) * r, z = Math.sin(a) * r, w = .011 + Math.random() * .008, h = .07 + Math.random() * .08;
+    const la = Math.random() * 6.28, lean = .02 + Math.random() * .035, ox = Math.cos(la), oz = Math.sin(la);
+    pos.push(x + oz * w, 0, z - ox * w, x - oz * w, 0, z + ox * w, x + ox * lean, h, z + oz * lean);
+    col.push(.5, .56, .42, .5, .56, .42, 1.06, 1.1, .92); nor.push(0, 1, 0, 0, 1, 0, 0, 1, 0); // Normalen nach oben: Halme hell wie der Boden
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return g;
+}
+const grassMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
+grassMat.onBeforeCompile = sh => { // Wind: Halmspitzen wiegen sich, in Wellen über die Wiese
+  sh.uniforms.uT = grassU.uT;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT;').replace('#include <begin_vertex>', `#include <begin_vertex>
+    { vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]); float sw = sin(uT * 1.6 + ip.x * .45 + ip.y * .3) + .5 * sin(uT * 2.7 + ip.x * 1.3);
+      transformed.x += sw * .18 * position.y; transformed.z += cos(uT * 1.3 + ip.y * .5) * .1 * position.y; }`);
+  // beide Seiten der Halme wie der Boden beleuchten (sonst ist die Rückseite schwarz)
+  sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize((viewMatrix * vec4(0., 1., 0., 0.)).xyz);');
+};
+const flowerGeo = mergeGeometries([
+  paint(new THREE.BoxGeometry(.005, .1, .005).translate(0, .05, 0), (x, y, z, ny, c) => c.set(0x4c8a35)),
+  paint(new THREE.CircleGeometry(.026, 5).rotateX(-Math.PI / 2).translate(0, .1, 0), (x, y, z, ny, c) => c.set(0xffffff)),
+  paint(new THREE.IcosahedronGeometry(.009, 0).translate(0, .104, 0), (x, y, z, ny, c) => c.set(0xf5c542)),
+]);
+const fernGeo = mergeGeometries([0, 1, 2, 3, 4, 5].map(k => paint(new THREE.ConeGeometry(.02, .17, 3).rotateX(Math.PI / 2).translate(0, 0, .085).rotateX(-.55).rotateY(k * 1.05 + rnd(.2)), fol(-.02, .1, 0x2f6b2c, 0x6aa84a))));
+const pebbleGeos = [5, 11].map(sd => rockGeo(sd, 0));
+const shellGeo = paint(new THREE.SphereGeometry(.024, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .55, 1.25), (x, y, z, ny, c) => c.set(0xffffff).multiplyScalar(.8 + .25 * Math.abs(Math.sin(Math.atan2(z, x) * 5))));
+const driftGeo = mergeGeometries([paint(new THREE.CylinderGeometry(.028, .036, .5, 6).rotateZ(Math.PI / 2), bark(.1, 0x8f8576, 0xb3aa9a)), paint(new THREE.CylinderGeometry(.012, .018, .2, 5).translate(0, .1, 0).rotateZ(-.9).translate(.08, 0, 0), bark(.1, 0x8f8576, 0xb3aa9a))]);
+const cover = [];
+function coverKind(geo, mat, items, o) {
+  const m = new THREE.InstancedMesh(geo, mat, Math.max(1, items.length)); m.frustumCulled = false; m.receiveShadow = true; m.castShadow = !!o.shadow; m.count = items.length;
+  const hide = new THREE.Matrix4().makeScale(0, 0, 0); items.forEach((it, i) => { m.setMatrixAt(i, hide); m.setColorAt(i, COL.set(it.c ?? 0xffffff)); });
+  scene.add(m); const k = { m, items, hmin: o.hmin, hmax: o.hmax, sink: o.sink || 0, lie: !!o.lie }; cover.push(k); return k;
+}
+{
+  const BARE_AT = (x, z) => { const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL); return i < 0 || j < 0 || i >= N || j >= N ? 0 : BARE[j * N + i]; };
+  const grassC = [0x86b54b, 0x76a842, 0x9cbc55, 0x6e9e3e];
+  const grass = [];
+  for (let tries = 0; tries < 80000 && grass.length < 9000; tries++) {
+    const x = rnd(HALF * .92), z = rnd(HALF * .92), h = heightAt(x, z);
+    if (h < .42 || h > 2.8) continue;
+    const dens = (.3 + .7 * smooth(-.35, .45, noise(x * .22 + 5, z * .22))) * (1 - smooth(.3, .42, BARE_AT(x, z)));
+    if (Math.random() > dens) continue;
+    grass.push({ x, z, r: Math.random() * 6.28, s: .9 + Math.random() * .8, c: grassC[Math.floor(Math.random() * 4)] });
+  }
+  coverKind(tuftGeo(), grassMat, grass, { hmin: .38, hmax: 2.9 });
+  const PAL = [0xf6f3e8, 0xf2cf3a, 0xec86ad, 0x9c82dc, 0xdc4a3c, 0x75a6e6, 0xf09a3e];
+  const flowers = [];
+  for (let c = 0; c < 90; c++) {
+    let cx = 0, cz = 0, ok = false;
+    for (let t = 0; t < 30 && !ok; t++) { cx = rnd(HALF * .85); cz = rnd(HALF * .85); const h = heightAt(cx, cz); ok = h > .5 && h < 2.2; }
+    if (!ok) continue;
+    const col = PAL[Math.floor(Math.random() * PAL.length)], n = 5 + Math.floor(Math.random() * 12);
+    for (let k = 0; k < n; k++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * .9; flowers.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r, r: Math.random() * 6.28, s: .8 + Math.random() * .5, c: col }); }
+  }
+  coverKind(flowerGeo, plantMat, flowers, { hmin: .45, hmax: 2.6 });
+  const ferns = [];
+  for (const t of trees) if (TREE_FOREST.includes(t.type) && Math.random() < .55) for (let k = 0; k < 1 + (Math.random() < .4); k++) { const a = Math.random() * 6.28, r = .35 + Math.random() * .5; ferns.push({ x: t.x + Math.cos(a) * r, z: t.z + Math.sin(a) * r, r: Math.random() * 6.28, s: .8 + Math.random() * .6, c: 0xffffff }); }
+  coverKind(fernGeo, plantMat, ferns, { hmin: .45, hmax: 2.9 });
+  const pebbles = [[], []];
+  for (let k = 0; k < 520; k++) {
+    let x, z; const u = Math.random();
+    if (u < .45 && rocks.length) { const o = rocks[Math.floor(Math.random() * rocks.length)], a = Math.random() * 6.28, r = o.s * (1.05 + Math.random() * .9); x = o.x + Math.cos(a) * r; z = o.z + Math.sin(a) * r; }
+    else { x = rnd(HALF * .9); z = rnd(HALF * .9); const h = heightAt(x, z); if (!(h > -.05 && h < .45) && BARE_AT(x, z) < .3) { k--; continue; } }
+    pebbles[k % 2].push({ x, z, r: Math.random() * 6.28, s: .05 + Math.random() * .08, c: COL.setScalar(.85 + Math.random() * .3).getHex() });
+  }
+  pebbles.forEach((pb, k) => coverKind(pebbleGeos[k], plantMat, pb, { hmin: -.08, hmax: 4.5, sink: .25 }));
+  const shells = [], drift = [], SH = [0xfff6ec, 0xf6d3c6, 0xe9c9a0, 0xffe4ef];
+  for (let tries = 0; tries < 8000 && shells.length < 110; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > -.04 && h < .3) shells.push({ x, z, r: Math.random() * 6.28, s: .7 + Math.random() * .6, c: SH[Math.floor(Math.random() * 4)] }); }
+  for (let tries = 0; tries < 8000 && drift.length < 12; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > .02 && h < .22) drift.push({ x, z, r: Math.random() * 6.28, s: 1 + Math.random() * .7, c: 0xffffff }); }
+  coverKind(shellGeo, plantMat, shells, { hmin: -.06, hmax: .4 });
+  coverKind(driftGeo, plantMat, drift, { hmin: -.02, hmax: .35, sink: -.03, shadow: true });
+}
+// reihum ein Stück des Bewuchses neu setzen (Höhe nach Formen, Pfade, neue Gebäude); am Anfang alles
+let coverK = 0, coverI = 0;
+function refreshCover(budget) {
+  while (budget > 0 && cover.length) {
+    const K = cover[coverK], m = K.m, i0 = coverI, i1 = Math.min(K.items.length, i0 + budget);
+    for (let i = i0; i < i1; i++) {
+      const it = K.items[i], h = heightAt(it.x, it.z);
+      const wi = Math.round((it.x + HALF) / CELL), wj = Math.round((it.z + HALF) / CELL), w = wi >= 0 && wj >= 0 && wi < N && wj < N ? WEAR[wj * N + wi] : 0;
+      let vis = h > K.hmin && h < K.hmax && w < 7;
+      if (vis && navReady) { const c = navCell(it.x, it.z); vis = c >= 0 && !navV.g[c] || (K.hmin < 0 && navWater[c] === 1 && h > K.hmin); }
+      if (!vis) { m.setMatrixAt(i, zero); continue; }
+      dummy.position.set(it.x, h - K.sink * it.s, it.z); dummy.rotation.set(0, it.r, 0); dummy.scale.setScalar(it.s); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix);
+    }
+    if (i1 > i0) { m.instanceMatrix.addUpdateRange(i0 * 16, (i1 - i0) * 16); m.instanceMatrix.needsUpdate = true; }
+    budget -= i1 - i0; coverI = i1;
+    if (coverI >= K.items.length) { coverI = 0; coverK = (coverK + 1) % cover.length; }
+  }
+}
+let coverFirst = true; // beim ersten Frame alles setzen
 
 /* ------------------------------------------------------------------ Wegfindung */
 // Raster über die ganze Insel (NAV_C Einheiten je Feld). Belegt sind Gebäude (gedrehte Rechtecke aus den Modellmaßen),
@@ -583,7 +852,6 @@ const navV = { m: .12, g: new Uint8Array(NAV_SZ) }, navF = { m: .3, g: new Uint8
 const navWater = new Uint8Array(NAV_SZ);
 const navCell = (x, z) => { const i = Math.floor((x + HALF) / NAV_C), j = Math.floor((z + HALF) / NAV_C); return i < 0 || j < 0 || i >= NAV_N || j >= NAV_N ? -1 : j * NAV_N + i; };
 const cellX = c => -HALF + (c % NAV_N + .5) * NAV_C, cellZ = c => -HALF + (Math.floor(c / NAV_N) + .5) * NAV_C;
-const ROCK_R = [gRockA, gRockC].map(g => { const sz = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3()); return Math.max(sz.x, sz.z) / 2 * .8; });
 // Grundrisse im Modellraum: Mitte (cx, cz) und halbe Ausdehnung (hx, hz)
 const FOOT = { homeA: [0, -.04, .4, .43], homeB: [0, .01, .44, .55], sawmill: [0, .055, .69, .52] };
 function navObstacles() {
@@ -594,7 +862,8 @@ function navObstacles() {
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
   circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.02 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: -3.8, z: -1.2, r: .8 });
   if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
-  for (const r of rocks) circles.push({ x: r.x, z: r.z, r: ROCK_R[r.type] * r.s });
+  for (const r of rocks) circles.push({ x: r.x, z: r.z, r: r.s * .95 });
+  for (const b of bushes) circles.push({ x: b.x, z: b.z, r: .17 * b.s });
   for (const t of trees) if (t.alive && !t.gone && t.g > .25) circles.push({ x: t.x, z: t.z, r: .12 });
   return { rects, circles };
 }
@@ -1510,7 +1779,7 @@ function updateVillager(v, dt, t) {
       if (v.timer <= 0) {
         const sp = v.plant; v.plant = null; v.saplings = Math.max(0, (v.saplings || 0) - 1);
         let t = null;
-        if (sp && sp.tree && sp.tree.reserved === v) { t = sp.tree; t.reserved = null; Object.assign(t, { alive: true, g: .12, stumpT: 0, regrow: 0, type: Math.random() < .5 ? 0 : 1 }); }
+        if (sp && sp.tree && sp.tree.reserved === v) { t = sp.tree; t.reserved = null; Object.assign(t, { alive: true, g: .12, stumpT: 0, regrow: 0, type: treeKindAt(t.x, t.z) }); }
         else if (sp && !sp.tree && !treeNear(sp.x, sp.z, .9)) t = addTree(sp.x, sp.z, .12);
         if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
         if (t) floatText(t.x, heightAt(t.x, t.z) + .5, t.z, 'Gepflanzt', 's');
@@ -1548,7 +1817,10 @@ function foxFinish(a) {
 }
 function foxChoose() {
   // ab und zu hinlegen und ausruhen
-  if (foxActs.lie && Math.random() < .25) { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); return; }
+  if (foxActs.lie && Math.random() < .25) { // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
+    const p = restSpot(); if (Math.hypot(p.x - fox.x, p.z - fox.z) > .15) { foxWalk(p.x, p.z, 'rest'); return; }
+    fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); return;
+  }
   const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
   let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
   if (a !== 'play') {
@@ -1558,6 +1830,14 @@ function foxChoose() {
   }
   fox.act = a;
   if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); }
+}
+// Liegeplatz: rundum frei im Umkreis der halben Körperlänge (Gebäude, Bäume, Felsen, Wasser)
+function restSpot() {
+  if (!navReady) buildNav();
+  const R = CREATURES[fox.kind].h * .5, room = (x, z) => { if (blockedAt(navV, x, z)) return false; for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (blockedAt(navV, x + Math.cos(a) * R, z + Math.sin(a) * R) || blockedAt(navV, x + Math.cos(a) * R * .5, z + Math.sin(a) * R * .5)) return false; } return true; };
+  if (room(fox.x, fox.z)) return { x: fox.x, z: fox.z };
+  for (let r = .5; r < 8; r += .5) for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = fox.x + Math.cos(a) * r, z = fox.z + Math.sin(a) * r; if (room(x, z)) return { x, z }; }
+  return { x: fox.x, z: fox.z };
 }
 // freier Spielplatz: ein Kreis (Radius 1,6) nahe der Dorfmitte, auf dem nichts im Weg steht
 function playSpot() {
@@ -1585,6 +1865,7 @@ function updateFox(dt, t) {
         const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
         addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
       }
+      else if (fox.next === 'rest') { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); }
     } break;
     case 'work': anim('attack'); fox.timer -= dt; if (fox.timer <= 0) {
@@ -1692,11 +1973,11 @@ let ptrType = 'mouse';
 const touchLift = () => ptrType === 'touch' ? 90 : 0;
 const setHoldOff = (x, z) => { if (ptrType === 'touch') holdOff.set(0, 0, 0); else holdOff.set(x - hit.x, 0, z - hit.z); }
 const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, tilt: 0 };
-const heldObjs = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
+const heldObjs = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
 rootBall.castShadow = true; rootBall.visible = false; scene.add(rootBall);
 // Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
-const TREE_H = new THREE.Box3().setFromObject(gTreeA.scene).getSize(new THREE.Vector3()).y, tA = new THREE.Vector2(), tB = new THREE.Vector2();
+const TREE_H = 1.12, tA = new THREE.Vector2(), tB = new THREE.Vector2();
 function toScreen(x, y, z, out) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return out.set((tmpV.x + 1) / 2 * r.width + r.left, (1 - tmpV.y) / 2 * r.height + r.top); }
 function treeAt(cx, cy) {
   let best = null, bd = 1e9;
@@ -1727,7 +2008,7 @@ const fallen = []; // { o, t, dir, x, z, s, life }
 const FALL_T = .7;
 function fallTree(tr, fromX, fromZ, life, lying = false) {
   if (fallen.length >= 12) { const f = fallen.shift(); scene.remove(f.o); }
-  const o = shadowify((tr.type ? gTreeB : gTreeA).scene.clone(true)); scene.add(o);
+  const o = shadowify(TK[tr.type || 0].scene.clone(true)); scene.add(o);
   fallen.push({ o, t: lying ? FALL_T : 0, dir: Math.atan2(tr.x - fromX, tr.z - fromZ), x: tr.x, z: tr.z, s: ST * (tr.g ?? 1), life });
 }
 const fallQ = new THREE.Quaternion(), fallE = new THREE.Euler();
@@ -1741,7 +2022,7 @@ function updateFallen(dt) {
   }
 }
 // Der Tiergeist trägt einen Baum quer im Maul (wie einen Stock); hängt an der Kopfposition des Modells.
-const mouthTrees = [gTreeA, gTreeB].map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
+const mouthTrees = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2), mouthV = new THREE.Vector3(), mouthF = new THREE.Vector3();
 function updateMouthTree() {
   mouthTrees.forEach(o => o.visible = false);
@@ -2205,7 +2486,7 @@ function frame() {
   updateShrine(dt, t);
 
   // trees
-  const tc2 = [0, 0]; let sc = 0;
+  const tc2 = TK.map(() => 0); let sc = 0;
   for (const tr of trees) {
     if (tr.gone) continue;
     const y = heightAt(tr.x, tr.z);
@@ -2216,17 +2497,21 @@ function frame() {
       if (tr.shake > 0) tr.shake = Math.max(0, tr.shake - dt * 3.5);
       const shk = tr.shake ? Math.sin(t * 45) * tr.shake * .045 : 0;
       dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12 + shk, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
-      treeSwarms[tr.type].set(tc2[tr.type]++, dummy.matrix);
+      const tm = treeMeshes[tr.type], ti = tc2[tr.type]++; tm.setMatrixAt(ti, dummy.matrix); tm.setColorAt(ti, COL.setScalar(tr.tint || 1));
     } else if (tr.stumpT > 0) {
       tr.stumpT -= dt;
       dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
     } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
     else if (!tr.reserved && Math.random() < dt / 900) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus
   }
-  treeSwarms[0].commit(tc2[0]); treeSwarms[1].commit(tc2[1]); stumpSwarm.commit(sc);
-  const rc = [0, 0];
-  for (const r of rocks) { const y = heightAt(r.x, r.z); dummy.position.set(r.x, y - .02, r.z); dummy.rotation.set(0, r.r, 0); dummy.scale.setScalar(r.s); dummy.updateMatrix(); rockSwarms[r.type].set(rc[r.type]++, dummy.matrix); }
-  rockSwarms[0].commit(rc[0]); rockSwarms[1].commit(rc[1]);
+  treeMeshes.forEach((m, k) => { m.count = tc2[k]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }); stumpSwarm.commit(sc);
+  const rc = ROCK_GEOS.map(() => 0);
+  for (const r of rocks) { const y = heightAt(r.x, r.z); dummy.position.set(r.x, y - r.s * .28, r.z); dummy.rotation.set(r.tx, r.r, r.tz); dummy.scale.setScalar(r.s); dummy.updateMatrix(); rockMeshes[r.v].setMatrixAt(rc[r.v]++, dummy.matrix); }
+  rockMeshes.forEach((m, k) => { m.count = rc[k]; m.instanceMatrix.needsUpdate = true; });
+  const bc = BUSH_GEOS.map(() => 0);
+  for (const b of bushes) { const y = heightAt(b.x, b.z); dummy.position.set(b.x, y, b.z); dummy.rotation.set(Math.sin(t * 1.1 + b.r * 3) * .03, b.r, 0); dummy.scale.setScalar(b.s); dummy.updateMatrix(); bushMeshes[b.v].setMatrixAt(bc[b.v]++, dummy.matrix); }
+  bushMeshes.forEach((m, k) => { m.count = bc[k]; m.instanceMatrix.needsUpdate = true; });
+  refreshCover(coverFirst ? 1e6 : 450); coverFirst = false; grassU.uT.value = t;
   for (const s of statics) s.o.position.set(s.x, heightAt(s.x, s.z), s.z);
   if (millFan) millFan.rotation.z += dt * 1.4;
 
@@ -2278,7 +2563,9 @@ function frame() {
   }
   if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
   for (const c of clouds) { c.position.x += dt * .4; if (c.position.x > 36) c.position.x = -36; }
-  { const p = wGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = wBase[i * 3], z = wBase[i * 3 + 2]; p.setY(i, Math.sin(x * .45 + t * 1.1) * .05 + Math.cos(z * .5 + t * .9) * .05 - .02); } p.needsUpdate = true; }
+  // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
+  waterU.uT.value = t; waterU.uWind.value += (clamp(.38 + noise(t * .012, 3.7) * .7 + (rain.t > 0 ? .35 : 0), .08, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
+  updateTerrain(dt);
 
   // camera
   if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
@@ -2332,7 +2619,8 @@ function frame() {
 }
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
-window.__wk = { S, villagers, trees, fox, setTool };
+// Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
+window.__wk = { S, villagers, trees, fox, setTool, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
