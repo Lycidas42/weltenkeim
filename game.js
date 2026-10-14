@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1 }, huts: { lumber: 1, forester: 1, sawyer: 1 }, logs: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -25,6 +25,8 @@ if (loaded && typeof loaded === 'object') {
   Object.assign(S, loaded, { w: Object.assign({}, S.w, loaded.w || {}), handStyle: Object.assign({}, S.handStyle, oldStyle, loaded.handStyle || {}),
     jobs: Object.assign({}, S.jobs, loaded.jobs || {}), huts: Object.assign({}, S.huts, loaded.huts || {}) });
   if (typeof S.hand !== 'number' || !isFinite(S.hand) || S.hand < 1) S.hand = 1;
+  if (!loaded.gender && loaded.name === 'Ruun') S.name = 'Fenja'; // alter Standardname: die Kreatur heißt jetzt zu Beginn Fenja
+  if (S.gender !== 'm') S.gender = 'w';
   if (typeof S.hour !== 'number' || !isFinite(S.hour)) S.hour = 8;
 }
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
@@ -1815,6 +1817,8 @@ function renderPortrait(dt, t) {
 const tmpV2 = new THREE.Vector2();
 useCreature(S.creature, gCreature);
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
+// Fürwörter nach dem gewählten Geschlecht der Kreatur (S.gender: 'w' oder 'm')
+const pron = () => S.gender === 'm' ? { er: 'er', ihn: 'ihn', ihm: 'ihm' } : { er: 'sie', ihn: 'sie', ihm: 'ihr' };
 const ACT_DESC = { help: 'einen Baum ins Lager gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 
@@ -2805,7 +2809,7 @@ function renderShrine() {
 function renderFox() {
   $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
   const t = clock.elapsedTime;
-  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${ACT_DESC[fox.last]}. Deine Reaktion prägt ihn.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ihn.`;
+  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${ACT_DESC[fox.last]}. Deine Reaktion prägt ${pron().ihn}.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ${pron().ihn}.`;
   $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
   renderForms();
 }
@@ -2830,13 +2834,16 @@ function foxDoing() {
   }
 }
 // Name an allen Stellen der Oberfläche setzen
+function renderGender() { for (const b of $('foxGender').children) b.setAttribute('aria-checked', String(b.dataset.g === S.gender)); }
+$('foxGender').addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (!b || b.dataset.g === S.gender) return; S.gender = b.dataset.g; renderGender(); renderFox(); toast(`${S.name} ist jetzt ${S.gender === 'w' ? 'weiblich' : 'männlich'}.`, 2); save(); });
+renderGender();
 function renderName() {
   $('btnFox').textContent = S.name; $('sheetFox').setAttribute('aria-label', S.name);
   if (document.activeElement !== $('foxName')) $('foxName').value = S.name;
   $('btnFollow').textContent = `Folgt ${S.name} ✕`;
   if (tool === 'hand') $('hint').textContent = HINTS.hand;
 }
-$('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim().slice(0, 16) || 'Ruun'; renderName(); renderFox(); save(); });
+$('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim().slice(0, 16) || 'Fenja'; renderName(); renderFox(); save(); });
 $('foxName').addEventListener('keydown', e => { if (e.key === 'Enter') $('foxName').blur(); });
 function renderForms() {
   for (const b of $('foxForms').children) {

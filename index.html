@@ -194,6 +194,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .buy:disabled{background:rgba(244,239,225,.12);color:var(--ink-dim);cursor:default}
 .bars{display:grid;gap:7px;margin:4px 0 12px}
 .formsLbl{margin:14px 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+.gender{display:flex;gap:6px;margin:0 0 8px}
+.gender button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-weight:700;font-size:13px}
+.gender button[aria-checked="true"]{background:var(--soul);color:#10302a;border-color:var(--soul)}
 .forms{display:flex;flex-wrap:wrap;gap:6px}
 .forms button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px}
 .forms button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
@@ -266,7 +269,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <button class="chip" id="btnWork">Arbeit</button>
       <button class="chip" id="btnShrine">Schrein</button>
       <button class="chip" id="btnFollow" hidden aria-pressed="true">Folgen ✕</button>
-      <button class="chip" id="btnFox">Ruun</button>
+      <button class="chip" id="btnFox">Fenja</button>
       <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
     </div>
   </header>
@@ -295,8 +298,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="items" id="shrineItems"></div>
   </section>
 
-  <section class="sheet" id="sheetFox" hidden aria-label="Ruun">
+  <section class="sheet" id="sheetFox" hidden aria-label="Fenja">
     <header><h2><input class="title-in" id="foxName" maxlength="16" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Name des Tiergeists"></h2><button class="x" data-close aria-label="Schließen">×</button></header>
+    <div class="gender" id="foxGender" role="radiogroup" aria-label="Geschlecht"><button role="radio" data-g="w" aria-checked="true">♀ weiblich</button><button role="radio" data-g="m" aria-checked="false">♂ männlich</button></div>
     <div class="portrait" id="foxPortrait" aria-hidden="true"></div>
     <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
     <div class="bars" id="foxBars"></div>
