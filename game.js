@@ -142,9 +142,10 @@ const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, re
 $('loadSt').textContent = 'Lade Modelle …';
 // Ruun kann verschiedene Gestalten annehmen (S.creature). Modelle: Quaternius Animated Animal Pack (CC0).
 // h = Zielhöhe in Welteinheiten, walk/run = Geschwindigkeit, ws = Zeitfaktor der Lauf-Animation,
-// rest = Liegepose aus POSES (nur Tiere mit Quaternius-AnimalArmature), hd = Fell-Modell für die Nahansicht.
+// rest = Liegepose aus POSES (nur Tiere mit Quaternius-AnimalArmature), hd = Fell-Modell für das Charakter-Blatt,
+// react = eigene Reaktionen auf Lob und Tadel (buildReactClips).
 const CREATURES = {
-  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', hd: 'Fox_HD', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1, rest: 'paw' },
+  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', hd: 'Fox_HD', react: true, h: 1.45, walk: 1.9, run: 3.4, ws: 1.1, rest: 'paw' },
   wolf: { label: 'Wolf', spirit: 'Wolfsgeist', file: 'Wolf', h: 1.75, walk: 2, run: 3.8, ws: 1, rest: 'paw' },
   stag: { label: 'Hirsch', spirit: 'Hirschgeist', file: 'Stag', h: 3.1, walk: 2, run: 3.8, ws: .9, rest: 'hoof' },
   bull: { label: 'Stier', spirit: 'Stiergeist', file: 'Bull', h: 1.95, walk: 1.7, run: 3.4, ws: .9, rest: 'hoof' },
@@ -324,7 +325,8 @@ function buildRig(id, gltf, fur = false) {
   for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!acts[k] && acts[f]) { acts[k] = mixer.clipAction(acts[f].getClip().clone()); acts[k].timeScale = ts; }
   if (acts.walk) acts.walk.timeScale = C.ws;
   if (C.rest && acts.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, acts.idle.getClip(), C.rest))) acts[k] = mixer.clipAction(clip);
-  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
+  if (C.react && acts.idle) for (const [k, clip] of Object.entries(buildReactClips(model, acts.idle.getClip()))) acts[k] = mixer.clipAction(clip);
+  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast', 'praise', 'scold']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
   return { model, mixer, acts, cur: null, id, dims };
@@ -369,7 +371,13 @@ const NO_POSE = { rot: {}, pos: {} };
 const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.pos });
 // keys: [{ t, pose }] -> AnimationClip, ausgehend von der ersten Frame der Basis-Animation
 function poseClip(model, baseClip, name, keys) {
-  model.traverse(o => { if (o.isSkinnedMesh) o.skeleton.pose(); });
+  // Knochen auf ihre Werte beim Laden zurücksetzen. Nicht skeleton.pose(): das rechnet bei aus Blender
+  // exportierten Modellen die Skalierung des Armature-Knotens (×100) ein zweites Mal ein.
+  model.traverse(o => {
+    if (!o.isBone) return;
+    const r = o.userData.rest || (o.userData.rest = { p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() });
+    o.position.copy(r.p); o.quaternion.copy(r.q); o.scale.copy(r.s);
+  });
   const mixer = new THREE.AnimationMixer(model), act = mixer.clipAction(baseClip); act.play(); mixer.update(0);
   model.updateMatrixWorld(true);
   const space = model.parent ? model.parent.matrixWorld.clone().invert() : new THREE.Matrix4(), spaceQ = new THREE.Quaternion().setFromRotationMatrix(space);
@@ -405,6 +413,20 @@ function buildPoseClips(model, baseClip, rest) {
     standUp: poseClip(model, baseClip, 'standUp', [{ t: 0, pose: L }, { t: .7, pose: NO_POSE }]),
     cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [-28, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [-28, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
   };
+}
+// Eigene Reaktionen auf Lob und Tadel (bisher nur Fuchs, CREATURES.*.react):
+// Lob = Schwanz hoch und wedeln, Ohren nach vorn, kleines Wippen; Tadel = Schwanz zwischen die Beine,
+// Ohren angelegt, Kopf gesenkt und abgewandt, geduckt. Beides endet wieder in der Grundhaltung.
+function buildReactClips(model, baseClip) {
+  const ears = a => ({ Ear1L: [a, 0, 0], Ear1R: [a, 0, 0] });
+  const up = { rot: { Tail1: [22, 0, 0], Tail2: [8, 0, 0], Neck1: [-6, 0, 0], Head: [-10, 0, 0], ...ears(14) }, pos: { Body: [0, .03, 0] } };
+  const wag = (side, bob) => ({ rot: { ...up.rot, Tail2: [8, 18 * side, 0], Tail3: [0, 14 * side, 0], Tail5: [0, 11 * side, 0], Tail7: [0, 8 * side, 0], Head: [-10, -5 * side, 0] }, pos: { Body: [0, .03 + bob, 0] } });
+  const praise = [{ t: 0, pose: NO_POSE }, { t: .22, pose: up }];
+  for (let i = 0; i < 9; i++) praise.push({ t: .36 + i * .15, pose: wag(i % 2 ? -1 : 1, i % 2 ? 0 : .035) });
+  praise.push({ t: praise[praise.length - 1].t + .3, pose: NO_POSE });
+  const duck = (turn, sink) => ({ rot: { Back: [6, 0, 0], Tail1: [-58, 0, 0], Tail2: [-38, 0, 0], Tail3: [-22, 0, 0], Tail5: [-10, 0, 0], Neck1: [16, turn * .5, 0], Head: [12, turn, 0], ...ears(-55) }, pos: { Body: [0, -sink, 0] } });
+  const scold = [{ t: 0, pose: NO_POSE }, { t: .32, pose: duck(26, .08) }, { t: 1.1, pose: duck(32, .09) }, { t: 1.8, pose: duck(24, .08) }, { t: 2.35, pose: NO_POSE }];
+  return { praise: poseClip(model, baseClip, 'praise', praise), scold: poseClip(model, baseClip, 'scold', scold) };
 }
 // Fell (Shell-Fur) für Modelle mit Fellmaske _FUR (z. B. Fox_HD.glb aus assets/source/Fox_HD.blend).
 // Jede Schicht ist dieselbe Skinned-Geometrie, im Vertex-Shader entlang der Normalen nach außen geschoben;
@@ -810,10 +832,10 @@ function reinforce(kind) {
     const top = foxPivot.position.y + CREATURES[fox.kind].h + .5;
     if (kind === 'pet') {
       floatText(fox.x, top, fox.z, '♥', 'love');
-      if (fox.state === 'rest') fox.timer += 4; else foxOnce('idle2'); // liegend genießt es einfach weiter
+      if (fox.state === 'rest') fox.timer += 4; else foxOnce(foxActs.praise ? 'praise' : 'idle2'); // liegend genießt es einfach weiter
     } else {
       floatText(fox.x, top, fox.z, '!', 'w');
-      if (fox.state === 'rest') { foxOnce('standUp'); foxIdle(1); } else { foxOnce('hit'); fox.hop = .5; }
+      if (fox.state === 'rest') { foxOnce('standUp'); foxIdle(1); } else if (foxActs.scold) foxOnce('scold'); else { foxOnce('hit'); fox.hop = .5; }
     }
   });
   if (a && t - fox.lastT < 25) {
@@ -1081,7 +1103,9 @@ function renderFox() {
 }
 // Buttons nur einmal anlegen und danach aktualisieren: renderFox läuft alle 0,25 s,
 // ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
-$('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}">${c.label}</button>`).join('');
+// Gestalten mit Fell-Modell und eigenen Reaktionen bekommen einen Stern
+const formLabel = id => CREATURES[id].label + (CREATURES[id].react ? ' ★' : '');
+$('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}"${c.react ? ' class="feat"' : ''}>${formLabel(id)}</button>`).join('');
 // kurze Beschreibung des aktuellen Zustands für das Panel
 function foxDoing() {
   switch (fox.state) {
@@ -1107,7 +1131,7 @@ $('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim
 $('foxName').addEventListener('keydown', e => { if (e.key === 'Enter') $('foxName').blur(); });
 function renderForms() {
   for (const b of $('foxForms').children) {
-    const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : CREATURES[id].label;
+    const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : formLabel(id);
     b.setAttribute('aria-pressed', id === fox.kind); b.disabled = !!creatureLoading;
     if (b.textContent !== label) b.textContent = label;
   }

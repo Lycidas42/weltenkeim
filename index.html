@@ -123,6 +123,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .forms button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px}
 .forms button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
 .forms button:disabled{opacity:.6}
+.forms button.feat{border-color:rgba(243,192,77,.6)}
+.formsHint{margin:8px 0 0;font-size:12px;color:var(--ink-dim);line-height:1.35}
 /* Name des Tiergeists direkt im Titel umbenennen */
 .title-in{font:inherit;color:inherit;background:none;border:0;border-bottom:1px dashed rgba(243,192,77,.45);padding:0 2px 2px;margin:0;width:min(11ch,60vw);user-select:text;-webkit-user-select:text}
 .title-in:focus{outline:none;border-bottom:1px solid var(--glaube)}
@@ -194,6 +196,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     </div>
     <p class="formsLbl">Gestalt</p>
     <div class="forms" id="foxForms" role="group" aria-label="Gestalt"></div>
+    <p class="formsHint">★ Bisher hat nur der Fuchs ein Fell-Modell und eigene Reaktionen auf Lob und Tadel. Streicheln und Klaps gehen mit allen Gestalten.</p>
   </section>
 
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">
