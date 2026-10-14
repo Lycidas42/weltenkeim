@@ -31,7 +31,7 @@ Katze (`Cat.glb`):
 
 ## Gotteshand (`models/hand/GodHand.glb`, Quelle `source/GodHand.blend`)
 
-Für Weltenkeim selbst gebaut in Blender 5.2 (Metaballs mit Aussparungen zwischen den Fingern, Voxel-Remesh, eigenes Skelett mit 17 Knochen, Ärmel mit Saum; Haut, Nägel, Ärmel und Saum als eigene Materialien). Gehört zum Projekt, keine fremde Lizenz.
+Für Weltenkeim selbst gebaut in Blender 5.2 (Metaballs, jeder Finger als eigene Gruppe, Voxel-Remesh, eigenes Skelett mit 17 Knochen, Ärmel mit Saum; Haut, Nägel, Ärmel und Saum als eigene Materialien). Gehört zum Projekt, keine fremde Lizenz. Aufbau-Skript: `source/build_godhand.py`.
 
 ## Three.js
 

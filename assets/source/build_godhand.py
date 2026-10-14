@@ -6,18 +6,17 @@ from mathutils import Vector, Matrix
 
 REPO = r'C:\Entwicklung\Git\weltenkeim'
 P = dict(
-    F=1.7,              # Dicke der Finger (Faktor auf die Radien)
+    F=1.3,              # Dicke der Finger (Faktor auf die Radien; sichtbar sind etwa 87 % davon)
     palm=0.5,           # Handteller
+    palmY=-0.06, palmSY=0.76,  # Mitte und Länge des Handtellers
     wrist=0.22, forearm=0.24,
-    neg=0.068,          # Aussparungen zwischen den Fingern (gegen Schwimmhäute)
-    negT=(0.0, 0.25, 0.5, 0.8),  # Lage der Aussparungen entlang der Grundglieder (0 = Knöchel)
     voxel=0.021,
 )
 FINGERS = {  # Ansatz, Richtung, Gliedlängen, Radien
-    'Index':  (Vector(( 0.20, 0.18, 0.0)),  Vector(( 0.15, 1, 0)), (0.21, 0.145, 0.115), (0.060, 0.055, 0.049)),
-    'Middle': (Vector(( 0.068, 0.205, 0.0)), Vector(( 0.04, 1, 0)), (0.23, 0.16, 0.125), (0.062, 0.057, 0.050)),
-    'Ring':   (Vector((-0.068, 0.19, 0.0)), Vector((-0.09, 1, 0)), (0.215, 0.15, 0.115), (0.059, 0.054, 0.048)),
-    'Pinky':  (Vector((-0.195, 0.145, -0.005)), Vector((-0.25, 1, 0)), (0.165, 0.115, 0.095), (0.052, 0.048, 0.043)),
+    'Index':  (Vector(( 0.225, 0.17, 0.0)),  Vector(( 0.16, 1, 0)), (0.21, 0.145, 0.115), (0.060, 0.055, 0.049)),
+    'Middle': (Vector(( 0.076, 0.2, 0.0)), Vector(( 0.05, 1, 0)), (0.23, 0.16, 0.125), (0.062, 0.057, 0.050)),
+    'Ring':   (Vector((-0.076, 0.185, 0.0)), Vector((-0.06, 1, 0)), (0.215, 0.15, 0.115), (0.059, 0.054, 0.048)),
+    'Pinky':  (Vector((-0.215, 0.14, -0.005)), Vector((-0.2, 1, 0)), (0.165, 0.115, 0.095), (0.052, 0.048, 0.043)),
     'Thumb':  (Vector(( 0.24, -0.11, -0.03)), Vector(( 0.78, 0.6, -0.2)), (0.19, 0.16), (0.076, 0.066)),
 }
 WRIST, ELBOW = Vector((0, -0.34, 0.02)), Vector((0, -0.92, 0.36))
@@ -29,43 +28,63 @@ for o in list(sc.objects):
     if o.type in ('META', 'MESH', 'ARMATURE'): bpy.data.objects.remove(o, do_unlink=True)
 for m in list(bpy.data.metaballs): bpy.data.metaballs.remove(m)
 
-# --- Form aus Metaballs
-mb = bpy.data.metaballs.new('HandMB'); mb.resolution = 0.014; mb.render_resolution = 0.014; mb.threshold = 0.6
-mbo = bpy.data.objects.new('HandMB', mb); sc.collection.objects.link(mbo)
-def ball(pos, r, typ='BALL', size=None, rot=None, stiff=2.0, neg=False):
-    e = mb.elements.new(); e.type = typ; e.co = pos; e.radius = r; e.stiffness = stiff; e.use_negative = neg
+# --- Form aus Metaballs. Jeder Finger ist eine eigene Metaball-Gruppe (eigener Objektname): Gruppen verschmelzen
+# nicht miteinander, also entsteht keine Haut zwischen den Fingern. Erst das Voxel-Remesh vereint alles dort,
+# wo es sich wirklich überlappt (Knöchel am Handteller).
+def group(name):
+    mb = bpy.data.metaballs.new(name); mb.resolution = 0.014; mb.render_resolution = 0.014; mb.threshold = 0.6
+    o = bpy.data.objects.new(name, mb); sc.collection.objects.link(o); return o
+def ball(mb, pos, r, typ='BALL', size=None, rot=None, stiff=2.0):
+    e = mb.elements.new(); e.type = typ; e.co = pos; e.radius = r; e.stiffness = stiff
     if size: e.size_x, e.size_y, e.size_z = size
     if rot: e.rotation = rot
-def capsule(a, b, r, stiff=2.4):
-    ball((a + b) / 2, r, 'CAPSULE', ((b - a).length / 2, 1, 1), rot=Vector((1, 0, 0)).rotation_difference(b - a), stiff=stiff)
-ball(Vector((0, -0.05, 0)), P['palm'], 'ELLIPSOID', (0.92, 0.80, 0.34), stiff=2.2)
-ball(Vector((0.18, -0.14, -0.035)), 0.25, 'ELLIPSOID', (0.8, 1.0, 0.6), stiff=1.6)
-capsule(Vector((0, -0.24, 0.0)), WRIST, P['wrist'], stiff=2.0); capsule(WRIST, ELBOW, P['forearm'], stiff=2.2)
+def capsule(mb, a, b, r, stiff=2.4):
+    ball(mb, (a + b) / 2, r, 'CAPSULE', ((b - a).length / 2, 1, 1), rot=Vector((1, 0, 0)).rotation_difference(b - a), stiff=stiff)
+groups = [group('HandMB')]; core = groups[0].data
+ball(core, Vector((0, P['palmY'], 0)), P['palm'], 'ELLIPSOID', (0.92, P['palmSY'], 0.34), stiff=2.2)
+ball(core, Vector((0.18, -0.14, -0.035)), 0.25, 'ELLIPSOID', (0.8, 1.0, 0.6), stiff=1.6)
+capsule(core, Vector((0, -0.24, 0.0)), WRIST, P['wrist'], stiff=2.0); capsule(core, WRIST, ELBOW, P['forearm'], stiff=2.2)
 J = {}
+order = ['Index', 'Middle', 'Ring', 'Pinky']
 for name, (base, d, lens, rads) in FINGERS.items():
+    # der Daumen gehört zum Handteller (weicher Übergang zum Ballen), die übrigen Finger sind eigene Gruppen
+    mb = core if name == 'Thumb' else (groups.append(group('Finger' + name)) or groups[-1].data)
     d = d.normalized(); p = base.copy(); pts = [p.copy()]
     for L in lens: p = p + d * L; pts.append(p.copy())
     J[name] = pts
-    for i in range(len(lens)): capsule(pts[i], pts[i + 1], rads[i] * P['F'])
-    ball(pts[0], rads[0] * P['F'] * 1.02, 'BALL', stiff=2.0)
-    ball(pts[-1] - d * 0.012, rads[-1] * P['F'] * 0.98, 'BALL', stiff=2.4)
-order = ['Index', 'Middle', 'Ring', 'Pinky']
-for a, b in zip(order, order[1:]):
-    A, B = J[a], J[b]
-    for t in P['negT']:
-        pa = A[0] + (A[1] - A[0]) * t; pb = B[0] + (B[1] - B[0]) * t
-        ball((pa + pb) / 2, P['neg'], 'BALL', stiff=2.4, neg=True)
+    for i in range(len(lens)): capsule(mb, pts[i], pts[i + 1], rads[i] * P['F'])
+    ball(mb, pts[0] - d * 0.04, rads[0] * P['F'] * 1.05, 'BALL', stiff=2.0)  # Knöchel, reicht in den Handteller
+    ball(mb, pts[-1] - d * 0.012, rads[-1] * P['F'] * 0.98, 'BALL', stiff=2.4)
 bpy.context.view_layer.update()
 
-# --- Mesh
+# --- Mesh: Gruppen umwandeln, zusammenfügen, per Voxel-Remesh vereinen
 for o in sc.objects: o.select_set(False)
-bpy.context.view_layer.objects.active = mbo; mbo.select_set(True)
+for g in groups: g.select_set(True)
+bpy.context.view_layer.objects.active = groups[0]
 bpy.ops.object.convert(target='MESH')
+meshes = [o for o in sc.objects if o.type == 'MESH']
+for o in sc.objects: o.select_set(o in meshes)
+bpy.context.view_layer.objects.active = meshes[0]; bpy.ops.object.join()
 hand = bpy.context.view_layer.objects.active; hand.name = 'GodHand'; hand.data.name = 'GodHand'
 hand.data.remesh_voxel_size = P['voxel']; hand.data.use_remesh_fix_poles = True; hand.data.use_remesh_preserve_volume = True
 bpy.ops.object.voxel_remesh()
 sm = hand.modifiers.new('Glatt', 'SMOOTH'); sm.factor = 0.5; sm.iterations = 4
 bpy.ops.object.modifier_apply(modifier='Glatt')
+# lose Splitter entfernen, die die Aussparungen übrig lassen können (nur das größte Stück bleibt)
+bm = bmesh.new(); bm.from_mesh(hand.data); bm.verts.ensure_lookup_table(); seen, islands = set(), []
+for v in bm.verts:
+    if v.index in seen: continue
+    isl, st = [], [v]
+    while st:
+        x = st.pop()
+        if x.index in seen: continue
+        seen.add(x.index); isl.append(x); st.extend(e.other_vert(x) for e in x.link_edges)
+    islands.append(isl)
+islands.sort(key=len, reverse=True)
+small = [isl for isl in islands[1:] if len(isl) < 0.03 * len(bm.verts)]
+for isl in small: bmesh.ops.delete(bm, geom=isl, context='VERTS')
+print('Splitter entfernt:', len(small), '| getrennte große Teile (Fehler!):', len(islands) - 1 - len(small))
+bm.to_mesh(hand.data); bm.free()
 for p in hand.data.polygons: p.use_smooth = True
 
 # --- Skelett (Beugen um lokale X-Achse, negativ = zur Handfläche)
