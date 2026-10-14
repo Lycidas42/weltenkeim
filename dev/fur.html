@@ -27,6 +27,10 @@
   <div class="row"><button id="cmp" aria-pressed="false">Low-Poly daneben</button><button id="wind" aria-pressed="true">Wind</button></div>
   <small id="info"></small>
 </div>
+<script>
+  // Module und Modelle lassen sich nicht aus file:// laden – Seite muss über einen lokalen Server laufen
+  if (location.protocol === 'file:') document.getElementById('info').innerHTML = 'Bitte über einen lokalen Server öffnen: im Repo-Ordner <b>python -m http.server 8000</b>, dann <b>http://localhost:8000/dev/fur.html</b>.';
+</script>
 <script type="module">
 // Prototyp: Shell-Fur auf dem geglätteten Fuchs (Fox_HD.glb, in Blender aus Fox.glb erzeugt).
 // Jede Schicht ist dieselbe Skinned-Geometrie, im Vertex-Shader entlang der Normalen nach außen geschoben;
@@ -122,7 +126,9 @@ function applyShells() {
   document.getElementById('info').textContent = `${P.n} Schichten · ${(fur.tris * (P.n + 1) / 1000).toFixed(0)} k Dreiecke`;
 }
 
-const [gHD, gLow] = await Promise.all(['Fox_HD.glb', 'Fox.glb'].map(f => loader.loadAsync('../assets/models/animals/' + f)));
+let gHD, gLow;
+try { [gHD, gLow] = await Promise.all(['Fox_HD.glb', 'Fox.glb'].map(f => loader.loadAsync('../assets/models/animals/' + f))); }
+catch (e) { document.getElementById('info').textContent = 'Modelle konnten nicht geladen werden: ' + e.message; throw e; }
 fur = buildFur(gHD); scene.add(fur.model);
 low = gLow.scene; fitModel(low, 1.45); low.position.x = -1.4; low.visible = false; low.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(low);
 for (const [root, g] of [[fur.model, gHD], [low, gLow]]) {
@@ -144,7 +150,12 @@ document.getElementById('cmp').addEventListener('click', e => { low.visible = !l
 document.getElementById('wind').addEventListener('click', e => { P.wind = !P.wind; e.target.setAttribute('aria-pressed', P.wind); });
 
 window.__fur = { camera, controls, P, applyShells, play }; // zum Ausprobieren in der Konsole
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
+  // im Hochformat den horizontalen Bildwinkel halten, damit der Fuchs ganz zu sehen bleibt
+  camera.fov = camera.aspect < 1.2 ? 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(35) / 2) * 1.2 / camera.aspect) * 180 / Math.PI : 35;
+  camera.updateProjectionMatrix();
+}
 addEventListener('resize', resize); resize();
 const inv = new THREE.Matrix4(), gv = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
