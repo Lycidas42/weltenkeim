@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Ruun', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -175,7 +175,7 @@ function updateDay(dt, t) {
   if (skipTo !== null) { // vorwärts bis zur Zielstunde, höchstens 3 Spielstunden pro Sekunde
     const left = (skipTo - S.hour + 24) % 24, step = Math.min(left, dt * 3);
     S.hour = (S.hour + step) % 24; if (left - step < 1e-3) { S.hour = skipTo; skipTo = null; }
-  } else S.hour = (S.hour + dt * hourRate(S.hour)) % 24;
+  } else if (!S.timePaused) S.hour = (S.hour + dt * hourRate(S.hour)) % 24;
   const h = S.hour; sampleSky(h);
   const ts = (h - 6.2) / 13.6 * Math.PI, tm = ((h - 19.6 + 24) % 24) / 10.8 * Math.PI; // Sonne 6:12–19:48, Mond 19:36–6:24
   sunDir.set(Math.cos(ts), Math.sin(ts) * .9, .4).normalize(); moonDir.set(-Math.cos(tm), Math.sin(tm) * .8, -.3).normalize();
@@ -1480,7 +1480,22 @@ function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidd
 function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
-$('btnTime').addEventListener('click', toggleDayNight);
+// Uhrzeit-Menü: vorspulen zum Tag/zur Nacht, Tagesverlauf anhalten
+const timeMenu = $('timeMenu');
+function closeTimeMenu() { if (timeMenu.hidden) return; timeMenu.hidden = true; $('btnTime').setAttribute('aria-expanded', 'false'); }
+function openTimeMenu() {
+  const toNight = skipTo !== null ? skipTo < 12 : isDaytime(S.hour);
+  $('tmSkipL').textContent = toNight ? 'Zur Nacht vorspulen' : 'Zum Morgen vorspulen'; timeMenu.dataset.to = toNight ? 'night' : 'day';
+  $('tmPauseL').textContent = S.timePaused ? 'Zeit weiterlaufen lassen' : 'Zeit anhalten'; $('tmPause').setAttribute('aria-checked', String(!!S.timePaused));
+  timeMenu.hidden = false; $('btnTime').setAttribute('aria-expanded', 'true');
+  const r = $('btnTime').getBoundingClientRect(), w = timeMenu.offsetWidth;
+  timeMenu.style.top = `${r.bottom + 6}px`; timeMenu.style.left = `${clamp(r.right - w, 16, innerWidth - w - 16)}px`;
+}
+$('btnTime').addEventListener('click', () => (timeMenu.hidden ? openTimeMenu() : closeTimeMenu()));
+$('tmSkip').addEventListener('click', () => { toggleDayNight(); closeTimeMenu(); });
+$('tmPause').addEventListener('click', () => { S.timePaused = !S.timePaused; toast(S.timePaused ? 'Die Zeit steht still.' : 'Die Zeit läuft weiter.', 2); save(); closeTimeMenu(); });
+addEventListener('pointerdown', e => { if (!timeMenu.hidden && !timeMenu.contains(e.target) && !$('btnTime').contains(e.target)) closeTimeMenu(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeTimeMenu(); });
 $('btnFox').addEventListener('click', () => openSheet('sheetFox'));
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
@@ -1779,12 +1794,12 @@ function frame() {
     uiT = .25;
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
     $('vH').textContent = fmt(S.holz); $('vHn').textContent = construction ? 'Haus im Bau' : (freeSite() ? `Haus ab ${houseCost()}` : 'Dorf voll');
-    $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = dayPhase(S.hour);
+    $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);
     { // Sonne bzw. Mond auf dem kleinen Himmelsbogen in der Uhrzeit-Kachel
       const sunUp = sunDir.y >= moonDir.y, a = sunUp ? (S.hour - 6.2) / 13.6 * Math.PI : ((S.hour - 19.6 + 24) % 24) / 10.8 * Math.PI, k = clamp(a, 0, Math.PI);
       const dial = $('tDial'); dial.dataset.body = sunUp ? 'sun' : 'moon';
       $('tBody').setAttribute('transform', `translate(${(18 - 14 * Math.cos(k)).toFixed(1)} ${(17 - 13 * Math.sin(k)).toFixed(1)})`);
-      $('btnTime').setAttribute('aria-label', `Uhrzeit ${$('vT').textContent}, ${$('vTs').textContent}. Tippen: ${isDaytime(S.hour) ? 'zur Nacht' : 'zum Tag'} vorspulen`);
+      $('btnTime').setAttribute('aria-label', `Uhrzeit ${$('vT').textContent}, ${$('vTs').textContent}. ${S.timePaused ? 'angehalten' : 'läuft'}. Tippen für Zeitmenü`);
     }
     $('vP').textContent = `${villagers.length}/${cap()}`; $('vPh').textContent = `${houses.length} ${houses.length === 1 ? 'Haus' : 'Häuser'}`;
     document.querySelectorAll('#ctxMiracle button').forEach(b => b.classList.toggle('poor', S.glaube < MIRACLES[b.dataset.m].cost));

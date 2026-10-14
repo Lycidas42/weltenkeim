@@ -68,6 +68,16 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #tDial .moon circle{fill:#dfe6f7}
 #tDial .moon .cut{fill:var(--panel-solid)}
 #tDial[data-body="sun"] .moon,#tDial[data-body="moon"] .sun{display:none}
+.stat.zeit.paused #tDial{opacity:.45}
+.stat.zeit.paused small{color:var(--glaube)}
+.time-menu{position:fixed;z-index:6;display:grid;gap:4px;padding:6px;background:var(--panel-solid);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.time-menu button{display:flex;align-items:center;gap:9px;background:none;border:0;border-radius:8px;padding:9px 12px;font-weight:700;font-size:14px;text-align:left;min-height:40px}
+.time-menu button:hover,.time-menu button:focus-visible{background:rgba(244,239,225,.08)}
+.time-menu svg{width:19px;height:19px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.time-menu[data-to="night"] .i-day,.time-menu[data-to="day"] .i-night{display:none}
+#tmSkip{color:var(--sky)}
+#tmPause[aria-checked="false"] .i-play,#tmPause[aria-checked="true"] .i-pause{display:none}
+#tmPause[aria-checked="true"]{color:var(--glaube)}
 @media (max-width:420px){.res{gap:4px}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
@@ -179,7 +189,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <div class="stat glaube"><span class="lbl">Glaube</span><b id="vG">0</b><small id="vGr">+0,0/s</small></div>
       <div class="stat holz"><span class="lbl">Holz</span><b id="vH">0</b><small id="vHn">Haus ab 0</small></div>
       <div class="stat pop"><span class="lbl">Seelen</span><b id="vP">0/0</b><small id="vPh">0 Häuser</small></div>
-      <button class="stat zeit" id="btnTime" aria-label="Uhrzeit, tippen zum Wechsel zwischen Tag und Nacht">
+      <button class="stat zeit" id="btnTime" aria-label="Uhrzeit, tippen für Zeitmenü" aria-haspopup="menu" aria-expanded="false">
         <span class="lbl">Uhrzeit</span>
         <svg id="tDial" viewBox="0 0 36 20" aria-hidden="true" data-body="sun"><path class="arc" d="M4 17a14 13 0 0 1 28 0"/><path class="hz" d="M1 17.5h34"/>
           <g id="tBody" transform="translate(18 4)"><circle class="sun" r="3.6"/><g class="moon"><circle r="3.4"/><circle class="cut" r="3" cx="1.8" cy="-1.2"/></g></g></svg>
@@ -193,6 +203,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
     </div>
   </header>
+  <div class="time-menu" id="timeMenu" role="menu" hidden>
+    <button id="tmSkip" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-night"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></g><g class="i-day"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg><span id="tmSkipL">Zur Nacht vorspulen</span></button>
+    <button id="tmPause" role="menuitemcheckbox" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-pause"><path d="M9 5v14M15 5v14"/></g><g class="i-play"><path d="M8 5l11 7-11 7z"/></g></svg><span id="tmPauseL">Zeit anhalten</span></button>
+  </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
