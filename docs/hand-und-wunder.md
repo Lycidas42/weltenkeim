@@ -29,6 +29,8 @@ Ja → Hand. Nein (Wetter, Zeit, Geist, Natur beeinflussen) → Wunder.
 | Waren der Hütte ins Lager | Hand | **Hand** | Tragen (Arbeit der Träger) |
 | Säge/Mühle/Bäckerei sofort verarbeiten | Hand | **entfällt** → Wunder Eile | Sofort-Produktion ist übernatürlich; Eile beschleunigt die Arbeiter dort |
 | Bäume ausreißen, Bewohner packen/werfen | Hand | **Hand** | Kraft der Hand, wie bisher |
+| Große Mengen von A nach B tragen (Stapel packen, halten, abladen) | – | **Hand** (neu) | Transport; die Kreatur kann es durch Zusehen lernen (`kreatur.md` 4.7) |
+| Bewohner sanft an einem Ort absetzen | (nur werfen) | **Hand** | gute Tat; Werfen bleibt böse (`gut-und-boese.md`) |
 
 ## Wunder (heute und Vorschläge)
 

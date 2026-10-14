@@ -115,13 +115,43 @@ Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` 
   Vorführungen zählen doppelt.
 - Ohne Leine: freies Leben nach Bedürfnissen und Neigungen.
 
-### 4.6 Lernen, Fähigkeiten, Wunder
+### 4.6 Was die Kreatur von Anfang an kann
+
+Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
+
+- **Angeboren** (Tierverhalten, ohne Vormachen):
+  - einen Baum fällen und ins Lager bringen (heute schon),
+  - **Waren tragen** – bis zu 3 Stück im Maul (heute schon: von Hütten ins Lager, aus dem Lager zu Säge, Mühle, Bäckerei),
+  - spielen, dösen, Unfug.
+- **Zu lernen** (durch Vormachen der Hand): Feldarbeit, Füttern, Fischen, Pflanzen, große Transporte (siehe 4.7),
+  Bewohner tragen (siehe 4.8), Wunder.
+- Denkbar: Jungtiere können anfangs weniger (nur 1 Stück tragen), Ausgewachsene mehr.
+
+### 4.7 Große Transporte mit der Hand (und Lernen dadurch)
+
+- Die Hand soll auch **große Mengen** von A nach B bringen können: z. B. am Lager einen ganzen Stapel Stämme packen
+  (gedrückt halten, je länger, desto mehr), in der Hand halten (sichtbar als Bündel/Kiste) und an einer Säge, einem
+  Bauplatz oder einer anderen Hütte loslassen.
+- Unterscheidung zur heutigen Tipp-Hilfe: Tippen = kleine Arbeit an Ort und Stelle; Packen und Tragen = Transport.
+- **Die Kreatur schaut zu** und lernt so, selbst größere Mengen gezielt zu verteilen (z. B. Stämme zur Säge,
+  Bretter zur Baustelle, Korn zur Mühle), statt nur 3 Stück.
+- Gehört zur Hand, nicht zu den Wundern (körperliche Arbeit, siehe `hand-und-wunder.md`).
+
+### 4.8 Bewohner vorsichtig tragen
+
+- Die Kreatur kann Bewohner behutsam im Maul (am Kragen) tragen und an einem Ort absetzen – z. B. einen Holzfäller
+  zum Wald, einen Bauern zum Hof, einen Erschöpften nach Hause.
+- Lernbar durch Vormachen: Die Hand packt einen Bewohner und setzt ihn **sanft** an seinem Arbeitsplatz ab
+  (nicht werfen) – das zählt auf die Waage als gute Tat; Werfen bleibt eine böse Tat.
+- Eine böse Kreatur trägt Bewohner dagegen weg und setzt sie irgendwo aus oder lässt sie fallen.
+
+### 4.9 Lernen, Fähigkeiten, Wunder
 
 - Siehe `kreatur-lernen.md`: Zuschauen → Fortschritt → gelernt → selbst anwenden → Lob/Tadel je Fähigkeit.
 - Wunder: Regen, Eile, später weitere; kosten Glaube; Erlaubnis-Schalter im Kreatur-Panel.
 - Böse Kreatur kann Wunder auch böswillig einsetzen (Regen aufs Fest), wenn so erzogen.
 
-### 4.7 Persönlichkeit je Gestalt
+### 4.10 Persönlichkeit je Gestalt
 
 - Startwerte je Art, z. B.: Fuchs (verspielt, schlau, lernt schnell), Wolf (treu, kräftig, neigt zu Jagd),
   Hirsch (sanft, groß, langsam), Stier (stark, stur – verweigert öfter), Alpaka (freundlich, eigensinnig),
