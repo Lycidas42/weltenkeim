@@ -142,9 +142,9 @@ const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, re
 $('loadSt').textContent = 'Lade Modelle …';
 // Ruun kann verschiedene Gestalten annehmen (S.creature). Modelle: Quaternius Animated Animal Pack (CC0).
 // h = Zielhöhe in Welteinheiten, walk/run = Geschwindigkeit, ws = Zeitfaktor der Lauf-Animation,
-// rest = Liegepose aus POSES (nur Tiere mit Quaternius-AnimalArmature).
+// rest = Liegepose aus POSES (nur Tiere mit Quaternius-AnimalArmature), hd = Fell-Modell für die Nahansicht.
 const CREATURES = {
-  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1, rest: 'paw' },
+  fox: { label: 'Fuchs', spirit: 'Fuchsgeist', file: 'Fox', hd: 'Fox_HD', h: 1.45, walk: 1.9, run: 3.4, ws: 1.1, rest: 'paw' },
   wolf: { label: 'Wolf', spirit: 'Wolfsgeist', file: 'Wolf', h: 1.75, walk: 2, run: 3.8, ws: 1, rest: 'paw' },
   stag: { label: 'Hirsch', spirit: 'Hirschgeist', file: 'Stag', h: 3.1, walk: 2, run: 3.8, ws: .9, rest: 'hoof' },
   bull: { label: 'Stier', spirit: 'Stiergeist', file: 'Bull', h: 1.95, walk: 1.7, run: 3.4, ws: .9, rest: 'hoof' },
@@ -303,11 +303,14 @@ const fox = { x: -6, z: 4, h: 0, state: 'idle', timer: 4, next: null, tx: 0, tz:
 const foxPivot = new THREE.Group(); scene.add(foxPivot);
 const creatureCache = { [S.creature]: gCreature };
 let foxModel = null, foxMixer = null, foxActs = {};
-function useCreature(id, gltf) {
+function useCreature(id, gltf, hd = false) {
   const C = CREATURES[id];
   if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
   const model = shadowify(gltf.scene);
   model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
+  model.userData.hd = hd;
+  if (hd && !model.userData.fur) model.userData.fur = addFur(model);
+  model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   model.scale.setScalar(1); model.rotation.set(0, 0, 0); model.position.set(0, 0, 0); model.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
   model.scale.setScalar(C.h / size.y); model.updateMatrixWorld(true);
@@ -390,6 +393,69 @@ function buildPoseClips(model, baseClip, rest) {
     cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [-28, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [-28, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
   };
 }
+// Fell (Shell-Fur) für Modelle mit Fellmaske _FUR (z. B. Fox_HD.glb aus assets/source/Fox_HD.blend).
+// Jede Schicht ist dieselbe Skinned-Geometrie, im Vertex-Shader entlang der Normalen nach außen geschoben;
+// der Fragment-Shader lässt nur Haarquerschnitte stehen, die nach außen dünner werden.
+const FUR = { len: .045, den: 520, grav: .35, shells: isMobile ? 16 : 24 };
+function furShellMaterial(h, uni) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uni, { uH: { value: h } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float _fur;\nuniform float uLen, uH, uTime;\nuniform vec3 uGrav;\nvarying float vFur;\nvarying vec2 vUv2;')
+      .replace('#include <skinning_vertex>', `#include <skinning_vertex>
+        vFur = _fur; vUv2 = uv;
+        vec3 sway = vec3(sin(uTime * 1.7 + position.x * 9.0), 0.0, cos(uTime * 1.3 + position.z * 7.0)) * 0.12;
+        transformed += normalize(objectNormal) * uLen * _fur * 2.0 * uH + (uGrav + sway) * uH * uH * uLen * 2.0 * _fur;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uDen, uH;\nvarying float vFur;\nvarying vec2 vUv2;\nfloat h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vFur < 0.02) discard;
+        vec2 g = vUv2 * uDen, id = floor(g), f = fract(g) - 0.5;
+        float r = h21(id), len = mix(0.55, 1.0, r);
+        if (uH > len) discard;
+        if (length(f + (vec2(h21(id + 7.1), h21(id + 3.7)) - 0.5) * 0.3) > (1.0 - uH / len) * 0.62) discard;
+        diffuseColor.rgb *= mix(0.72, 1.06, uH) * mix(0.92, 1.08, r);`);
+  };
+  m.customProgramCacheKey = () => 'furShell';
+  return m;
+}
+function furBaseMaterial() {
+  // wo kein Fell ist (Augen, Nase), glänzt die Oberfläche
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _fur;\nvarying float vFur;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFur = _fur;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vFur;').replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.18, roughnessFactor, smoothstep(0.0, 0.03, vFur));');
+  };
+  m.customProgramCacheKey = () => 'furBase';
+  return m;
+}
+function addFur(model) {
+  const parts = []; model.traverse(o => { if (o.isSkinnedMesh && o.geometry.attributes._fur) parts.push(o); });
+  if (!parts.length) return null;
+  // Materialfarben als Vertex-Farbe in eine Geometrie legen: ein Draw-Call pro Schicht
+  const tint = { Main_Light: new THREE.Color(0xf1ebde) }, sk = parts[0];
+  const geo = mergeGeometries(parts.map(o => {
+    const g = o.geometry.clone(), c = tint[o.material.name] || o.material.color, n = g.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+  }));
+  for (const o of parts) o.visible = false;
+  const uni = { uLen: { value: 0 }, uDen: { value: FUR.den }, uGrav: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  const mk = (mat, shell) => {
+    const m = new THREE.SkinnedMesh(geo, mat); m.position.copy(sk.position); m.quaternion.copy(sk.quaternion); m.scale.copy(sk.scale);
+    m.bind(sk.skeleton, sk.bindMatrix); m.frustumCulled = false; m.userData.shell = shell; sk.parent.add(m); return m;
+  };
+  const base = mk(furBaseMaterial(), false);
+  for (let i = 1; i <= FUR.shells; i++) mk(furShellMaterial(i / FUR.shells, uni), true);
+  return { base, uni };
+}
+const furInv = new THREE.Matrix4();
+function updateFur(f, t) {
+  // Länge und Schwerkraft in die Koordinaten der (skalierten) Mesh umrechnen
+  f.uni.uLen.value = FUR.len / f.base.matrixWorld.getMaxScaleOnAxis(); f.uni.uTime.value = t;
+  furInv.copy(f.base.matrixWorld).invert(); f.uni.uGrav.value.set(0, -1, 0).transformDirection(furInv).multiplyScalar(FUR.grav * 1.5);
+}
 // Augen (Lederhaut, Iris, Pupille) in Modellkoordinaten setzen und an den Kopfknochen hängen
 function addEyes(model, head, e) {
   model.updateMatrixWorld(true);
@@ -415,13 +481,53 @@ async function setCreature(id) {
   if (!CREATURES[id] || id === fox.kind || creatureLoading) return;
   creatureLoading = id; renderForms();
   try {
-    const g = creatureCache[id] || (creatureCache[id] = await load(`animals/${CREATURES[id].file}.glb`));
-    useCreature(id, g); S.creature = id; save();
+    const hd = closeUp && !!CREATURES[id].hd, g = await loadCreature(id, hd);
+    useCreature(id, g, hd); S.creature = id; save();
     floatText(fox.x, CREATURES[id].h + .6, fox.z, `Ruun wird ${CREATURES[id].label}`, 's');
   } catch (e) { toast('Diese Gestalt konnte nicht geladen werden. Bist du offline?'); }
   creatureLoading = null; renderForms(); renderFox();
 }
 useCreature(S.creature, gCreature);
+// Nahansicht: Ist das Ruun-Panel offen, fährt die Kamera vor Ruun. Hat die Gestalt ein Fell-Modell (hd),
+// wird es dafür eingewechselt; in der Weltansicht bleibt das schlanke Modell.
+let closeUp = false, camBack = 0, closeAz = 0, viewOff = 0;
+const camSaved = { pos: new THREE.Vector3(), target: new THREE.Vector3() }, camLook = new THREE.Vector3(), camWant = new THREE.Vector3(), lookWant = new THREE.Vector3();
+async function loadCreature(id, hd) {
+  const C = CREATURES[id], key = hd ? id + ':hd' : id;
+  return creatureCache[key] || (creatureCache[key] = await load(`animals/${hd ? C.hd : C.file}.glb`));
+}
+async function swapCreatureModel() {
+  const id = fox.kind, hd = closeUp && !!CREATURES[id].hd;
+  if (!!foxModel.userData.hd === hd) return;
+  try {
+    const g = await loadCreature(id, hd);
+    if (id === fox.kind && (closeUp && !!CREATURES[id].hd) === hd) useCreature(id, g, hd);
+  } catch (e) { /* ohne Fell-Modell bleibt das schlanke Modell */ }
+}
+function setCloseUp(on) {
+  closeUp = on;
+  if (on) {
+    if (camBack <= 0) { camSaved.pos.copy(camera.position); camSaved.target.copy(controls.target); camLook.copy(controls.target); }
+    camBack = 0; controls.enabled = false; closeAz = fox.h + .55;
+    // Ruun hält inne und schaut her, sofern er nicht gerade Holz trägt, spielt oder arbeitet
+    if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) { if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null; foxIdle(1e9); }
+  } else { camBack = 1; if (fox.state === 'idle' && fox.timer > 1e8) foxIdle(1.5); }
+  swapCreatureModel();
+}
+function closeUpCamera(dt) {
+  const C = CREATURES[fox.kind], gy = surfaceAt(fox.x, fox.z), k = 1 - Math.exp(-dt * (closeUp ? 3.5 : 5));
+  // Bild um die halbe Panelhöhe nach oben schieben, damit Ruun nicht verdeckt wird
+  viewOff += ((closeUp ? $('sheetFox').getBoundingClientRect().height * .5 : 0) - viewOff) * k;
+  if (closeUp) {
+    const d = 2.2 + C.h * 1.6;
+    camWant.set(fox.x + Math.sin(closeAz) * d, gy + C.h * .75 + .3, fox.z + Math.cos(closeAz) * d);
+    lookWant.set(fox.x, gy + C.h * .45, fox.z);
+  } else { camWant.copy(camSaved.pos); lookWant.copy(camSaved.target); camBack -= dt; }
+  camera.position.lerp(camWant, k); camLook.lerp(lookWant, k); camera.lookAt(camLook);
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (viewOff > .5) camera.setViewOffset(w, h, 0, viewOff, w, h); else camera.clearViewOffset();
+  if (!closeUp && camBack <= 0) { camera.position.copy(camSaved.pos); controls.target.copy(camSaved.target); camera.clearViewOffset(); viewOff = 0; controls.enabled = true; controls.update(); }
+}
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
 const ACT_DESC = { help: 'Holz zum Brunnen gebracht', play: 'mit dem Dorf gespielt', mischief: 'einen Baum umgeworfen' };
 const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
@@ -544,7 +650,9 @@ function updateFox(dt, t) {
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
   if (fox.once > 0) fox.once -= dt;
   switch (fox.state) {
-    case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose(); break;
+    case 'idle': anim(fox.idleA); fox.timer -= dt; if (fox.timer <= 0) foxChoose();
+      if (closeUp) { let dh = closeAz - .25 - fox.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); fox.h += dh * Math.min(1, dt * 2.5); }
+      break;
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.6); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'walk': anim('walk'); if (stepTo(fox, fox.tx, fox.tz, spd * dt)) {
@@ -581,6 +689,7 @@ function updateFox(dt, t) {
   foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
   foxPivot.rotation.y = fox.h;
   foxMixer.update(dt);
+  if (foxModel.userData.fur) updateFur(foxModel.userData.fur, t);
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)
 const GLOW_T = 2.3; let glowT = 0;
@@ -868,12 +977,16 @@ function frame() {
   { const p = wGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = wBase[i * 3], z = wBase[i * 3 + 2]; p.setY(i, Math.sin(x * .45 + t * 1.1) * .05 + Math.cos(z * .5 + t * .9) * .05 - .02); } p.needsUpdate = true; }
 
   // camera
+  if (!$('sheetFox').hidden !== closeUp) setCloseUp(!closeUp);
+  if (closeUp || camBack > 0) closeUpCamera(dt);
+  else {
   if (focusT > 0) { focusT -= dt; const k = 1 - Math.exp(-dt * 4); const nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
     camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
   const tr = Math.hypot(controls.target.x, controls.target.z);
   if (tr > 18) { const k = 18 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
   controls.target.y = 1;
   controls.update();
+  }
 
   // floating texts
   const rect = canvas.getBoundingClientRect();
