@@ -2,7 +2,7 @@
 
 ## KayKit Medieval Hexagon Pack 1.0
 
-Gebäude (u. a. Häuser, Holzfäller-, Förster-, Jagd- und Fischerhütte, Sägemühle), Baumstumpf, Zielscheibe, Pfeilköcher sowie Kisten, Säcke, Fässer und Holzstapel am Lager in `models/` (alle Dateien außer `Fox.glb`).
+Gebäude (u. a. Häuser, Holzfäller-, Förster-, Jagd- und Fischerhütte, Bauernhaus, Sägemühle), Baumstumpf, Zielscheibe, Pfeilköcher, Schubkarre, Wassereimer sowie Kisten, Säcke, Fässer und Holzstapel am Lager in `models/` (alle Dateien außer `Fox.glb`).
 
 - Von Kay Lousberg, https://www.kaylousberg.com
 - Lizenz: Creative Commons Zero (CC0 1.0)

@@ -16,7 +16,7 @@ const rnd = s => (Math.random() * 2 - 1) * s;
 async function start() {
 /* ------------------------------------------------------------------ state */
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0 }, logs: 0, meat: 0, fish: 0, paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
+const S = { v: 1, glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0, hof: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0, farmer: 0 }, logs: 0, meat: 0, fish: 0, veg: 0, milk: 0, eggs: 0, fields: [], hutGoods: [], paths: [], weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -44,18 +44,25 @@ const ROLES = {
   sawyer: { label: 'Säger', hut: 'Sägemühle', per: 2, cost: n => 24 + 12 * n },
   hunter: { label: 'Jäger', hut: 'Jagdhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
   fisher: { label: 'Fischer', hut: 'Fischerhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
+  farmer: { label: 'Bauer', hut: 'Bauernhof', per: 3, cost: n => 30 + 14 * n, opt: true },
 };
 // Arbeitsstätten: der Spieler weist ihnen Bewohner zu (0 oder mindestens `min`), sie verteilen sich auf die Berufe
 const WORKS = {
   wood: { label: 'Wald', min: 3, desc: 'Holzfäller fällen Bäume und bringen die Stämme ins Lager. Förster pflanzen neue Bäume.', split: k => { const f = Math.max(1, Math.round(k / 3)); return { lumber: k - f, forester: f }; } },
   jagd: { label: 'Jagd', min: 1, desc: 'Jäger pirschen sich mit Pfeil und Bogen an Rehe und Hasen heran und bringen das Wild als Fleisch ins Lager. Das Wild wächst nach.', split: k => ({ hunter: k }) },
   fischerei: { label: 'Fischerei', min: 1, desc: 'Fischer angeln vom Steg ihrer Hütte an der Küste und bringen den Fang ins Lager. Die Fische wachsen nach.', split: k => ({ fisher: k }) },
+  hof: { label: 'Bauernhof', min: 1, desc: 'Bauern säen Gemüse auf den Feldern rund um den Hof, ernten, was reif ist, und versorgen Kühe, Schweine und Hühner. Regen lässt die Felder schneller wachsen. Reife Felder kannst du auch selbst mit der Hand abernten.', split: k => ({ farmer: k }) },
   saw: { label: 'Sägemühle', min: 1, desc: 'Säger sägen aus Stämmen Bretter, das Baumaterial für Hütten und Häuser. Freie Bewohner tragen die Stämme aus dem Lager zur Säge und die Bretter zurück.', split: k => ({ sawyer: k }) },
 };
 for (const id in WORKS) if (typeof S.jobs[id] !== 'number' || !isFinite(S.jobs[id]) || S.jobs[id] < 0) S.jobs[id] = 0;
 for (const r in ROLES) if (typeof S.huts[r] !== 'number' || !isFinite(S.huts[r]) || S.huts[r] < (ROLES[r].opt ? 0 : 1)) S.huts[r] = ROLES[r].opt ? 0 : 1; // Jagd- und Fischerhütte erst bei Bedarf
-for (const k of ['meat', 'fish']) if (typeof S[k] !== 'number' || !isFinite(S[k]) || S[k] < 0) S[k] = 0;
+for (const k of ['meat', 'fish', 'veg', 'milk', 'eggs']) if (typeof S[k] !== 'number' || !isFinite(S[k]) || S[k] < 0) S[k] = 0;
 if (typeof S.logs !== 'number' || !isFinite(S.logs) || S.logs < 0) S.logs = 0;
+if (!Array.isArray(S.fields)) S.fields = [];
+if (!Array.isArray(S.hutGoods)) S.hutGoods = [];
+// Waren: Name im Spielstand (S[key]) und Bezeichnung (Einzahl, Mehrzahl); carry = was ein Bewohner davon trägt
+const RES = { logs: ['Stamm', 'Stämme', 1, 2], meat: ['Fleisch', 'Fleisch', 3, 3], fish: ['Fisch', 'Fisch', 4, 4], veg: ['Gemüse', 'Gemüse', 5, 6], milk: ['Milch', 'Milch', 6, 4], eggs: ['Ei', 'Eier', 7, 6] };
+const resText = (k, n) => `${fmt(n)} ${n === 1 ? RES[k][0] : RES[k][1]}`;
 const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' } };
 
 /* ------------------------------------------------------------------ noise */
@@ -274,6 +281,8 @@ function updateDay(dt, t) {
   const sunUp = sunDir.y >= moonDir.y, body = sunUp ? sunDir : moonDir;
   // Licht fällt nie flacher als etwa 20°, sonst werden die Schatten endlos; am Horizont blendet es aus, damit der Wechsel Sonne/Mond nicht springt
   lightDir.copy(body); lightDir.y = Math.max(lightDir.y, .35); lightDir.normalize();
+  // in kleinen Stufen nachführen: wandert das Licht in jedem Frame ein winziges Stück, flimmern die Schattenkanten
+  { const Q = .6 * Math.PI / 180, az = Math.round(Math.atan2(lightDir.z, lightDir.x) / Q) * Q, el = Math.round(Math.asin(lightDir.y) / Q) * Q; lightDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); }
   sun.position.copy(lightDir).multiplyScalar(50); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
   hemi.color.copy(sky.hemiS); hemi.groundColor.copy(sky.hemiG); hemi.intensity = sky.hi;
   scene.fog.color.copy(sky.hor); scene.fog.near = 42 - 18 * weather.rain; scene.fog.far = 105 - 30 * weather.rain; // Regen: diesig
@@ -633,8 +642,8 @@ if (!CREATURES[S.creature]) S.creature = 'fox';
 const files = ['building_home_A_blue.gltf', 'building_home_B_blue.gltf', 'building_well_blue.gltf', 'building_windmill_blue.gltf', 'building_scaffolding.gltf',
   'tree_single_A_cut.gltf', `animals/${CREATURES[S.creature].file}.glb`, 'hand/GodHand.glb',
   'building_home_A_red.gltf', 'building_home_A_green.gltf', 'building_lumbermill_blue.gltf', 'resource_lumber.gltf', 'crate_A_big.gltf', 'sack.gltf', 'barrel.gltf',
-  'building_home_A_yellow.gltf', 'building_home_B_yellow.gltf', 'target.gltf', 'bucket_arrows.gltf'];
-const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel, gHutYellowA, gHutYellowB, gTarget, gArrows] = await Promise.all(files.map(load));
+  'building_home_A_yellow.gltf', 'building_home_B_yellow.gltf', 'target.gltf', 'bucket_arrows.gltf', 'building_home_B_red.gltf', 'wheelbarrow.gltf', 'bucket_water.gltf'];
+const [gHomeA, gHomeB, gWell, gMill, gScaff, gStump, gCreature, gHand, gHutRed, gHutGreen, gSawmill, gLogs, gCrate, gSack, gBarrel, gHutYellowA, gHutYellowB, gTarget, gArrows, gFarmHouse, gWheelbarrow, gBucket] = await Promise.all(files.map(load));
 const shadowify = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 function parts(g) { const out = []; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh) { const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); out.push({ geo, mat: o.material }); } }); return out; }
 /* ------------------------------------------------------------------ Pflanzen und Felsen (im Code erzeugt) */
@@ -1063,6 +1072,7 @@ const HUT = {
   sawyer: { gl: gSawmill, k: 1.2, door: { x: -.32, z: .62 }, work: { x: .3, z: .55 } },
   hunter: { gl: gHutYellowA, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .5 } },
   fisher: { gl: gHutYellowB, k: SB, door: { x: .14, z: .32 }, work: { x: -.45, z: .6 } },
+  farmer: { gl: gFarmHouse, k: SB, door: { x: .14, z: .32 }, work: { x: .55, z: .62 } },
 };
 // Fischerplätze an der Küste: Hütte etwas landeinwärts, Tür zum Meer, ein Steg führt ins tiefere Wasser
 const fisherSites = [];
@@ -1091,12 +1101,224 @@ for (let i = 0; i < 18; i++) {
   const slope = Math.max(...[[.8, 0], [-.8, 0], [0, .8], [0, -.8]].map(([dx, dz]) => Math.abs(heightAt(x + dx, z + dz) - h)));
   if (h > .3 && h < 2.8 && slope < .55 && streamDist(x, z) > 2.2 && Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) > 5 && Math.hypot(x - MILL_POS.x, z - MILL_POS.z) > 3) hutSites.push({ x, z, ry: -a + Math.PI / 2 + Math.PI, used: false, a });
 }
+// Bauernhöfe brauchen Platz: ebenes, offenes Land weiter draußen. Im Hofraum zeigt z zum Dorf: Wohnhaus vorn links,
+// Weide mit Hühnerstall vorn rechts, dahinter vier Felder nebeneinander. Die Plätze werden gleich zu Beginn
+// reserviert, damit dort keine Bäume, Felsen und Büsche stehen.
+const FARM = { house: [-1.6, 1.35], fw: 1.4, fd: 2.0, fz: -1.5, fx: [-2.4, -.8, .8, 2.4], pen: { x0: .3, x1: 3.35, z0: .4, z1: 2.85 }, coop: [2.75, .95], trough: [1.7, 2.62], lx0: -3.4, lx1: 3.6, lz0: -2.8, lz1: 3.15 };
+const farmSites = [];
+{
+  const cand = [];
+  for (let r = 11; r <= 19; r += .75) for (let k = 0; k < 64; k++) {
+    const a = k / 64 * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r, ry = Math.atan2(-x, -z), c = Math.cos(ry), sn = Math.sin(ry);
+    let lo = 9, hi = -9, ok = true;
+    for (let lx = FARM.lx0; lx <= FARM.lx1 && ok; lx += .5) for (let lz = FARM.lz0; lz <= FARM.lz1; lz += .5) {
+      const px = x + lx * c + lz * sn, pz = z - lx * sn + lz * c, h = heightAt(px, pz);
+      if (h < .3 || h > 3.2 || streamDist(px, pz) < 1.2 || onSacred(px, pz, 1) || Math.hypot(px, pz) < 7.6) { ok = false; break; }
+      lo = Math.min(lo, h); hi = Math.max(hi, h);
+    }
+    if (!ok || hi - lo > 1.5 || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 7.5 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 5.5) continue;
+    // die ersten Hüttenplätze bleiben frei (dort stehen meist schon Hütten), spätere gibt der Hof auf
+    const near = hutSites.filter(st => Math.hypot(st.x - x, st.z - z) < 5);
+    if (near.some(st => hutSites.indexOf(st) < 7) || fisherSites.some(st => Math.hypot(st.x - x, st.z - z) < 5.5)) continue;
+    cand.push({ x, z, ry, used: false, near, score: (hi - lo) * 3 + r * .15 + near.length * .5 });
+  }
+  cand.sort((a, b) => a.score - b.score);
+  for (const st of cand) if (farmSites.length < 3 && farmSites.every(o => Math.hypot(o.x - st.x, o.z - st.z) > 10)) { farmSites.push(st); for (const h of st.near) h.used = true; }
+}
+const farmPt = (F, lx, lz, out = {}) => { const c = Math.cos(F.ry), sn = Math.sin(F.ry); out.x = F.x + lx * c + lz * sn; out.z = F.z - lx * sn + lz * c; return out; };
+const onFarm = (x, z, m = 0) => farmSites.some(F => { const dx = x - F.x, dz = z - F.z, c = Math.cos(F.ry), sn = Math.sin(F.ry), lx = dx * c - dz * sn, lz = dx * sn + dz * c; return lx > FARM.lx0 - m && lx < FARM.lx1 + m && lz > FARM.lz0 - m && lz < FARM.lz1 + m; });
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
+  if (role === 'farmer') { const F = farmSites.find(st => !st.used); if (!F) return null; const p = farmPt(F, FARM.house[0], FARM.house[1]); return { x: p.x, z: p.z, ry: F.ry, farm: F }; }
   if (role === 'fisher') { const fs = fisherSites.filter(st => !st.used && fisherSites.every(o => !o.used || Math.abs(Math.atan2(Math.sin(o.a - st.a), Math.cos(o.a - st.a))) > .5)); return fs.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0] || null; }
   const free = hutSites.filter(st => !st.used); if (!free.length) return null;
   if (role !== 'sawyer') return free[0];
   return free.reduce((b, st) => (Math.hypot(st.x - LAGER.x, st.z - LAGER.z) < Math.hypot(b.x - LAGER.x, b.z - LAGER.z) ? st : b));
+}
+/* ------------------------------------------------------------------ Bauernhof */
+// Gemüse: wächst unterschiedlich schnell (Sekunden bis zur Reife bei Sonne), Ertrag als Gemüse im Lager
+const CROPS = [
+  { label: 'Salat', grow: 85, yield: 2, rows: 3, per: 5 },
+  { label: 'Möhren', grow: 125, yield: 3, rows: 3, per: 6 },
+  { label: 'Kohl', grow: 190, yield: 4, rows: 3, per: 4 },
+  { label: 'Kürbis', grow: 280, yield: 6, rows: 2, per: 3 },
+];
+const FIELD_STATES = ['leer', 'grow', 'reif'];
+const cropGeo = (() => {
+  const P = (geo, fn) => paint(geo, fn), C = (c, c2, k = 6) => (x, y, z, ny, col) => col.set(c).lerp(COL2.set(c2), clamp(y * k, 0, 1));
+  const ring = (n, make) => mergeGeometries([...Array(n)].map((_, k) => make(k).rotateY(k / n * Math.PI * 2 + k * .3)));
+  return [
+    { // Salat: Rosette heller Blätter, in der Mitte schließt sich der Kopf
+      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.038, .012, .062).rotateX(-.45).translate(0, .025, .045), C(0x6fae45, 0xb9e27e, 14))),
+      fruit: P(new THREE.SphereGeometry(.046, 8, 6).scale(1, .8, 1).translate(0, .04, 0), C(0x9fd067, 0xd6f0a4, 12)),
+    },
+    { // Möhren: gefiedertes Kraut, oben schaut die orange Rübe heraus
+      leaf: ring(6, k => P(new THREE.ConeGeometry(.014, .13, 3).translate(0, .065, 0).rotateZ(.25 + (k % 2) * .15), C(0x3f8a32, 0x7cc25a, 8))),
+      fruit: P(new THREE.ConeGeometry(.024, .06, 6).rotateX(Math.PI).translate(0, .012, 0), C(0xd4691e, 0xf09a3e, 20)),
+    },
+    { // Kohl: blaugrüne Außenblätter um einen festen Kopf
+      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.05, .016, .08).rotateX(-.6).translate(0, .035, .06), C(0x4f7f5c, 0x86ad8a, 10))),
+      fruit: P(new THREE.IcosahedronGeometry(.066, 1).scale(1, .9, 1).translate(0, .065, 0), C(0x8dbb78, 0xc5e0a6, 8)),
+    },
+    { // Kürbis: große Blätter am Boden, dazwischen wächst der Kürbis
+      leaf: ring(5, () => P(new THREE.SphereGeometry(1, 7, 4).scale(.075, .012, .075).translate(0, .045, .13), C(0x3f7a2c, 0x6fa84a, 10))),
+      fruit: mergeGeometries([
+        P(new THREE.SphereGeometry(.11, 12, 7).scale(1, .72, 1).translate(0, .072, 0), (x, y, z, ny, c) => c.set(0xe07a22).multiplyScalar(.82 + .18 * Math.abs(Math.cos(Math.atan2(z, x) * 4)))),
+        P(new THREE.CylinderGeometry(.008, .012, .045, 5).translate(0, .16, 0), (x, y, z, ny, c) => c.set(0x6b7a3a)),
+      ]),
+    },
+  ];
+})();
+// gleiche Anordnung der Pflanzen für jedes Feld (Reihen längs des Feldes, leicht versetzt)
+const CROP_LAYOUT = CROPS.map(C => { const out = []; for (let i = 0; i < C.rows; i++) for (let j = 0; j < C.per; j++) out.push({ x: (i - (C.rows - 1) / 2) * (FARM.fw / 3) * (C.rows === 2 ? 1.2 : 1) + rnd(.03), z: ((j + .5) / C.per - .5) * (FARM.fd - .25) + rnd(.04), r: Math.random() * 6.28, s: .85 + Math.random() * .3 }); return out; });
+const cropMeshes = cropGeo.map(g => ['leaf', 'fruit'].map(k => { const m = new THREE.InstancedMesh(g[k], plantMat, 240); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; }));
+const fields = [], stock = [], farms = [];
+const stockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9, flatShading: true });
+// Rinder, Schweine, Hühner: Körper aus einem Stück, Beine und Kopf beweglich
+function makeStock(kind) {
+  const g = new THREE.Group(), add = (geo, par = g) => { const o = new THREE.Mesh(geo, stockMat); o.castShadow = true; o.userData.noSnow = true; par.add(o); return o; };
+  const P = (geo, c) => paint(geo, typeof c === 'function' ? c : (x, y, z, ny, col) => col.set(c));
+  const legs = []; let head = null, body = null;
+  const leg = (x, y, z, len, r, c, hoof) => { const L = new THREE.Group(); L.position.set(x, y, z); g.add(L); add(mergeGeometries([P(new THREE.CylinderGeometry(r, r * .8, len, 6).translate(0, -len / 2, 0), c), P(new THREE.CylinderGeometry(r * .85, r * .9, len * .12, 6).translate(0, -len * .94, 0), hoof)]), L); legs.push(L); };
+  if (kind === 'kuh') {
+    const seed = Math.random() * 40, spots = (x, y, z, ny, col) => col.set(noise(x * 14 + seed, z * 14 + y * 9) > .18 ? 0x2b2522 : 0xf1ede6);
+    body = add(mergeGeometries([P(new THREE.SphereGeometry(1, 10, 7).scale(.15, .14, .27).translate(0, .4, 0), spots), P(new THREE.SphereGeometry(.05, 6, 4).translate(0, .27, -.1), 0xeaa3a3),
+      P(new THREE.CylinderGeometry(.01, .012, .22, 4).translate(0, -.11, 0).rotateX(.25).translate(0, .45, -.27), 0x2b2522)]));
+    head = new THREE.Group(); head.position.set(0, .47, .24); g.add(head);
+    add(mergeGeometries([P(new THREE.BoxGeometry(.11, .12, .17).translate(0, 0, .08), spots), P(new THREE.BoxGeometry(.105, .07, .06).translate(0, -.03, .18), 0xe8b1a4),
+      ...[-1, 1].map(sx => P(new THREE.ConeGeometry(.014, .06, 4).rotateZ(-sx * 1.1).translate(sx * .07, .07, .05), 0xe8dcc0)),
+      ...[-1, 1].map(sx => P(new THREE.SphereGeometry(1, 5, 3).scale(.04, .015, .025).translate(sx * .08, .03, .03), 0x2b2522))]), head);
+    for (const [x, z] of [[.08, .16], [-.08, .16], [.08, -.16], [-.08, -.16]]) leg(x, .33, z, .32, .032, 0xf1ede6, 0x3a302a);
+    g.scale.setScalar(.82);
+  } else if (kind === 'schwein') {
+    body = add(mergeGeometries([P(new THREE.SphereGeometry(1, 10, 7).scale(.13, .11, .19).translate(0, .2, 0), C2(0xe9a7a0, 0xf6c3bb)),
+      P(new THREE.TorusGeometry(.025, .006, 4, 8, 4.5).translate(0, .24, -.19), 0xe09a93)]));
+    head = new THREE.Group(); head.position.set(0, .22, .16); g.add(head);
+    add(mergeGeometries([P(new THREE.SphereGeometry(.08, 8, 6).translate(0, 0, .03), 0xeeb0a8), P(new THREE.CylinderGeometry(.036, .04, .04, 8).rotateX(Math.PI / 2).translate(0, -.015, .11), 0xd98c86),
+      ...[-1, 1].map(sx => P(new THREE.ConeGeometry(.03, .06, 3).rotateX(.6).rotateZ(-sx * .4).translate(sx * .045, .065, .02), 0xe09a93))]), head);
+    for (const [x, z] of [[.07, .1], [-.07, .1], [.07, -.1], [-.07, -.1]]) leg(x, .12, z, .12, .026, 0xe9a7a0, 0x8f5f58);
+    g.scale.setScalar(.85);
+  } else { // Huhn
+    const col = Math.random() < .35 ? 0xb06a35 : 0xf4f1ea;
+    body = new THREE.Group(); g.add(body);
+    add(mergeGeometries([P(new THREE.SphereGeometry(1, 8, 6).scale(.05, .045, .065).translate(0, .1, 0), col), P(new THREE.ConeGeometry(.035, .07, 4).rotateX(-.9).translate(0, .14, -.06), col),
+      P(new THREE.SphereGeometry(.03, 7, 5).translate(0, .165, .045), col), P(new THREE.BoxGeometry(.008, .025, .035).translate(0, .195, .045), 0xd8352a),
+      P(new THREE.ConeGeometry(.01, .025, 4).rotateX(Math.PI / 2).translate(0, .162, .08), 0xe9b53a), P(new THREE.SphereGeometry(.009, 4, 3).translate(0, .145, .065), 0xd8352a),
+      ...[-1, 1].map(sx => P(new THREE.CylinderGeometry(.005, .005, .06, 3).translate(sx * .02, .03, 0), 0xe9b53a))]), body);
+    g.scale.setScalar(.9);
+  }
+  scene.add(g); return { g, legs, head, body };
+  function C2(a, b) { return (x, y, z, ny, col) => col.set(a).lerp(COL2.set(b), clamp((y - .15) * 8, 0, 1)); }
+}
+// Hof anlegen: Lichtung schlagen, einebnen, Felder mit Furchen, Weide mit Zaun, Trog, Hühnerstall, Heu, Schubkarre
+function buildFarm(e, F) {
+  F.used = true; clearAround(F.x, F.z, 5); flattenAt(F.x, F.z, 5.2); flattenAt(e.x, e.z, 1.9);
+  e.farm = F; F.hut = e; F.fields = []; F.milk = 0; F.eggs = 0; F.pork = 0; F.feedT = 0; farms.push(F);
+  const y0 = heightAt(F.x, F.z), g = new THREE.Group(), parts = [], wood = 0x8a5f3a, dark = 0x6a4428;
+  const at = (lx, lz) => { const p = farmPt(F, lx, lz); return heightAt(p.x, p.z) - y0; };
+  const B = (w, h, d, x, y, z, c, ry = 0) => parts.push(paint(new THREE.BoxGeometry(w, h, d).rotateY(ry).translate(x, y, z), (px, py, pz, ny, cc) => cc.set(c).multiplyScalar(ny > .5 ? 1 : .82)));
+  // Zaun um die Weide: Pfosten, zwei Querlatten je Feld
+  const { x0, x1, z0, z1 } = FARM.pen, post = [];
+  const side = (ax, az, bx, bz) => { const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / .55)); for (let k = 0; k <= n; k++) post.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n, k < n ? [ax + (bx - ax) * (k + 1) / n, az + (bz - az) * (k + 1) / n] : null]); };
+  side(x0, z0, x1, z0); side(x1, z0, x1, z1); side(x1, z1, x0, z1); side(x0, z1, x0, z0);
+  for (const [px, pz, nx] of post) {
+    const y = at(px, pz); B(.05, .34, .05, px, y + .14, pz, dark);
+    if (nx) { const [qx, qz] = nx, L = Math.hypot(qx - px, qz - pz), yy = (y + at(qx, qz)) / 2, ry = Math.atan2(qx - px, qz - pz); for (const h of [.13, .25]) B(.025, .035, L, (px + qx) / 2, yy + h, (pz + qz) / 2, wood, ry); }
+  }
+  // Hühnerstall auf Stelzen mit Satteldach und Rampe
+  { const [cx, cz] = FARM.coop, y = at(cx, cz); for (const [ox, oz] of [[-.25, -.18], [.25, -.18], [-.25, .18], [.25, .18]]) B(.05, .16, .05, cx + ox, y + .08, cz + oz, dark);
+    B(.62, .32, .44, cx, y + .32, cz, 0xb5523b); B(.12, .14, .02, cx, y + .26, cz + .225, 0x3a2a20);
+    for (const sx of [-1, 1]) { const r = new THREE.BoxGeometry(.72, .035, .3).rotateX(sx * .62).translate(cx, y + .56, cz + sx * .12); parts.push(paint(r, (px, py, pz, ny, cc) => cc.set(0x6e4526))); }
+    parts.push(paint(new THREE.BoxGeometry(.12, .02, .32).rotateX(.5).translate(cx, y + .1, cz + .36), (px, py, pz, ny, cc) => cc.set(wood))); }
+  // Futtertrog an der Vorderseite der Weide, Heuballen, Wassertrog
+  { const [tx, tz] = FARM.trough, y = at(tx, tz); B(.9, .14, .22, tx, y + .07, tz - .1, wood); B(.82, .03, .16, tx, y + .13, tz - .1, 0xc9a24a);
+    for (const [hx, hz] of [[x0 + .45, z0 + .35], [x0 + .9, z0 + .3]]) parts.push(paint(new THREE.CylinderGeometry(.2, .2, .32, 10).rotateZ(Math.PI / 2).translate(hx, at(hx, hz) + .2, hz), (px, py, pz, ny, cc) => cc.set(0xd9b65a).multiplyScalar(.9 + .1 * Math.sin(py * 60)))); }
+  const mesh = new THREE.Mesh(mergeGeometries(parts), plantMat); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
+  g.rotation.y = F.ry; scene.add(g); statics.push({ o: g, x: F.x, z: F.z });
+  { const p = farmPt(F, -2.95, .55); place(gWheelbarrow, p.x, p.z, F.ry + .6, 1.5); F.barrow = p; const q = farmPt(F, -.45, .5); place(gBucket, q.x, q.z, F.ry, 1.5); F.bucket = q; }
+  // Felder: Ackerboden mit Furchen, folgt dem Gelände
+  FARM.fx.forEach((lx, i) => {
+    const p = farmPt(F, lx, FARM.fz), sv = S.fields[fields.length], fy = heightAt(p.x, p.z);
+    const f = { F, i, x: p.x, z: p.z, ry: F.ry, lx, lz: FARM.fz, c: i, state: 'leer', g: 0, water: 0, by: null };
+    if (Array.isArray(sv)) { f.c = Math.abs(sv[0] | 0) % CROPS.length; f.state = FIELD_STATES[sv[1]] || 'leer'; f.g = clamp(+sv[2] || 0, 0, 1); }
+    const geo = new THREE.PlaneGeometry(FARM.fw, FARM.fd, 12, 12).rotateX(-Math.PI / 2), pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = Math.cos(F.ry), sn = Math.sin(F.ry);
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), z = pos.getZ(k), ridge = .5 + .5 * Math.cos(2 * Math.PI * x / (FARM.fw / 3)), edge = Math.abs(x) > FARM.fw / 2 - .01 || Math.abs(z) > FARM.fd / 2 - .01;
+      pos.setY(k, heightAt(p.x + x * c + z * sn, p.z - x * sn + z * c) - fy + (edge ? .005 : .03 + ridge * .03));
+      COL.set(0x4a3222).lerp(COL2.set(0x7a5638), ridge * .8).multiplyScalar(.92 + Math.random() * .12); col.set([COL.r, COL.g, COL.b], k * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+    f.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+    const o = new THREE.Mesh(geo, f.mat); o.receiveShadow = true; o.rotation.y = F.ry; scene.add(o); statics.push({ o, x: p.x, z: p.z });
+    fields.push(f); F.fields.push(f);
+  });
+  // Vieh auf der Weide
+  for (const [kind, n] of [['kuh', 2], ['schwein', 2], ['huhn', 5]]) for (let k = 0; k < n; k++) {
+    const a = { kind, F, lx: x0 + .4 + Math.random() * (x1 - x0 - .8), lz: z0 + .4 + Math.random() * (z1 - z0 - .8), h: Math.random() * 6.28, tx: 0, tz: 0, moving: false, timer: Math.random() * 3, ph: Math.random() * 6.28, m: makeStock(kind) };
+    stock.push(a);
+  }
+}
+const fieldAt = (x, z, m = .15) => fields.find(f => { const dx = x - f.x, dz = z - f.z, c = Math.cos(f.ry), sn = Math.sin(f.ry); return Math.abs(dx * c - dz * sn) < FARM.fw / 2 + m && Math.abs(dx * sn + dz * c) < FARM.fd / 2 + m; });
+const fieldFront = f => farmPt(f.F, f.lx + rnd(.45), f.lz + FARM.fd / 2 + .3);
+let cropT = 0, ripeTip = false;
+function updateFarm(dt, t) {
+  // Wachstum: Regen (Wetter oder Wunder) beschleunigt, nachts und im Schnee wächst kaum etwas
+  const k = (1 + .7 * weather.wet) * (1 - .9 * smooth(.2, .6, weather.snowCover)) * (sky.night > .6 ? .4 : 1);
+  for (const f of fields) {
+    f.water = Math.max(0, f.water - dt);
+    if (f.state === 'grow') { f.g = Math.min(1, f.g + dt / CROPS[f.c].grow * k * (f.water > 0 ? 2.2 : 1)); if (f.g >= 1) { f.state = 'reif'; if (!ripeTip) { ripeTip = true; toast('Ein Feld ist reif. Der Bauer erntet es, du kannst aber auch mit der Hand darauf tippen.', 4); } } }
+    f.mat.color.setScalar(1 - .4 * Math.max(weather.wet, smooth(0, 12, f.water)));
+  }
+  // Erzeugnisse der Tiere sammeln sich tagsüber im Stall
+  for (const F of farms) {
+    F.feedT -= dt; if (sky.night > .5) continue;
+    const n = kind => stock.filter(a => a.F === F && a.kind === kind).length;
+    F.milk = Math.min(6, F.milk + n('kuh') * dt / 150); F.eggs = Math.min(8, F.eggs + n('huhn') * dt / 130); F.pork = Math.min(4, F.pork + n('schwein') * dt / 650);
+  }
+  if ((cropT -= dt) <= 0) { // Pflanzen neu setzen (nicht in jedem Frame nötig)
+    cropT = .3; const cnt = cropMeshes.map(() => 0);
+    for (const f of fields) {
+      if (f.state === 'leer') continue;
+      const L = CROP_LAYOUT[f.c], M = cropMeshes[f.c], ls = .18 + .82 * smooth(0, .7, f.g), fs = smooth(.42, 1, f.g), co = Math.cos(f.ry), sn = Math.sin(f.ry);
+      COL.setRGB(1, 1, 1).lerp(COL2.setRGB(1.15, 1.2, 1.05), (1 - f.g) * .6); // junge Pflanzen heller
+      for (const pl of L) {
+        const x = f.x + pl.x * co + pl.z * sn, z = f.z - pl.x * sn + pl.z * co, y = heightAt(x, z) + .05, i = cnt[f.c]++;
+        dummy.position.set(x, y, z); dummy.rotation.set(0, pl.r, 0); dummy.scale.setScalar(ls * pl.s); dummy.updateMatrix(); M[0].setMatrixAt(i, dummy.matrix); M[0].setColorAt(i, COL);
+        dummy.scale.setScalar(Math.max(1e-4, fs * pl.s)); dummy.updateMatrix(); M[1].setMatrixAt(i, dummy.matrix); M[1].setColorAt(i, COL2.setRGB(1, 1, 1));
+      }
+    }
+    cropMeshes.forEach((M, k) => M.forEach(m => { m.count = cnt[k]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }));
+  }
+  // Vieh: grast, zieht über die Weide, beim Füttern kommt es zum Trog
+  for (const a of stock) {
+    const F = a.F, P = FARM.pen, chick = a.kind === 'huhn', feed = F.feedT > 0;
+    a.timer -= dt;
+    if (!a.moving && a.timer <= 0) {
+      if (feed && !chick) { a.tx = FARM.trough[0] + rnd(.4); a.tz = FARM.trough[1] - .45 + rnd(.08); }
+      else if (feed) { a.tx = FARM.trough[0] + rnd(.9); a.tz = FARM.trough[1] - .55 + rnd(.3); }
+      else { const r = chick ? 1.2 : 2.2; a.tx = clamp(a.lx + rnd(r), P.x0 + .3, P.x1 - .3); a.tz = clamp(a.lz + rnd(r), P.z0 + .3, P.z1 - .3); }
+      a.moving = true;
+    }
+    const sp = a.kind === 'kuh' ? .3 : a.kind === 'schwein' ? .4 : .55;
+    if (a.moving) {
+      const dx = a.tx - a.lx, dz = a.tz - a.lz, d = Math.hypot(dx, dz);
+      if (d < .05) { a.moving = false; a.timer = (chick ? 1 : 3) + Math.random() * (chick ? 3 : 7); }
+      else { const st = Math.min(d, sp * dt); a.lx += dx / d * st; a.lz += dz / d * st; let dh = Math.atan2(dx, dz) - a.h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); a.h += dh * Math.min(1, dt * 5); }
+    }
+    const M = a.m, p = farmPt(F, a.lx, a.lz), y = heightAt(p.x, p.z), cyc = t * (chick ? 16 : 7) + a.ph, sw = a.moving ? Math.sin(cyc) * .5 : 0;
+    M.legs.forEach((L, k) => { L.rotation.x = (k === 0 || k === 3 ? sw : -sw); });
+    if (chick) M.body.rotation.x = a.moving ? 0 : Math.max(0, Math.sin(t * 3 + a.ph)) ** 6 * .9; // pickt
+    else if (M.head) M.head.rotation.x = a.moving ? 0 : smooth(.2, .8, Math.sin(t * .35 + a.ph) * .5 + .5) * .9; // grast
+    M.g.position.set(p.x, y + (chick && a.moving ? Math.abs(Math.sin(cyc)) * .02 : 0), p.z); M.g.rotation.y = a.h + F.ry;
+  }
+}
+// Ernte mit der Hand Gottes: das Gemüse geht gleich ins Lager
+function harvestByHand(f) {
+  const C = CROPS[f.c], n = C.yield, y = heightAt(f.x, f.z);
+  S.veg += n; floatText(f.x, y + .5, f.z, `${C.label}: +${resText('veg', n)}`, 'h');
+  for (let k = 0; k < 6; k++) { const p = farmPt(f.F, f.lx + rnd(FARM.fw / 2), f.lz + rnd(FARM.fd / 2)); spawnChips(p.x, heightAt(p.x, p.z) + .1, p.z, Math.random() * 6.28); }
+  if (f.by && f.by.field === f) { const v = f.by; v.field = null; if (v.state === 'harvest' || (v.state === 'walk' && v.next === 'harvest')) idle(v, .3); }
+  f.by = null; f.state = 'leer'; f.g = 0; f.c = (f.c + 1) % CROPS.length;
 }
 // Lichtung: Bäume auf dem Bauplatz verschwinden
 function clearAround(x, z, r) { if (!worldReady) return; for (const t of trees) if (!t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r) { if (t.reserved && t.reserved !== 'fox') t.reserved.tree = null; t.reserved = null; t.gone = true; } }
@@ -1105,6 +1327,8 @@ function addHut(role, site) {
   e.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
   e.role = role; e.H = H; e.saw = role === 'sawyer' ? e.o.getObjectByName('building_lumbermill_saw_blue') : null; e.sawing = 0;
   e.logs = 0; e.planks = 0; // Vorrat an der Säge: Träger bringen Stämme und holen Bretter
+  e.goods = {}; // abgelegte Waren der Spezialisten (Stämme, Fleisch, Fisch, Gemüse ...), Träger bringen sie ins Lager
+  if (role === 'farmer') buildFarm(e, site.farm);
   if (role === 'lumber') { const p = localPt(e, .62, -.12); place(gLogs, p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
   if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(TK[Math.random() < .5 ? 0 : 2], p.x, p.z, Math.random() * 6, ST * .2); }
   if (role === 'hunter') { const p = localPt(e, .7, .35); place(gTarget, p.x, p.z, site.ry, 1.6); e.pile = p; const q = localPt(e, -.55, .15); place(gArrows, q.x, q.z, site.ry, 1.6); }
@@ -1124,6 +1348,7 @@ const hutDoor = (e, d = .25) => localPt(e, e.H.door.x, e.H.door.z + d / e.o.scal
 const hutWork = e => localPt(e, e.H.work.x, e.H.work.z);
 for (const r in ROLES) for (let i = 0; i < S.huts[r]; i++) { const st = hutSite(r); if (st) addHut(r, st); }
 for (const r in ROLES) S.huts[r] = huts.filter(h => h.role === r).length;
+huts.forEach((h, i) => { const g = S.hutGoods[i]; if (g && typeof g === 'object') for (const k in g) if (RES[k] && isFinite(g[k]) && g[k] > 0) h.goods[k] = Math.floor(g[k]); });
 
 /* ------------------------------------------------------------------ trees & rocks */
 const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
@@ -1133,14 +1358,14 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 165; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
-  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
+  if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || onFarm(x, z, .8) || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
 worldReady = true;
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 // Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
-const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || streamDist(x, z) < 1 + r || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
+const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onFarm(x, z, .5 + r) || streamDist(x, z) < 1 + r || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
@@ -1288,14 +1513,31 @@ const navCell = (x, z) => { const i = Math.floor((x + HALF) / NAV_C), j = Math.f
 const cellX = c => -HALF + (c % NAV_N + .5) * NAV_C, cellZ = c => -HALF + (Math.floor(c / NAV_N) + .5) * NAV_C;
 // Grundrisse im Modellraum: Mitte (cx, cz) und halbe Ausdehnung (hx, hz)
 const FOOT = { homeA: [0, -.04, .4, .43], homeB: [0, .01, .44, .55], sawmill: [0, .055, .69, .52] };
-function navObstacles() {
+function buildingObstacles() {
   const rects = [], circles = [];
   const rect = (e, f) => { const k = e.o.scale.x, p = localPt(e, f[0], f[1]); rects.push({ x: p.x, z: p.z, ry: e.o.rotation.y, hx: f[2] * k, hz: f[3] * k }); };
   for (const h of houses) { rect(h, h.b ? FOOT.homeB : FOOT.homeA); if (h.garden) rects.push({ x: h.garden.x, z: h.garden.z, ry: h.garden.ry, hx: .58, hz: .4 }); }
-  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : h.role === 'fisher' ? FOOT.homeB : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
+  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : h.role === 'fisher' || h.role === 'farmer' ? FOOT.homeB : FOOT.homeA); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
+  for (const F of farms) { // Felder und Weidezaun (die Weide selbst bleibt Gras)
+    for (const f of F.fields) rects.push({ x: f.x, z: f.z, ry: f.ry, hx: FARM.fw / 2, hz: FARM.fd / 2 });
+    const P = FARM.pen, fr = (lx, lz, hx, hz) => { const p = farmPt(F, lx, lz); rects.push({ x: p.x, z: p.z, ry: F.ry, hx, hz }); };
+    fr((P.x0 + P.x1) / 2, P.z0, (P.x1 - P.x0) / 2 + .04, .04); fr((P.x0 + P.x1) / 2, P.z1, (P.x1 - P.x0) / 2 + .04, .04); fr(P.x0, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2); fr(P.x1, (P.z0 + P.z1) / 2, .04, (P.z1 - P.z0) / 2);
+    circles.push({ x: F.barrow.x, z: F.barrow.z, r: .3 }, { x: F.bucket.x, z: F.bucket.z, r: .14 });
+  }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
   circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: MILL_POS.x, z: MILL_POS.z, r: .8 }, ...sacredProps.obstacles);
   if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
+  return { rects, circles };
+}
+// Liegt der Punkt (mit Abstand m) in oder an einem Gebäude, Garten, Feld, Zaun?
+function nearBuilding(x, z, m = .5) {
+  const o = buildingObstacles();
+  for (const c of o.circles) if ((x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + m) ** 2) return true;
+  for (const r of o.rects) { const dx = x - r.x, dz = z - r.z, co = Math.cos(r.ry), si = Math.sin(r.ry); if (Math.abs(dx * co - dz * si) < r.hx + m && Math.abs(dx * si + dz * co) < r.hz + m) return true; }
+  return Math.hypot(x - LAGER.x, z - LAGER.z) < 2.6 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < PLAZA.r + .5 || onFarm(x, z, .3);
+}
+function navObstacles() {
+  const { rects, circles } = buildingObstacles();
   for (const r of rocks) circles.push({ x: r.x, z: r.z, r: r.s * .95 });
   for (const b of bushes) circles.push({ x: b.x, z: b.z, r: .17 * b.s });
   for (const t of trees) if (t.alive && !t.gone && t.g > .25) circles.push({ x: t.x, z: t.z, r: .12 });
@@ -1754,15 +1996,30 @@ const vHats = {
   forester: vMesh(mergeGeometries([new THREE.CylinderGeometry(.125, .125, .012, 12).translate(0, HEAD_Y + .035, 0), new THREE.CylinderGeometry(.06, .078, .075, 10).translate(0, HEAD_Y + .075, 0)]), 0x3f6b2a, .95),
   hunter: vMesh(mergeGeometries([new THREE.ConeGeometry(.09, .1, 8).translate(0, HEAD_Y + .09, -.005), new THREE.CylinderGeometry(.1, .1, .012, 10).translate(0, HEAD_Y + .04, 0), new THREE.BoxGeometry(.012, .09, .02).rotateX(-.5).translate(.07, HEAD_Y + .1, -.04)]), 0x2f4a2a, .95),
   fisher: vMesh(mergeGeometries([new THREE.SphereGeometry(.085, 10, 6, 0, Math.PI * 2, 0, Math.PI * .5).translate(0, HEAD_Y + .01, 0), new THREE.CylinderGeometry(.075, .13, .03, 12).translate(0, HEAD_Y + .01, -.015)]), 0xe8c42f, .7),
+  farmer: vMesh(mergeGeometries([new THREE.CylinderGeometry(.14, .14, .012, 14).translate(0, HEAD_Y + .04, 0), new THREE.CylinderGeometry(.062, .074, .065, 10).translate(0, HEAD_Y + .075, 0)]), 0xe3c77a, .95),
   sawyer: vMesh(mergeGeometries([new THREE.SphereGeometry(.083, 10, 6, 0, Math.PI * 2, 0, Math.PI * .45).scale(1, .8, 1).translate(0, HEAD_Y + .02, -.004), new THREE.BoxGeometry(.1, .01, .05).translate(0, HEAD_Y + .03, .085)]), 0x6b4a2e, .95),
 };
 // Bogen (Bogenarm entlang der Hand, Sehne), Köcher auf dem Rücken, Angel, Fang und Wild zum Tragen
-const vBow = vMesh(mergeGeometries([new THREE.TorusGeometry(.13, .008, 4, 14, Math.PI * .9).rotateZ(Math.PI / 2 - Math.PI * .45).rotateY(Math.PI / 2).translate(0, -.13, -.02), new THREE.CylinderGeometry(.002, .002, .25, 3).translate(0, -.13, -.13)]), 0x6b4527, .8);
+// Bogen: Griff im Ursprung, Sehne senkrecht dahinter. Auf dem Rücken getragen, zum Schuss in die linke Hand genommen.
+const bowArc = () => new THREE.TorusGeometry(.2, .007, 4, 16, 1.4).rotateZ(-.7).translate(-.2, 0, 0).rotateY(-Math.PI / 2);
+const bowStr = () => new THREE.CylinderGeometry(.0025, .0025, .258, 3).translate(0, 0, -.047);
+const bowSeg = (a, b) => { const d = new THREE.Vector3().subVectors(b, a), L = d.length(); return new THREE.CylinderGeometry(.0025, .0025, L, 3).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())).translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); };
+const vBowBack = vMesh(mergeGeometries([bowArc(), bowStr()]).rotateY(Math.PI).rotateZ(.75).translate(-.02, .21, -.125), 0x6b4527, .8);
+const vBowAim = vMesh(mergeGeometries([bowArc(), bowStr()]), 0x6b4527, .8);
+const vBowDraw = vMesh(mergeGeometries([bowArc(), bowSeg(new THREE.Vector3(0, .129, -.047), new THREE.Vector3(0, 0, -.2)), bowSeg(new THREE.Vector3(0, -.129, -.047), new THREE.Vector3(0, 0, -.2))]), 0x6b4527, .8);
 const vQuiver = vMesh(mergeGeometries([new THREE.CylinderGeometry(.028, .024, .16, 6).rotateX(.35).translate(.03, .2, -.08), ...[0, 1, 2].map(k => new THREE.ConeGeometry(.01, .04, 4).translate(.02 + k * .012, .3, -.12))]), 0x5a3a22, .9);
-const vRod = vMesh(new THREE.CylinderGeometry(.004, .008, .62, 4).translate(0, .31, 0).rotateX(-1.1).translate(0, -.13, 0), 0x8a6440, .8);
+// Angel: liegt in der rechten Hand und zeigt bei vorgestrecktem Arm schräg nach vorn oben (Spitze: ROD_TIP im Armraum)
+const vRod = vMesh(new THREE.CylinderGeometry(.004, .008, .62, 4).translate(0, .31, 0).rotateX(1.96).translate(0, -.13, 0), 0x8a6440, .8);
+const ROD_TIP = new THREE.Vector3(0, -.13 + .62 * Math.cos(1.96), .62 * Math.sin(1.96));
 const vGame = vMesh(new THREE.SphereGeometry(1, 7, 5).scale(.09, .06, .16).translate(0, .25, -.02), 0x8d6a46, .95);
+// Gemüsekiste, Milchkanne, Eierkorb
+const vVeg = vMesh(new THREE.BoxGeometry(.17, .07, .12).translate(0, .2, .13), 0x9a6a3c, .95);
+const vVegTop = vMesh(mergeGeometries([[-.05, -.02, 0xe2802c], [0, .02, 0], [.05, -.01, 0], [-.02, .03, 0], [.03, -.03, 0]].map(([x, z]) => new THREE.SphereGeometry(.03, 6, 4).translate(x, .245, .13 + z))), 0xe58a2e, .7);
+const vMilk = vMesh(mergeGeometries([new THREE.CylinderGeometry(.042, .05, .13, 8).translate(0, .21, .13), new THREE.CylinderGeometry(.025, .03, .03, 8).translate(0, .29, .13)]), 0xd9dee2, .4);
+const vEggBasket = vMesh(new THREE.CylinderGeometry(.075, .06, .06, 8).translate(0, .2, .13), 0xb08a55, .95);
+const vEggs = vMesh(mergeGeometries([[-.03, 0], [.03, .01], [0, -.03], [0, .03]].map(([x, z]) => new THREE.SphereGeometry(.022, 6, 4).scale(1, 1.3, 1).translate(x, .24, .13 + z))), 0xf3ead8, .6);
 const vBasket = vMesh(mergeGeometries([new THREE.CylinderGeometry(.08, .065, .09, 8).translate(0, .2, .13), ...[0, 1].map(k => new THREE.ConeGeometry(.02, .06, 3).rotateZ(Math.PI / 2).translate(-.03 + k * .06, .26, .13))]), 0xa98a5c, .95);
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats), vBow, vQuiver, vRod, vGame, vBasket];
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats), vBowBack, vBowAim, vBowDraw, vQuiver, vRod, vGame, vBasket, vVeg, vVegTop, vMilk, vEggBasket, vEggs];
 // Lichtschein nachts: Lichthöfe um Laternen (zur Kamera gedreht) und warme Lichtflecken am Boden vor Türen und unter Laternen
 const glowMat = c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
 const haloMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(0xffb85c), VCAP + 64);
@@ -2285,9 +2542,10 @@ function leaveJob(v) {
   if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
   // Last abgeben: ein Stamm geht zurück ins Lager, fertige Bretter zählen als Holz (außer er ist schon auf dem Weg dorthin)
   if (v.state === 'saw' && v.hut) v.hut.logs++; // angefangener Stamm bleibt an der Säge
-  const keep = v.state === 'walk' && ['store', 'storeMeat', 'storeFish'].includes(v.next);
-  if (v.carry && !keep) { if (v.carry === 1) S.logs++; v.carry = 0; }
-  if (['chop', 'plant', 'saw'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
+  const keep = v.state === 'walk' && v.next === 'dropHut';
+  if (v.carry && !keep) { if (v.drop) putDown(v, true); else if (v.carry === 1 && v.state !== 'saw') S.logs++; v.carry = 0; }
+  if (v.field) { if (v.field.by === v) v.field.by = null; v.field = null; }
+  if (['chop', 'plant', 'saw', 'sow', 'harvest', 'tend'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
   v.role = null; v.hut = null; v.saplings = 0; v.prey = null; v.catch = 0; if (v.state === 'aim' || v.state === 'fish') idle(v, .3);
 }
 // Bewohner auf Berufe verteilen: so viele wie gewünscht und Hüttenplätze frei sind, der Rest betet als Dorfbewohner
@@ -2328,6 +2586,7 @@ function chooseJob(v) {
   if (S.hour >= BED || S.hour < WAKE) { goHome(v); return; }           // Feierabend: heim in die Hütte
   if (S.hour >= LUNCH[0] && S.hour < LUNCH[1]) { goLunch(v); return; } // Mittagspause am Brunnen
   if (v.wish) { if (wish.kind && wish.by === v) { goBeg(v); return; } v.wish = false; }
+  if (v.drop && v.carry) { walkDrop(v); return; } // Ware erst an der Hütte ablegen
   if (v.role && v.hut) { JOB[v.role](v); return; }
   if (haulJob(v)) return;
   // Dorfbewohner beten am Schrein, ab und zu ruhen sie sich aus
@@ -2336,12 +2595,24 @@ function chooseJob(v) {
 // Träger: freie Dorfbewohner bringen Stämme aus dem Lager zur Sägemühle und Bretter zurück ins Lager.
 // Was unterwegs ist, wird pro Mühle mitgezählt, so tragen immer nur so viele, wie gebraucht werden.
 const MILL_BUF = 4;
-function hauling(hs, kind) { let n = 0; for (const v of villagers) if (v.haul && v.haul.hut === hs && v.haul.kind === kind) n += v.haul.n; return n; }
+function hauling(hs, kind, res) { let n = 0; for (const v of villagers) if (v.haul && v.haul.hut === hs && v.haul.kind === kind && (!res || v.haul.res === res)) n += v.haul.n; return n; }
+// Spezialisten legen ihre Ware an der eigenen Hütte ab (Holzfäller, Jäger, Fischer, Bauer); Träger bringen sie ins Lager
+function walkDrop(v, goods) {
+  if (goods) { v.drop = goods; v.dropAt = v.hut; }
+  const H = v.dropAt && huts.includes(v.dropAt) ? v.dropAt : null, p = H ? hutWork(H) : lagerDrop(); v.dropAt = H;
+  walk(v, p.x + rnd(.2), p.z + rnd(.2), 'dropHut');
+}
+function putDown(v, quiet) {
+  const H = v.dropAt, g = v.drop || {}, out = [];
+  for (const k in g) if (g[k] > 0) { if (H) H.goods[k] = (H.goods[k] || 0) + g[k]; else S[k] += g[k]; out.push(resText(k, g[k])); }
+  if (!quiet && out.length) floatText(v.x, v.y + .8, v.z, H ? `${out.join(', ')} abgelegt` : `+${out.join(', ')}`, 'h');
+  v.carry = 0; v.drop = null; v.dropAt = null;
+}
 function haulJob(v) {
   if (v.haul) { // angefangenen Auftrag fortsetzen (z. B. nach Mittagspause, Flucht oder Wurf)
     const H = v.haul;
-    if (v.carry === 1) { const p = hutWork(H.hut); walk(v, p.x + rnd(.2), p.z + .2, 'dropLogs'); return true; }
-    if (v.carry === 2) { const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); return true; }
+    if (H.kind === 'in' && v.carry === 1) { const p = hutWork(H.hut); walk(v, p.x + rnd(.2), p.z + .2, 'dropLogs'); return true; }
+    if (H.kind !== 'in' && v.carry) { const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); return true; }
     v.haul = null;
   }
   for (const hs of huts) {
@@ -2351,18 +2622,25 @@ function haulJob(v) {
     const room = MILL_BUF - hs.logs - hauling(hs, 'in'), have = Math.floor(S.logs) - villagers.reduce((a, x) => a + (x.haul && x.haul.kind === 'in' && !x.carry ? x.haul.n : 0), 0);
     if (room >= 1 && have >= 1) { v.haul = { hut: hs, kind: 'in', n: Math.min(2, room, have) }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickLogs'); return true; }
   }
+  // Waren an den Hütten abholen: die größte, nächste Menge zuerst
+  let best = null, bd = 1e9;
+  for (const hs of huts) for (const res in hs.goods) {
+    const left = hs.goods[res] - hauling(hs, 'pick', res); if (left < (res === 'logs' ? 2 : 1)) continue;
+    const d = Math.hypot(hs.x - v.x, hs.z - v.z) - left * 1.5; if (d < bd) { bd = d; best = { hut: hs, kind: 'pick', res, n: Math.min(RES[res][3], left) }; }
+  }
+  if (best) { v.haul = best; const p = hutWork(best.hut); walk(v, p.x + rnd(.2), p.z + rnd(.2), 'pickGoods'); return true; }
   return false;
 }
 function atHut(v, next = 'rest') { const p = hutWork(v.hut); walk(v, p.x + rnd(.25), p.z + rnd(.25), next); }
 // freier Platz für einen Setzling: leerer Baumplatz oder Stumpf nahe der Hütte, sonst ein neuer Platz am Waldrand
 function plantSpot(x, z) {
   let best = null, bd = 1e9;
-  for (const t of trees) if (freeSlot(t)) { const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd) { bd = d; best = t; } }
+  for (const t of trees) if (freeSlot(t)) { const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd && !nearBuilding(t.x, t.z, .4)) { bd = d; best = t; } }
   if (best && bd < 14 * 14) return { tree: best };
   const alive = trees.filter(t => t.alive && !t.gone);
   for (let i = 0; i < 30 && alive.length; i++) {
     const o = alive[Math.floor(Math.random() * alive.length)], a = Math.random() * 6.28, r = 1.2 + Math.random() * 1.3, px = o.x + Math.cos(a) * r, pz = o.z + Math.sin(a) * r, h = heightAt(px, pz);
-    if (h > .45 && h < 3 && Math.hypot(px, pz) > 8.5 && !treeNear(px, pz, 1) && !hutSites.some(st => st.used && Math.hypot(st.x - px, st.z - pz) < 1.5) && trees.length < 480) return { x: px, z: pz };
+    if (h > .45 && h < 3 && Math.hypot(px, pz) > 8.5 && !treeNear(px, pz, 1) && !nearBuilding(px, pz, .55) && streamDist(px, pz) > 1 && !hutSites.some(st => st.used && Math.hypot(st.x - px, st.z - pz) < 1.5) && trees.length < 480) return { x: px, z: pz };
   }
   return best ? { tree: best } : null;
 }
@@ -2379,7 +2657,6 @@ const JOB = {
     walk(v, tx + Math.cos(a) * .3, tz + Math.sin(a) * .3, 'plant');
   },
   hunter(v) { // Wild suchen, anpirschen, zielen, schießen; Beute holen und ins Lager bringen
-    if (v.carry === 3) { const p = lagerDrop(); walk(v, p.x, p.z, 'storeMeat'); return; }
     if (v.prey && v.prey.state === 'dead' && wild.includes(v.prey)) { walk(v, v.prey.x + rnd(.2), v.prey.z + rnd(.2), 'pickup'); return; }
     let best = null, bd = 26 * 26;
     for (const a of wild) { if (a.state === 'dead' || villagers.some(o => o !== v && o.prey === a)) continue; const d = (a.x - v.hut.x) ** 2 + (a.z - v.hut.z) ** 2; if (d < bd) { bd = d; best = a; } }
@@ -2388,10 +2665,17 @@ const JOB = {
     walk(v, best.x + dx / d * r, best.z + dz / d * r, 'aim'); v.stalk = true;
   },
   fisher(v) { // zum Stegende, angeln, nach drei Fischen den Fang ins Lager bringen
-    if (v.carry === 4) { const p = lagerDrop(); walk(v, p.x, p.z, 'storeFish'); return; }
     const J = v.hut && v.hut.jetty; if (!J) { atHut(v); return; }
     if (Math.hypot(v.x - J.end.x, v.z - J.end.z) > .3) { walk(v, J.end.x, J.end.z, 'fishspot'); return; }
     startFishing(v);
+  },
+  farmer(v) { // reife Felder ernten, leere besäen, sonst das Vieh füttern und Milch, Eier, Fleisch holen
+    const F = v.hut.farm; if (!F) { atHut(v); return; }
+    const free = f => !f.by || f.by === v || f.by.field !== f || f.by.role !== 'farmer' || !villagers.includes(f.by);
+    const f = F.fields.find(f => f.state === 'reif' && free(f)) || F.fields.find(f => f.state === 'leer' && free(f));
+    if (f) { f.by = v; v.field = f; const p = fieldFront(f); walk(v, p.x, p.z, f.state === 'reif' ? 'harvest' : 'sow'); return; }
+    if (F.milk >= 1 || F.eggs >= 2 || F.pork >= 1 || Math.random() < .3) { const p = farmPt(F, FARM.trough[0] + rnd(.3), FARM.pen.z1 + .35); walk(v, p.x, p.z, 'tend'); return; }
+    atHut(v);
   },
   sawyer(v) { // bleibt an der Säge und sägt, was die Träger bringen
     const p = hutWork(v.hut);
@@ -2436,14 +2720,14 @@ function fishStep(v, dt) {
     if (near >= 0) fish.splice(near, 1);
     v.catch = (v.catch || 0) + 1; floatText(v.x, v.y + .7, v.z, 'Fisch!', 'h'); splash(J.bob.x, J.bob.z);
   } else floatText(v.x, v.y + .7, v.z, 'Nichts', 'w');
-  if (v.catch >= 3) { v.catch = 0; v.carry = 4; const p = lagerDrop(); walk(v, p.x, p.z, 'storeFish'); return; }
+  if (v.catch >= 3) { v.catch = 0; v.carry = 4; walkDrop(v, { fish: 3 }); return; }
   v.fp = 'cast'; v.timer = .9;
 }
-const lines = [];
+const lines = [], LINE_N = 12;
 function updateFishingLines(t) {
   const fishers = villagers.filter(v => v.state === 'fish' && v.fp !== 'cast' && v.hut && v.hut.jetty);
   while (lines.length < fishers.length) {
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(LINE_N * 3), 3));
     const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe8e8e0, transparent: true, opacity: .7 })); l.frustumCulled = false; scene.add(l);
     const b = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd8352a, roughness: .5 })); b.userData.noSnow = true; scene.add(b);
     lines.push({ l, b });
@@ -2451,8 +2735,10 @@ function updateFishingLines(t) {
   lines.forEach((L, k) => {
     const v = fishers[k]; L.l.visible = L.b.visible = !!v; if (!v) return;
     const J = v.hut.jetty, dip = v.fp === 'bite' ? -.05 - Math.abs(Math.sin(t * 18)) * .04 : Math.sin(t * 2 + v.ph) * .015;
-    const tipx = v.x + Math.sin(v.h) * .45, tipz = v.z + Math.cos(v.h) * .45, tipy = v.y + .62, bx = J.bob.x, bz = J.bob.z, by = -.02 + dip;
-    L.l.geometry.attributes.position.array.set([tipx, tipy, tipz, bx, by, bz]); L.l.geometry.attributes.position.needsUpdate = true;
+    if (!v.tip) { L.l.visible = L.b.visible = false; return; }
+    const tipx = v.tip.x, tipz = v.tip.z, tipy = v.tip.y, bx = J.bob.x, bz = J.bob.z, by = -.02 + dip, sag = v.fp === 'bite' ? .03 : .22, arr = L.l.geometry.attributes.position.array;
+    for (let k = 0; k < LINE_N; k++) { const u = k / (LINE_N - 1); arr[k * 3] = tipx + (bx - tipx) * u; arr[k * 3 + 1] = tipy + (by - tipy) * u - Math.sin(u * Math.PI) * sag * (1 - u * .5); arr[k * 3 + 2] = tipz + (bz - tipz) * u; }
+    L.l.geometry.attributes.position.needsUpdate = true;
     L.b.position.set(bx, by, bz);
   });
 }
@@ -2477,10 +2763,16 @@ function arrive(v) {
       if (!a || !wild.includes(a) || a.state === 'dead' || Math.hypot(a.x - v.x, a.z - v.z) > 7) { v.prey = a && a.state === 'dead' ? a : null; idle(v, .3); break; }
       v.state = 'aim'; v.timer = 1.3; v.h = Math.atan2(a.x - v.x, a.z - v.z); break;
     }
-    case 'pickup': { const a = v.prey; if (a && a.state === 'dead' && wild.includes(a)) { v.meat = a.kind === 'reh' ? 3 : 1; removeAnimal(a); v.carry = 3; const p = lagerDrop(); walk(v, p.x, p.z, 'storeMeat'); } else idle(v, .3); v.prey = null; break; }
-    case 'storeMeat': { const n = v.meat || 1; v.carry = 0; v.meat = 0; S.meat += n; floatText(v.x, v.y + .9, v.z, `+${n} Fleisch`, 'h'); idle(v, .4); break; }
+    case 'pickup': { const a = v.prey; if (a && a.state === 'dead' && wild.includes(a)) { const n = a.kind === 'reh' ? 3 : 1; removeAnimal(a); v.carry = 3; walkDrop(v, { meat: n }); } else idle(v, .3); v.prey = null; break; }
+    case 'dropHut': putDown(v); idle(v, .4); break;
+    case 'pickGoods': { // Träger nimmt Ware an einer Hütte auf
+      const H = v.haul, n = H ? Math.min(H.n, Math.floor(H.hut.goods[H.res] || 0)) : 0;
+      if (!n) { v.haul = null; idle(v, .5); break; }
+      H.hut.goods[H.res] -= n; H.n = n; v.carry = RES[H.res][2]; const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); break;
+    }
+    case 'sow': case 'harvest': { const f = v.field; if (f && f.by === v && f.state === (v.next === 'sow' ? 'leer' : 'reif')) { v.state = v.next; v.timer = (v.next === 'sow' ? 3 : 2.4) * DIG_T; v.cp = 0; v.h = Math.atan2(f.x - v.x, f.z - v.z); } else { if (f && f.by === v) f.by = null; v.field = null; idle(v, .3); } break; }
+    case 'tend': if (v.hut && v.hut.farm) { v.state = 'tend'; v.timer = 3.5; v.hut.farm.feedT = 9; const T = farmPt(v.hut.farm, FARM.trough[0], FARM.trough[1]); v.h = Math.atan2(T.x - v.x, T.z - v.z); } else idle(v, .3); break;
     case 'fishspot': if (v.role === 'fisher' && v.hut && v.hut.jetty) startFishing(v); else idle(v, .3); break;
-    case 'storeFish': v.carry = 0; S.fish += 3; floatText(v.x, v.y + .9, v.z, '+3 Fisch', 'h'); idle(v, .4); break;
     case 'pickLogs': { // Träger nimmt Stämme im Lager
       const H = v.haul, n = H ? Math.min(H.n, Math.floor(S.logs)) : 0;
       if (!n) { v.haul = null; idle(v, .5); break; }
@@ -2492,7 +2784,9 @@ function arrive(v) {
       if (!n) { v.haul = null; idle(v, .5); break; }
       H.hut.planks -= n; H.n = n; v.carry = 2; const p = lagerDrop(); walk(v, p.x, p.z, 'deliver'); break;
     }
-    case 'deliver': { const n = v.haul ? v.haul.n : 2; v.carry = 0; v.haul = null; addHolz(n, v.x, v.y + .2, v.z); idle(v, .4); break; }
+    case 'deliver': { const H = v.haul, n = H ? H.n : 2; v.carry = 0; v.haul = null;
+      if (H && H.res === 'logs') addLogs(n, v.x, v.y + .2, v.z); else if (H && H.res) { S[H.res] += n; floatText(v.x, v.y + .9, v.z, `+${resText(H.res, n)}`, 'h'); } else addHolz(n, v.x, v.y + .2, v.z);
+      idle(v, .4); break; }
     case 'fetchSap': v.saplings = 3; idle(v, .9); break;
     case 'plant':
       if (v.plant && (!v.plant.tree || v.plant.tree.reserved === v)) { v.state = 'plant'; v.timer = 3 * DIG_T; v.cp = 0; const pt = v.plant.tree || v.plant; v.h = Math.atan2(pt.x - v.x, pt.z - v.z); }
@@ -2528,7 +2822,7 @@ function updateVillager(v, dt, t) {
         tr.shake = 1; spawnChips(tr.x - Math.sin(v.h) * .08, surfaceAt(tr.x, tr.z) + .22, tr.z - Math.cos(v.h) * .08, v.h);
       }
     }
-      if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; const p = lagerDrop(); walk(v, p.x, p.z, 'store'); } else idle(v, .4); } break;
+      if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walkDrop(v, { logs: 1 }); } else idle(v, .4); } break;
     case 'pray': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = ((2 * PRAY_T - v.timer) / PRAY_T) % 1; v.timer -= k;
       const now = ((2 * PRAY_T - v.timer) / PRAY_T) % 1;
@@ -2554,11 +2848,30 @@ function updateVillager(v, dt, t) {
         const sp = v.plant; v.plant = null; v.saplings = Math.max(0, (v.saplings || 0) - 1);
         let t = null;
         if (sp && sp.tree && sp.tree.reserved === v) { t = sp.tree; t.reserved = null; Object.assign(t, { alive: true, g: .12, stumpT: 0, regrow: 0, type: treeKindAt(t.x, t.z) }); }
-        else if (sp && !sp.tree && !treeNear(sp.x, sp.z, .9)) t = addTree(sp.x, sp.z, .12);
+        else if (sp && !sp.tree && !treeNear(sp.x, sp.z, .9) && !nearBuilding(sp.x, sp.z, .5)) t = addTree(sp.x, sp.z, .12);
         if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
         if (t) floatText(t.x, heightAt(t.x, t.z) + .5, t.z, 'Gepflanzt', 's');
         idle(v, .4);
       }
+      break;
+    }
+    case 'sow': case 'harvest': { // in gebückter Haltung säen oder ernten, Erde fliegt
+      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
+      const now = v.cp % 1; if ((before < .55 && now >= .55) || now < before) spawnChips(v.x + Math.sin(v.h) * .25, v.y + .03, v.z + Math.cos(v.h) * .25, v.h + Math.PI);
+      if (v.timer > 0) break;
+      const f = v.field; v.field = null;
+      if (!f || f.by !== v) { idle(v, .3); break; }
+      f.by = null;
+      if (v.state === 'sow' && f.state === 'leer') { f.state = 'grow'; f.g = 0; floatText(f.x, heightAt(f.x, f.z) + .5, f.z, `${CROPS[f.c].label} gesät`, 's'); idle(v, .4); }
+      else if (v.state === 'harvest' && f.state === 'reif') { const n = CROPS[f.c].yield; floatText(f.x, heightAt(f.x, f.z) + .5, f.z, `${CROPS[f.c].label} geerntet`, 's'); f.state = 'leer'; f.g = 0; f.c = (f.c + 1) % CROPS.length; v.carry = 5; walkDrop(v, { veg: n }); }
+      else idle(v, .3);
+      break;
+    }
+    case 'tend': { // Futter in den Trog streuen, dann Milch, Eier und ab und zu Fleisch mitnehmen
+      v.timer -= dt; if (v.timer > 0) break;
+      const F = v.hut && v.hut.farm; if (!F) { idle(v, .3); break; }
+      const g = { milk: Math.floor(F.milk), eggs: Math.floor(F.eggs), meat: Math.floor(F.pork) }; F.milk -= g.milk; F.eggs -= g.eggs; F.pork -= g.meat;
+      if (g.milk + g.eggs + g.meat > 0) { v.carry = g.milk ? 6 : g.eggs ? 7 : 3; walkDrop(v, g); } else idle(v, 1);
       break;
     }
     case 'sleep': if (S.hour >= v.wake && S.hour < BED) idle(v, .2 + Math.random()); break;
@@ -2822,8 +3135,10 @@ function castRain(x, z) {
   let rev = 0;
   for (const t of trees) { if (t.gone || (t.x - x) ** 2 + (t.z - z) ** 2 > 25) continue; if (t.alive) t.g = Math.min(1, t.g + .5); else if (!t.reserved) { t.alive = true; t.g = .35; t.stumpT = 0; rev++; } }
   let n = 0; for (let k = 0; k < 60 && n < 6; k++) { const a = Math.random() * 6.28, r = Math.random() * 4.5, tx = x + Math.cos(a) * r, tz = z + Math.sin(a) * r, h = heightAt(tx, tz);
-    if (h < .4 || h > 3.4 || Math.hypot(tx, tz) < 5.5 || treeNear(tx, tz, .8)) continue; if (addTree(tx, tz, .15)) n++; }
+    if (h < .4 || h > 3.4 || Math.hypot(tx, tz) < 8.5 || treeNear(tx, tz, .8) || streamDist(tx, tz) < 1 || nearBuilding(tx, tz, .55)) continue; if (addTree(tx, tz, .15)) n++; }
   floatText(x, surfaceAt(x, z) + 2, z, n ? `${n} neue Setzlinge` : 'Der Wald trinkt', 's');
+  let wet = 0; for (const f of fields) if ((f.x - x) ** 2 + (f.z - z) ** 2 < 36) { f.water = 150; if (f.state === 'grow') f.g = Math.min(1, f.g + .12); wet++; }
+  if (wet) floatText(x, surfaceAt(x, z) + 2.6, z, `${wet} ${wet === 1 ? 'Feld trinkt' : 'Felder trinken'}`, 's');
   if (n + rev > 0 || trees.some(t => t.alive && !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < 25)) wishDone('rain');
   forestHelped(x, z);
 }
@@ -3027,8 +3342,13 @@ function onToolDown(cx, cy) {
     if (foxUnder(cx, cy)) { openRing(); pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
-    if (best) { grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; } best.state = 'grabbed'; }
-    else if (!heldTree.on) { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
+    if (best) { grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; best.drop = null; } best.state = 'grabbed'; }
+    else if (!heldTree.on) {
+      const fl = hitOk && fieldAt(hit.x, hit.z);
+      if (fl && fl.state === 'reif') harvestByHand(fl); // reifes Feld abernten
+      else if (fl) toast(fl.state === 'leer' ? 'Dieses Feld muss erst besät werden.' : `${CROPS[fl.c].label}: zu ${Math.round(fl.g * 100)} % gewachsen.`, 2);
+      else { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
+    }
   } else if (tool === 'miracle' && hitOk) { tryMiracle(hit); pressing = false; return; }
   pressing = true;
 }
@@ -3077,7 +3397,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
   get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
-  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen. ${S.name} antippen für Streicheln, Klaps und mehr.`; },
+  get hand() { return `Bewohner packen und werfen, Bäume packen und ausreißen, reife Felder abernten. ${S.name} antippen für Streicheln, Klaps und mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -3143,6 +3463,11 @@ function renderWork() {
     for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${construction && construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
     if (id === 'wood') notes.push(`${alive.length - young} Bäume zum Fällen, ${young} wachsen noch.`);
     if (id === 'jagd') notes.push(`Auf der Insel: ${wild.filter(a => a.kind === 'reh' && a.state !== 'dead').length} Rehe, ${wild.filter(a => a.kind === 'hase' && a.state !== 'dead').length} Hasen. Im Lager: ${fmt(S.meat)} Fleisch.`);
+    { const at = {}; for (const h of huts) if (sp[h.role] !== undefined) for (const g in h.goods) if (h.goods[g] > 0) at[g] = (at[g] || 0) + h.goods[g];
+      const list = Object.keys(at).map(g => resText(g, at[g])); if (list.length) notes.push(`An den Hütten zum Abholen: ${list.join(', ')}.`); }
+    if (id === 'hof') { const st = n => fields.filter(f => f.state === n).length, an = k => stock.filter(a => a.kind === k).length;
+      notes.push(fields.length ? `Felder: ${st('reif')} reif, ${st('grow')} wachsen, ${st('leer')} leer. Weide: ${an('kuh')} Kühe, ${an('schwein')} Schweine, ${an('huhn')} Hühner.` : (farmSites.length ? 'Noch kein Bauernhof.' : 'Auf der Insel ist kein Platz für einen Bauernhof.'));
+      notes.push(`Im Lager: ${resText('veg', S.veg)}, ${fmt(S.milk)} Milch, ${resText('eggs', S.eggs)}.`); }
     if (id === 'fischerei') notes.push(`Fische vor der Küste: ${fish.length}. Im Lager: ${fmt(S.fish)} Fisch.`);
     if (id === 'saw') { const ms = huts.filter(h => h.role === 'sawyer'); notes.push(`An der Säge: ${ms.reduce((a, h) => a + h.logs, 0)} Stämme, ${ms.reduce((a, h) => a + h.planks, 0)} Bretter. Im Lager: ${fmt(S.logs)} ${S.logs === 1 ? 'Stamm' : 'Stämme'}, ${fmt(S.holz)} Bretter.`); }
     el.querySelector('.wnote').textContent = notes.join(' ');
@@ -3274,7 +3599,7 @@ $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data
     setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube${h > 0 ? `, +${fmt(h)} Bretter` : ''}${l > 0 ? `, +${fmt(l)} Stämme` : ''}.`, 5), 900);
   }
 }
-function save() { if (skipSave) return; savePaths(); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function save() { if (skipSave) return; savePaths(); S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); S.hutGoods = huts.map(h => h.goods); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
@@ -3339,10 +3664,13 @@ function frame() {
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
     } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
-    else if (v.state === 'plant') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt; armA = armB = c.arm; splay = -.5; leg = .3; }
+    else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
+    else if (v.state === 'tend') { const s = Math.sin(t * 7 + v.ph); armA = -.5; armB = -1.1 + s * .35; splay = .15; tilt = .1; } // Futter streuen
     else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }
     else if (v.state === 'aim') { const draw = smooth(1.3, .5, v.timer); armA = -1.57; armB = -1.45; splay = .08; armRz = .55 + draw * .35; tilt = -.05; leg = .2; } // Bogen spannen
-    else if (v.state === 'fish') { const c = v.fp === 'cast' ? smooth(.9, 0, v.timer) : 1, bite = v.fp === 'bite' ? Math.sin(v.timer * 20) * .15 : 0; armB = -2.4 + c * 1.3 + bite; armA = -.9; splay = .1; }
+    else if (v.state === 'fish') { // auswerfen: Rute von hinten oben nach vorn, dann ruhig halten; beim Biss ruckt sie hoch
+      const c = v.fp === 'cast' ? smooth(.9, .1, v.timer) : 1, jerk = v.fp === 'bite' ? Math.abs(Math.sin(v.timer * 14)) * .3 : Math.sin(t * 1.3 + v.ph) * .03;
+      armB = -2.5 + c * 1.5 - jerk; armA = -.95; splay = .08; leg = .12; }
     else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
     else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
@@ -3354,6 +3682,8 @@ function frame() {
       leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
     } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
     if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
+    const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
+    if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
     if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
     else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
     const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
@@ -3397,10 +3727,15 @@ function frame() {
     vParts.beard.setMatrixAt(i, L.beard ? M : zero);
     vWood.forEach(m => m.setMatrixAt(i, v.carry === 1 ? M : zero)); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
     vGame.setMatrixAt(i, v.carry === 3 ? M : zero); vBasket.setMatrixAt(i, v.carry === 4 ? M : zero);
-    // Jäger: Bogen in der linken Hand, Köcher auf dem Rücken; Fischer: Angel in der rechten Hand
-    if (v.role === 'hunter' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state)) part(vBow, .085, SHO_Y, v.state === 'aim' ? -1.57 : (v.state === 'walk' ? armA : -.3), splay); else vBow.setMatrixAt(i, zero);
+    vVeg.setMatrixAt(i, v.carry === 5 ? M : zero); vVegTop.setMatrixAt(i, v.carry === 5 ? M : zero); vMilk.setMatrixAt(i, v.carry === 6 ? M : zero);
+    vEggBasket.setMatrixAt(i, v.carry === 7 ? M : zero); vEggs.setMatrixAt(i, v.carry === 7 ? M : zero);
+    // Jäger: Bogen und Köcher auf dem Rücken, zum Schuss nimmt er den Bogen in die linke Hand und spannt die Sehne
+    const aiming = v.role === 'hunter' && v.state === 'aim', drawn = aiming && v.timer < .8;
+    vBowBack.setMatrixAt(i, v.role === 'hunter' && !aiming ? M : zero);
+    if (aiming && !drawn) part(vBowAim, .075, SHO_Y + .005, 0, -.12, .15); else vBowAim.setMatrixAt(i, zero);
+    if (drawn) part(vBowDraw, .075, SHO_Y + .005, 0, -.12, .15); else vBowDraw.setMatrixAt(i, zero);
     vQuiver.setMatrixAt(i, v.role === 'hunter' ? M : zero);
-    if (v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state)) part(vRod, -.085, SHO_Y, v.state === 'fish' ? armB : -.4, -splay); else vRod.setMatrixAt(i, zero);
+    if (rodOn) { part(vRod, -.085, SHO_Y, armB, -splay + armRz); const tp = lV.copy(ROD_TIP).applyMatrix4(vOut); v.tip = v.tip || {}; v.tip.x = tp.x; v.tip.y = tp.y; v.tip.z = tp.z; } else vRod.setMatrixAt(i, zero);
     for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
     // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
     if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
@@ -3454,7 +3789,7 @@ function frame() {
   if (millFan) millFan.rotation.z += dt * 1.4;
 
   updateFox(dt, t);
-  updateWild(dt, t); updateFish(dt, t);
+  updateWild(dt, t); updateFish(dt, t); updateFarm(dt, t);
   updateTrees(dt, t);
 
   // hand
@@ -3538,7 +3873,8 @@ function frame() {
     uiT = .25;
     $('vG').textContent = fmt(S.glaube); $('vGr').textContent = '+' + fmt1(rate) + '/s';
     // Lager: alle Rohstoffe und was als Nächstes gebaut wird
-    $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish);
+    $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish); $('sVeg').textContent = fmt(S.veg); $('sMilk').textContent = fmt(S.milk); $('sEggs').textContent = fmt(S.eggs);
+    for (const [id, k, r] of [['sMeat', 'meat', 'hunter'], ['sFish', 'fish', 'fisher'], ['sVeg', 'veg', 'farmer'], ['sMilk', 'milk', 'farmer'], ['sEggs', 'eggs', 'farmer']]) $(id).parentElement.hidden = !S[k] && !S.huts[r] && !(r === 'hunter' && S.huts.farmer);
     { const nb = construction ? null : nextBuild(); $('sBuild').textContent = construction ? `${construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
@@ -3566,7 +3902,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
