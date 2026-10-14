@@ -275,7 +275,44 @@ const vParts = {
   beard: vMesh(new THREE.SphereGeometry(.076, 8, 5, Math.PI * .1, Math.PI * .8, Math.PI * .5, Math.PI * .38).translate(0, HEAD_Y + .004, .004), 0xffffff, .95),
 };
 const vWood = vMesh(new THREE.BoxGeometry(.26, .07, .07).translate(0, .21, .13), 0x8a5a33, .9);
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood];
+const vAxe = [
+  vMesh(new THREE.CylinderGeometry(.011, .013, .25, 6).translate(0, -.185, 0), 0x7a5230, .9),
+  vMesh(mergeGeometries([
+    new THREE.BoxGeometry(.016, .05, .06).translate(0, -.285, -.035),
+    new THREE.BoxGeometry(.008, .07, .016).translate(0, -.285, -.068), // Schneide
+    new THREE.BoxGeometry(.022, .034, .028).translate(0, -.285, .012),  // Nacken
+  ]), 0x9aa3ab, .35),
+];
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, vWood, ...vAxe];
+// Holzspäne beim Axthieb
+const CHIP_N = 48, chipMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.03, .012, .022), new THREE.MeshStandardMaterial({ color: 0xd9b07a, roughness: .9, flatShading: true }), CHIP_N);
+chipMesh.frustumCulled = false; chipMesh.count = 0; scene.add(chipMesh);
+const chips = [];
+function spawnChips(x, y, z, h) {
+  for (let k = 0; k < 5; k++) {
+    if (chips.length >= CHIP_N) chips.shift();
+    const a = h + Math.PI + rnd(1.3), sp = .8 + Math.random() * 1.2;
+    chips.push({ x, y, z, vx: Math.sin(a) * sp, vy: 1 + Math.random() * 1.4, vz: Math.cos(a) * sp, r: Math.random() * 6, life: .7 });
+  }
+}
+function updateChips(dt) {
+  for (let i = chips.length - 1; i >= 0; i--) {
+    const c = chips[i]; c.life -= dt;
+    if (c.life <= 0) { chips.splice(i, 1); continue; }
+    c.vy -= 6 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.r += dt * 14;
+    const g = surfaceAt(c.x, c.z); if (c.y < g) { c.y = g; c.vx *= .5; c.vz *= .5; c.vy = 0; }
+  }
+  chips.forEach((c, i) => { dummy.position.set(c.x, c.y, c.z); dummy.rotation.set(c.r, c.r * .7, 0); dummy.scale.setScalar(Math.min(1, c.life / .2)); dummy.updateMatrix(); chipMesh.setMatrixAt(i, dummy.matrix); });
+  chipMesh.count = chips.length; chipMesh.instanceMatrix.needsUpdate = true;
+}
+// Ein Axthieb dauert CHOP_T Sekunden: ausholen, zuschlagen (Treffer bei CHOP_HIT), zurücknehmen
+const CHOP_T = .8, CHOP_HIT = .72;
+function chopPose(p) {
+  const sm = x => x * x * (3 - 2 * x);
+  if (p < .55) { const e = sm(p / .55); return { arm: -.9 - 2.1 * e, tilt: -.12 * e, bob: 0 }; }
+  if (p < CHOP_HIT) { const e = ((p - .55) / (CHOP_HIT - .55)) ** 2; return { arm: -3 + 1.75 * e, tilt: -.12 + .4 * e, bob: -.012 * e }; }
+  const e = sm((p - CHOP_HIT) / (1 - CHOP_HIT)); return { arm: -1.25 + .35 * e, tilt: .28 * (1 - e), bob: -.012 * (1 - e) };
+}
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function dressVillager(i) {
   const r = mulberry(i * 7919 + 13), pick = a => a[Math.floor(r() * a.length)];
@@ -745,7 +782,7 @@ function findTree(x, z) {
 }
 function chooseJob(v) {
   const r = Math.random();
-  if (r < .55) { const t = findTree(v.x, v.z); if (t) { t.reserved = v; v.tree = t; const a = Math.random() * 6.28; walk(v, t.x + Math.cos(a) * .45, t.z + Math.sin(a) * .45, 'tree'); return; } }
+  if (r < .55) { const t = findTree(v.x, v.z); if (t) { t.reserved = v; v.tree = t; const a = Math.random() * 6.28; walk(v, t.x + Math.cos(a) * .4, t.z + Math.sin(a) * .4, 'tree'); return; } }
   if (r < .92) goPray(v); else { const p = homeSpot(); walk(v, p.x, p.z, 'rest'); }
 }
 function stepTo(o, tx, tz, d) {
@@ -757,7 +794,7 @@ function stepTo(o, tx, tz, d) {
 }
 function arrive(v) {
   switch (v.next) {
-    case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
+    case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
     case 'store': v.carry = 0; addHolz(1); holzAcc++; if (Math.random() < .6) goPray(v); else idle(v, 1); break;
     case 'pray': v.state = 'pray'; v.timer = 3.4; v.h = Math.atan2(CHURCH.x - v.x, CHURCH.z - v.z); break;
     default: idle(v, .8 + Math.random() * 2.5);
@@ -769,7 +806,14 @@ function updateVillager(v, dt, t) {
   switch (v.state) {
     case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
     case 'walk': if (stepTo(v, v.tx, v.tz, sp * dt)) arrive(v); break;
-    case 'chop': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
+    case 'chop': {
+      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
+      const tr = v.tree, now = v.cp % 1;
+      if (tr && tr.alive && ((before < CHOP_HIT && now >= CHOP_HIT) || (now < before && before < CHOP_HIT))) { // Treffer
+        tr.shake = 1; spawnChips(tr.x - Math.sin(v.h) * .08, surfaceAt(tr.x, tr.z) + .22, tr.z - Math.cos(v.h) * .08, v.h);
+      }
+    }
+      if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walk(v, WELL.x + rnd(.7), WELL.z + .3 + rnd(.5), 'store'); } else idle(v, .4); } break;
     case 'pray': v.timer -= dt * (v.haste > 0 ? 2 : 1); if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'flee': v.timer -= dt; if (stepTo(v, v.tx, v.tz, 2.2 * dt) || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
@@ -997,7 +1041,7 @@ function updateMouthTree() {
   mouthV.addScaledVector(mouthF, C.h * .17).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
   mouthQ.copy(foxPivot.quaternion).multiply(mouthZ);                   // Stamm quer zur Laufrichtung
   o.quaternion.copy(mouthQ); o.scale.setScalar(s);
-  o.position.copy(mouthV).addScaledVector(mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), TREE_H * s * .3); // Stamm etwa im unteren Drittel gepackt
+  o.position.copy(mouthV).addScaledVector(mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion), -TREE_H * s * .3); // Krone zeigt nach +x: Fuß um ein Drittel zur Gegenseite, so liegt das untere Drittel des Stamms im Maul
   o.visible = true;
 }
 const mouthTmp = new THREE.Vector3();
@@ -1301,7 +1345,7 @@ function frame() {
       const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
-    } else if (v.state === 'chop') { const c = Math.max(0, Math.sin(t * 9 + v.ph)); tilt = c * .3; armA = armB = -2.5 + c * 1.6; splay = .1; }
+    } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
     else if (v.state === 'pray') { tilt = .35 + Math.sin(t * 2 + v.ph) * .08; armA = armB = -1.35; splay = -.12; }
     else if (v.state === 'grabbed' || v.state === 'falling') {
       const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
@@ -1310,15 +1354,24 @@ function frame() {
     if (v.carry && v.state !== 'grabbed' && v.state !== 'falling') { armA = armB = -1.1; splay = .12; }
     dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, v.h, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
     const M = dummy.matrix;
-    const part = (mesh, x, y, a, z) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, 0); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
+    const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
     part(vParts.legL, .038, HIP_Y, leg, 0); part(vParts.legR, -.038, HIP_Y, -leg, 0);
     part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay);
     vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
     vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
     vParts.beard.setMatrixAt(i, L.beard ? M : zero);
     vWood.setMatrixAt(i, v.carry ? M : zero);
+    // Axt: beim Hacken in beiden Händen (Drehpunkt Schultermitte), auf dem Weg zum Baum geschultert
+    if (v.state === 'walk' && v.next === 'tree' && !v.carry) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
+    if (v.state === 'chop') vAxe.forEach(m => part(m, 0, SHO_Y, armA, 0));
+    else if (v.state === 'walk' && v.next === 'tree') {
+      const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
+      // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand
+      vAxe.forEach(m => part(m, -.07, SHO_Y + .02 + Math.cos(a) * sh, a, 0, Math.sin(a) * sh));
+    } else vAxe.forEach(m => m.setMatrixAt(i, zero));
   });
   for (const m of vAll) m.instanceMatrix.needsUpdate = true;
+  updateChips(dt);
 
   // trees
   const tc2 = [0, 0]; let sc = 0;
@@ -1329,7 +1382,9 @@ function frame() {
     if (tr.alive) {
       if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008);
       const s = ST * tr.g, pull = treeGrab && treeGrab.tr === tr ? treeGrab.prog : 0;
-      dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
+      if (tr.shake > 0) tr.shake = Math.max(0, tr.shake - dt * 3.5);
+      const shk = tr.shake ? Math.sin(t * 45) * tr.shake * .045 : 0;
+      dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12 + shk, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
       treeSwarms[tr.type].set(tc2[tr.type]++, dummy.matrix);
     } else if (tr.stumpT > 0) {
       tr.stumpT -= dt;
