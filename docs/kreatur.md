@@ -9,15 +9,20 @@ Stand der Features: siehe `README.md`.
 
 ## 1. Ist-Stand
 
-- **Gestalten:** Fuchs (Fell-Modell, eigene Reaktionen), Wolf, Hirsch, Stier, Alpaka, Katze. Name und Geschlecht wählbar
+- **Gestalten:** Fuchs (eigene Reaktionen; Fell-Modell vorhanden, derzeit nicht geladen), Wolf, Hirsch, Stier, Alpaka,
+  Katze; gewählt am Schrein (die Kreatur läuft hin und verwandelt sich). Name und Geschlecht im Charakterbogen
   (Start: Fenja, weiblich). `S.creature`, `S.name`, `S.gender`.
 - **Neigungen:** `S.w` mit `help` (Helfen), `play` (Spielen), `mischief` (Unfug); bestimmen, was sie aus eigenem Antrieb tut.
 - **Tätigkeiten:** Baum fällen und ins Lager bringen (Helfen), Waren tragen (bis zu 3 Stück im Maul: von Hütten ins
   Lager, aus dem Lager zu Säge, Mühle, Bäckerei), mit dem Dorf spielen, Baum umwerfen (Unfug; Bewohner in der Nähe
   fliehen), dösen, eine Geste beim Wunder des Spielers (`foxCast`).
-- **Erziehung:** Kreismenü an der Kreatur: Streicheln (Lob) und Klaps (Tadel) verstärken bzw. schwächen die zuletzt
-  gezeigte Tätigkeit (`reinforce`). Fuchs reagiert sichtbar (Schwanz wedeln bzw. einklemmen).
-- **Kamera:** „Folgen“ hält die Kreatur im Bild (nur Kamera, keine Leine).
+- **Erziehung:** direkt an der Kreatur langsam darüberstreichen (Lob) oder schnell wischen (Tadel), alternativ im
+  Kreismenü; verstärkt bzw. schwächt die zuletzt gezeigte Tätigkeit (`reinforce`). Fuchs reagiert sichtbar (Schwanz
+  wedeln bzw. einklemmen). Die Änderung steht danach über der Kreatur und in der Lernchronik (3.11).
+- **Nachvollziehen:** Jede Entscheidung hat Gründe (`src/creature/mind.js`), sichtbar als Gedankenblase, Zeile „Warum“
+  und im Charakterbogen (Erfahrung, Lernchronik, letzte Entscheidungen).
+- **Kamera:** Nahsicht (Tipp auf den Namen) zeigt die Kreatur aus der Nähe in der Welt; „Folgen“ im Kreismenü hält sie
+  nur im Bild (keine Leine).
 - **Hand-Hilfen** (`handHelp`) als Grundlage für das spätere Lernen durch Vormachen.
 
 ## 2. Überblick: was dazukommt
@@ -31,7 +36,7 @@ Stand der Features: siehe `README.md`.
 | Leine | der Hand folgen, an einem Pfahl anbinden | 3.5 | 🔵 geplant |
 | Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` | 🔵 geplant |
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
-| Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | 🔵 geplant |
+| Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | 🟡 teilweise |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
@@ -172,7 +177,7 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 ### 3.11 Erleben in der Welt, Charakterbogen und „Warum?“
 
-**Stand:** 🔵 geplant
+**Stand:** 🟡 teilweise – A bis E vorhanden (F 1–5), Fell-Fuchs in der Nahsicht (F 6) offen
 
 Leitgedanke: **Beobachten und Erziehen passieren in der Welt**, nicht in einem Fenster mit eigenem Modell. Dort sieht
 man, wie die Kreatur einen Baum umwirft, wie das Dorf reagiert, was sie umgibt. Der **Charakterbogen** bleibt, aber als
@@ -182,10 +187,10 @@ Verhalten kommt. Je mehr Tätigkeiten, Bedürfnisse und Fähigkeiten dazukommen 
 
 #### A. Nahsicht in der Welt statt Porträt
 
-- **Tipp auf den Namen** oben (`#btnFox`): Die Kamera gleitet in etwa 1 s zur Kreatur (Abstand etwa 6, schräg von
+- **Tipp auf den Namen** oben (`#btnFox`): Die Kamera gleitet in etwa 1 s zur Kreatur (Abstand etwa 9, schräg von
   oben) und folgt ihr (`setFollow`). Unten erscheint eine schmale Karte mit Name, Tätigkeit, Motiv (C) und dem Knopf
   „Bogen“. Ein zweiter Tipp auf den Namen öffnet den Charakterbogen.
-- Die Nahsicht endet beim Herauszoomen über etwa Abstand 12, beim Verschieben der Karte, mit „Nicht folgen“ im
+- Die Nahsicht endet beim Herauszoomen über etwa Abstand 16, mit „Nicht folgen“ im
   Kreismenü oder mit dem × der Karte. Die Kamera bleibt in der Nahsicht frei dreh- und zoombar.
 - Das **Porträt** (`src/ui/portrait.js`, eigener WebGL-Renderer im Bogen) entfällt. Das spart auf dem Handy einen
   zweiten WebGL-Kontext.
@@ -343,7 +348,7 @@ nicht als Ersatz.
 
 ## 5. Vorgeschlagene Reihenfolge
 
-0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar.
+0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar. 🟡
 1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur. ✅
 2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst). Davor die zweibeinige Gestalt (3.12 G 1–3), damit Arbeiten
    mit den Händen gleich mitgebaut werden kann.
