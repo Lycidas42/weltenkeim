@@ -58,41 +58,53 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
 
 ## 3. Greifen, Halten, Absetzen, Werfen
 
-### 3.1 Heute
+### 3.1 Frühere Bedienung
 
-**Stand:** ✅ vorhanden
+**Stand:** ⛔ abgelöst durch 3.2
 
-- Hand-Werkzeug: Druck auf einen Bewohner packt ihn, er hängt zappelnd unter der Hand und folgt dem Finger.
-- Beim Loslassen wird er **immer geworfen**, mit der Geschwindigkeit der Hand (`onToolUp`); er fällt und landet.
-- Bäume: gedrückt halten bzw. nach oben ziehen, bis der Baum samt Wurzel ausreißt; beim Loslassen fliegt er und
-  wird bei der Landung zu Holz (`uprootTree`, `throwTree`).
-- Ein zweiter Finger (Zoomen) oder ein Werkzeugwechsel lässt das Gehaltene sofort los (= Wurf).
+Bis [#6](https://github.com/Lycidas42/weltenkeim/issues/6) galt das Halten nur, solange der Finger auf dem Bildschirm
+lag: Beim Loslassen wurde das Gehaltene immer geworfen, ein zweiter Finger oder ein Werkzeugwechsel ließ es sofort
+los. Bäume reißt man weiterhin aus, indem man sie gedrückt hält bzw. nach oben zieht (`uprootTree`).
 
 ### 3.2 Halten ist ein Zustand, kein gedrückter Finger
 
-**Stand:** 🔵 geplant
+**Stand:** ✅ vorhanden · [#6](https://github.com/Lycidas42/weltenkeim/issues/6) – Bewohner und ausgerissene Bäume;
+Waren kommen mit 5.2
 
 Die Hand hält, was sie gegriffen hat, **so lange, bis der Spieler es bewusst absetzt oder wirft** – unabhängig davon,
 ob der Finger noch auf dem Bildschirm ist.
 
-- **Greifen:** wie heute – Druck auf Bewohner, Baum (ausreißen), Stapel oder Ware (Abschnitt 5).
+- **Greifen:** wie bisher – Druck auf Bewohner oder Baum (ausreißen); später Stapel und Waren (Abschnitt 5).
 - **Halten:** Finger anheben lässt nichts fallen. Die Hand bleibt an ihrer Stelle auf dem Bildschirm und trägt das
-  Gegriffene sichtbar (Haltung `hold`). Ein kleines Symbol am Werkzeugknopf „Hand“ zeigt, was gehalten wird.
-- **Kamera frei:** Während die Hand etwas hält, gehen alle Kamera-Aktionen: zwei Finger zoomen, verschieben und
-  drehen, das Blick-Werkzeug ebenso, am Rechner Mausrad, rechte Maustaste, Leertaste/Strg. Die Hand bleibt dabei am
-  selben Bildschirmpunkt und gleitet so mit über die Welt – so trägt man etwas weit über die Insel.
-- **Bewegen:** Ein Finger, der auf der Hand (oder irgendwo im Hand-Werkzeug) ansetzt, zieht die Hand mit.
-- **Absetzen (sanft):** Tippen auf einen Punkt der Welt – die Hand senkt sich dort und stellt das Gehaltene ab.
-  Alternativ: langsam ziehen und loslassen. Bewohner landen auf den Füßen und gehen weiter ihrer Arbeit nach.
-- **Werfen:** schnelles Wischen mit dem Gehaltenen und Loslassen in der Bewegung (Geschwindigkeit über einer
-  Schwelle). Wurfweite wie heute aus der Handgeschwindigkeit. Bäume und Waren dürfen geworfen werden, ohne dass es
-  böse zählt; Bewohner zu werfen ist böse (Abschnitt 7).
-- **Werkzeugwechsel** lässt nichts fallen. Im Wunder-Werkzeug ist die Hand ausgeblendet, das Gehaltene bleibt
-  (Symbol am Knopf); zurück im Hand-Werkzeug ist es wieder da.
-- **Kreismenü der Kreatur** bleibt erreichbar: Kreatur mit voller Hand antippen öffnet es; Absetzen auf der Kreatur
-  = ihr das Gehaltene geben (Futter, Holz zum Lernen).
-- **Speichern/Neuladen:** Gehaltene Bewohner werden beim Speichern an der Stelle der Hand abgesetzt. Gehaltene
-  Waren stehen in `S.held` und sind nach dem Laden wieder in der Hand (sonst gingen sie verloren).
+  Gegriffene sichtbar (Haltung `hold`). Ein kleines Symbol am Werkzeugknopf „Hand“ zeigt, was gehalten wird
+  (Bewohner bzw. Baum).
+- **Kamera frei:** Während die Hand etwas hält, gehen alle Kamera-Aktionen: zwei Finger zoomen und verschieben, das
+  Blick-Werkzeug ebenso, am Rechner Mausrad, rechte Maustaste, Leertaste/Strg. Die Hand bleibt dabei am selben
+  Bildschirmpunkt und gleitet so mit über die Welt – so trägt man etwas weit über die Insel.
+- **Bewegen:** Ein Finger, der irgendwo im Hand-Werkzeug ansetzt und zieht, zieht die Hand mit. Loslassen nach
+  langsamem Ziehen = weiter halten; die Hand bleibt am neuen Punkt.
+- **Absetzen (sanft):** nur per kurzem Tipp (bzw. Klick) auf einen Punkt der Welt – Boden, Gebäude, Feld. Die Hand
+  gleitet dorthin, senkt sich und stellt das Gehaltene ab. Bewohner landen auf den Füßen, ohne Schwindel, und gehen
+  weiter ihrer Arbeit nach; Bäume werden zu Stämmen. Im Wasser: Bewohner schwimmen an Land, Baum „Platsch!“.
+  Es zählt der Punkt unter dem Finger, nicht die Hand, die am Handy darüber schwebt.
+- **Tipp ins Leere** (Himmel, kein Bodenpunkt): Das Gehaltene fällt senkrecht unter der Hand herunter, ohne
+  Wurfschwung (kann Absicht sein). Aus großer Höhe ist ein Bewohner danach schwindelig.
+- **Werfen:** schnelles Wischen mit gehaltenem Finger und Loslassen in der Bewegung (über 700 px/s). Wurfweite wie
+  bisher aus der Handgeschwindigkeit. Bäume und Waren dürfen geworfen werden, ohne dass es böse zählt; Bewohner zu
+  werfen ist böse (Abschnitt 7).
+- **Hand ist voll:** Solange sie etwas hält, hilft die Hand nicht (kein Säen, Ernten, Füttern …), packt nichts
+  Weiteres und reißt keinen Baum aus. Ein Tipp auf ein Feld o. Ä. setzt das Gehaltene dort ab; das Schild unter dem
+  Zeiger (Rechner) zeigt dann „Absetzen“.
+- **Werkzeugwechsel** lässt nichts fallen. Im Wunder- und Formen-Werkzeug sind Hand und Gehaltenes ausgeblendet
+  (Symbol am Knopf bleibt); zurück im Hand-Werkzeug ist beides wieder da. Gehaltene Bewohner arbeiten so lange nicht.
+- **Kreismenü der Kreatur** bleibt erreichbar: Kreatur mit voller Hand antippen öffnet es, die Hand hält weiter.
+  Später: Absetzen auf der Kreatur = ihr das Gehaltene geben (Futter, Holz zum Lernen; kommt mit `nahrung.md`).
+- **Rechner:** dasselbe mit der Maus – Klick = Absetzen bzw. Fallenlassen, Ziehen mit gedrückter Maustaste und
+  schnelles Loslassen = Werfen.
+- **Ereignisse:** `handDrop` (`{ kind, what, x, z, soft }`) und `handThrow` (`{ kind, what, x, z, vx, vz }`), damit
+  die Waage sie später zählen kann.
+- **Speichern/Neuladen:** Nach dem Neuladen ist die Hand leer (Bewohner zählen weiter über `S.pop`, ein gehaltener
+  Baum ist weg). Gehaltene Waren stehen später in `S.held` und sind nach dem Laden wieder in der Hand.
 - Mehrere Bewohner auf einmal tragen: ab einer höheren Ausbaustufe der Hand (Abschnitt 6).
 
 ### 3.3 Gut und böse beim Tragen
@@ -271,7 +283,7 @@ Standardwerten zusammengeführt. Hand und Waage gehören zur Welt, nicht zum Pro
 
 ## 11. Vorgeschlagene Reihenfolge
 
-1. **Halten als Zustand** (3.2): Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten.
+1. **Halten als Zustand** (3.2) ✅: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten.
 2. **Waage** (`S.align`, `S.deeds`) mit Anzeige; vorhandene Taten zählen (Werfen, sanft Absetzen, Helfen, Bitten,
    Regen, Bäume ausreißen).
 3. **Abgrenzung Hand/Wunder** umsetzen: Gießen und Sofort-Verarbeitung aus `helpAt` entfernen, Bann als Wunder.
@@ -282,8 +294,6 @@ Standardwerten zusammengeführt. Hand und Waage gehören zur Welt, nicht zum Pro
 
 ## 12. Offene Fragen
 
-- Absetzen per Tippen: soll ein Tipp ins Leere (Himmel) das Gehaltene fallen lassen oder nichts tun?
 - Wirbelsturm: rein böses Wunder oder auch gutes Werkzeug (Roden, Waren verteilen)? Gewicht auf der Waage abhängig
   davon, was er trifft?
-- Darf die Hand mit gehaltenem Bewohner auch helfen (Tippen auf ein Feld), oder ist sie dann „voll“?
 - Wie sichtbar soll die Waage für Einsteiger sein – von Anfang an oder erst nach der ersten bösen Tat?

@@ -53,7 +53,7 @@ function updateTrees(dt, t) {
   }
   const o = heldObjs[heldTree.type];
   heldObjs.forEach(x => x.visible = false); rootBall.visible = false;
-  if (!heldTree.on) return;
+  if (!heldTree.on || (!heldTree.flying && input.heldHidden)) return;
   const s = ST * heldTree.g;
   if (heldTree.flying) {
     heldTree.vel.y -= 16 * dt; heldTree.pos.addScaledVector(heldTree.vel, dt); heldTree.tilt += heldTree.spin * dt + dt * 2.5;
