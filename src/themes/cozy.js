@@ -74,7 +74,9 @@ export default {
       night: { top: '#000105', mid: '#03060f' },
     },
     // Gelände: Ufer (tief, nass, Sand), Gras (zwei Töne), trocken, kahl, Fels, Schnee
-    terrain: { deep: 0xb7a06a, wet: 0xc8ad74, sand: 0xecd9a0, g1: 0x82b047, g2: 0x5a8d36, dry: 0xa6ad52, bare: 0x8f7a54, rock: 0x8e8476, snow: 0xf2f1ea },
+    // Bachbett und Ufergras, Trampelpfade (zwei Töne). Zur Laufzeit änderbar: setTerrainColor (src/world/paths.js)
+    terrain: { deep: 0xb7a06a, wet: 0xc8ad74, sand: 0xecd9a0, g1: 0x82b047, g2: 0x5a8d36, dry: 0xa6ad52, bare: 0x8f7a54, rock: 0x8e8476, snow: 0xf2f1ea,
+      streamBed: 0x8d8270, streamGrass: 0x4f8a3a, path: 0xa88a5c, path2: 0x957548 },
     // Farbrollen der im Code gebauten Pflanzen und Felsen (src/core/colors.js): je Rolle eine Farbe oder eine Liste
     // (Verlauf dunkel → hell bzw. Auswahl). Zur Laufzeit lässt sich jede Rolle umfärben (Jahreszeiten).
     nature: {
@@ -89,6 +91,8 @@ export default {
       'grass': [0x86b54b, 0x76a842, 0x9cbc55, 0x6e9e3e], 'stem': [0x4c8a35, 0x5c9a40], 'fern': [0x2f6b2c, 0x6aa84a],
       'flower': [0xf6f3e8, 0xf2cf3a, 0xec86ad, 0x9c82dc, 0xdc4a3c, 0x75a6e6, 0xf09a3e], 'flower.eye': 0xf5c542,
       'shell': [0xfff6ec, 0xf6d3c6, 0xe9c9a0, 0xffe4ef], 'driftwood': [0x8f8576, 0xb3aa9a],
+      // Blätter der Feldfrüchte und Gartenpflanzen (Einzelfarben im Code), Halme des Weizens (Farbe je Feld: grün bis golden)
+      'crop': [0x3f7a2c, 0x86ad8a], 'wheat': [0x7fa04a, 0xd8b54a],
     },
     // Bewohner: Hautfarben, Haarfarben, Gewänder, Hosen
     villagers: {

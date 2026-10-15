@@ -47,11 +47,11 @@ const gardenGeo = (() => {
   for (const x of [-W / 2, W / 2]) { B(.035, .2, .035, x, .1, 0, woodC); for (const y of [.08, .16]) B(.018, .022, D, x, y, 0, woodC); }
   B(W - .1, .04, D - .1, 0, .02, 0, 0x5c4330);
   for (let k = 0; k < 6; k++) { // Kohl
-    const x = -.42 + k * .17; parts.push(paint(new THREE.IcosahedronGeometry(.055, 1).scale(1, .75, 1).translate(x, .07, -.2), (px, py, pz, ny, c) => c.set(0x77a84f).lerp(COL2.set(0xb7d98a), smooth(.03, .1, py) * .6)));
+    const x = -.42 + k * .17; parts.push(paint(new THREE.IcosahedronGeometry(.055, 1).scale(1, .75, 1).translate(x, .07, -.2), (px, py, pz, ny, c) => c.set(0x77a84f).lerp(COL2.set(0xb7d98a), smooth(.03, .1, py) * .6), false, 'crop'));
   }
-  for (let k = 0; k < 8; k++) { const x = -.44 + k * .125; parts.push(paint(new THREE.ConeGeometry(.025, .09, 4).translate(x, .085, 0), (px, py, pz, ny, c) => c.set(0x4f9a3a))); parts.push(paint(new THREE.ConeGeometry(.015, .03, 4).rotateX(Math.PI).translate(x, .05, 0), (px, py, pz, ny, c) => c.set(0xe2802c))); }
+  for (let k = 0; k < 8; k++) { const x = -.44 + k * .125; parts.push(paint(new THREE.ConeGeometry(.025, .09, 4).translate(x, .085, 0), (px, py, pz, ny, c) => c.set(0x4f9a3a), false, 'crop')); parts.push(paint(new THREE.ConeGeometry(.015, .03, 4).rotateX(Math.PI).translate(x, .05, 0), (px, py, pz, ny, c) => c.set(0xe2802c))); }
   for (let k = 0; k < 5; k++) { // Tomatenstauden
-    const x = -.38 + k * .19; parts.push(paint(new THREE.IcosahedronGeometry(.06, 0).scale(.8, 1.3, .8).translate(x, .1, .2), (px, py, pz, ny, c) => c.set(0x3f7f2e)));
+    const x = -.38 + k * .19; parts.push(paint(new THREE.IcosahedronGeometry(.06, 0).scale(.8, 1.3, .8).translate(x, .1, .2), (px, py, pz, ny, c) => c.set(0x3f7f2e), false, 'crop'));
     for (const [dx, dy] of [[.04, .1], [-.03, .14], [.01, .06]]) parts.push(paint(new THREE.IcosahedronGeometry(.017, 0).translate(x + dx, dy, .24), (px, py, pz, ny, c) => c.set(0xd8352a)));
   }
   return mergeGeometries(parts);

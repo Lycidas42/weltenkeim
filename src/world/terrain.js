@@ -113,7 +113,7 @@ function terrainColor(h, jit, k = -1) {
     const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL;
     tc.lerp(C.bare, Math.max(smooth(.95, .5, sacredDist(x, z)), smooth(3.3, 2.9, Math.hypot(x, z)), smooth(2.6, 2.2, Math.hypot(x - SHRINE_AT.x, z - SHRINE_AT.z)), smooth(.75, .4, laneDist(x, z)) * .8) * .85);
   }
-  if (k >= 0 && typeof STREAM !== 'undefined') { const d = STREAM.dist[k]; if (d < 1.2) { tc.lerp(tg.set(0x8d8270), smooth(.55, .25, d) * .9); tc.lerp(tg.set(0x4f8a3a), smooth(1.2, .6, d) * (1 - smooth(.5, .25, d)) * .45); tg.copy(C.g1).lerp(C.g2, jit); } }
+  if (k >= 0 && typeof STREAM !== 'undefined') { const d = STREAM.dist[k]; if (d < 1.2) { tc.lerp(C.streamBed, smooth(.55, .25, d) * .9); tc.lerp(C.streamGrass, smooth(1.2, .6, d) * (1 - smooth(.5, .25, d)) * .45); tg.copy(C.g1).lerp(C.g2, jit); } }
   if (k >= 0) { // Wiese: trockene Flecken und kahle Erdstellen
     const gw = smooth(.45, .6, h) * (1 - smooth(2.5, 2.9, h));
     tc.lerp(C.dry, smooth(.05, .35, DRY[k]) * .55 * gw);
@@ -225,4 +225,4 @@ let terrainDirty = false, terrainT = 0;
 const markTerrainDirty = () => { terrainDirty = true; }; // Normalen, Höhen- und Tiefenkarte gleich nachziehen
 function updateTerrain(dt) { terrainU.uWet.value = weather.wet; terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 
-export { BARE, CELL, GARDEN_R, H, HALF, HOUSE_R, J, N, NOISE_GLSL, SACRED_SEG, SEG, SHRINE_AT, SIZE, STREAM, depData, hTex, heightAt, laneDist, markTerrainDirty, resetTerrain, sacredDist, streamDist, streamU, surfaceAt, tCol, tPos, terrainColor, terrainU, tg, updateTerrain };
+export { BARE, C, CELL, GARDEN_R, H, HALF, HOUSE_R, J, N, NOISE_GLSL, SACRED_SEG, SEG, SHRINE_AT, SIZE, STREAM, depData, hTex, heightAt, laneDist, markTerrainDirty, resetTerrain, sacredDist, streamDist, streamU, surfaceAt, tCol, tPos, terrainColor, terrainU, tg, updateTerrain };

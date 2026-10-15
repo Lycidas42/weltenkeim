@@ -25,30 +25,30 @@ const CROPS = [
 ];
 const FIELD_STATES = ['leer', 'grow', 'reif'];
 const cropGeo = (() => {
-  const P = (geo, fn) => paint(geo, fn), C = (c, c2, k = 6) => (x, y, z, ny, col) => col.set(c).lerp(COL2.set(c2), clamp(y * k, 0, 1));
+  const P = (geo, fn, slot) => paint(geo, fn, false, slot), C = (c, c2, k = 6) => (x, y, z, ny, col) => col.set(c).lerp(COL2.set(c2), clamp(y * k, 0, 1));
   const ring = (n, make) => mergeGeometries([...Array(n)].map((_, k) => make(k).rotateY(k / n * Math.PI * 2 + k * .3)));
   return [
     { // Salat: Rosette heller Blätter, in der Mitte schließt sich der Kopf
-      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.038, .012, .062).rotateX(-.45).translate(0, .025, .045), C(0x6fae45, 0xb9e27e, 14))),
+      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.038, .012, .062).rotateX(-.45).translate(0, .025, .045), C(0x6fae45, 0xb9e27e, 14), 'crop')),
       fruit: P(new THREE.SphereGeometry(.046, 8, 6).scale(1, .8, 1).translate(0, .04, 0), C(0x9fd067, 0xd6f0a4, 12)),
     },
     { // Möhren: gefiedertes Kraut, oben schaut die orange Rübe heraus
-      leaf: ring(6, k => P(new THREE.ConeGeometry(.014, .13, 3).translate(0, .065, 0).rotateZ(.25 + (k % 2) * .15), C(0x3f8a32, 0x7cc25a, 8))),
+      leaf: ring(6, k => P(new THREE.ConeGeometry(.014, .13, 3).translate(0, .065, 0).rotateZ(.25 + (k % 2) * .15), C(0x3f8a32, 0x7cc25a, 8), 'crop')),
       fruit: P(new THREE.ConeGeometry(.024, .06, 6).rotateX(Math.PI).translate(0, .012, 0), C(0xd4691e, 0xf09a3e, 20)),
     },
     { // Kohl: blaugrüne Außenblätter um einen festen Kopf
-      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.05, .016, .08).rotateX(-.6).translate(0, .035, .06), C(0x4f7f5c, 0x86ad8a, 10))),
+      leaf: ring(6, () => P(new THREE.SphereGeometry(1, 6, 4).scale(.05, .016, .08).rotateX(-.6).translate(0, .035, .06), C(0x4f7f5c, 0x86ad8a, 10), 'crop')),
       fruit: P(new THREE.IcosahedronGeometry(.066, 1).scale(1, .9, 1).translate(0, .065, 0), C(0x8dbb78, 0xc5e0a6, 8)),
     },
     { // Kürbis: große Blätter am Boden, dazwischen wächst der Kürbis
-      leaf: ring(5, () => P(new THREE.SphereGeometry(1, 7, 4).scale(.075, .012, .075).translate(0, .045, .13), C(0x3f7a2c, 0x6fa84a, 10))),
+      leaf: ring(5, () => P(new THREE.SphereGeometry(1, 7, 4).scale(.075, .012, .075).translate(0, .045, .13), C(0x3f7a2c, 0x6fa84a, 10), 'crop')),
       fruit: mergeGeometries([
         P(new THREE.SphereGeometry(.11, 12, 7).scale(1, .72, 1).translate(0, .072, 0), (x, y, z, ny, c) => c.set(0xe07a22).multiplyScalar(.82 + .18 * Math.abs(Math.cos(Math.atan2(z, x) * 4)))),
         P(new THREE.CylinderGeometry(.008, .012, .045, 5).translate(0, .16, 0), (x, y, z, ny, c) => c.set(0x6b7a3a)),
       ]),
     },
     { // Weizen: Büschel schlanker Halme (Farbe kommt je Feld: erst grün, reif golden), oben die Ähren
-      leaf: mergeGeometries([...Array(7)].map((_, k) => P(new THREE.ConeGeometry(.009, .28, 3).translate(0, .135, 0).rotateZ(rnd(.18)).rotateX(rnd(.18)).translate(rnd(.03), 0, rnd(.03)), C(0xb9bfa8, 0xffffff, 5)))),
+      leaf: mergeGeometries([...Array(7)].map((_, k) => P(new THREE.ConeGeometry(.009, .28, 3).translate(0, .135, 0).rotateZ(rnd(.18)).rotateX(rnd(.18)).translate(rnd(.03), 0, rnd(.03)), C(0xb9bfa8, 0xffffff, 5), 'wheat'))),
       fruit: mergeGeometries([...Array(7)].map((_, k) => P(new THREE.SphereGeometry(1, 5, 4).scale(.013, .038, .013).translate(Math.cos(k * 2.4) * .022 * (k % 3) / 2, .28, Math.sin(k * 2.4) * .022 * (k % 3) / 2), C(0xc99a3a, 0xf0d070, 30)))),
     },
   ];

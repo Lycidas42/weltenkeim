@@ -8,7 +8,7 @@ import { updateFloats, updateIncome } from './ui/feedback.js';
 import { lightDir, lightRaw, setWeather, snowSkip, snowU, snowify, toggleDayNight, updateDay, weather } from './world/sky.js';
 import { STREAM, depData, heightAt, updateTerrain } from './world/terrain.js';
 import { updateWater, waterMat, waterU } from './world/water.js';
-import { addWear, updateWear } from './world/paths.js';
+import { addWear, setTerrainColor, terrainColorOf, updateWear } from './world/paths.js';
 import { sculpt } from './world/sculpt.js';
 import { updateChips } from './world/particles.js';
 import { fox } from './creature/kinds.js';
@@ -117,5 +117,5 @@ setTimeout(() => $('loading').remove(), 800);
 window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab)
   step: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) { clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } },
-  setSlot, slotState, SLOTS, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
