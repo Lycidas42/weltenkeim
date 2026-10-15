@@ -89,13 +89,49 @@ Diese Modelle entstehen im Code und lassen sich noch nicht per Datei ersetzen:
 - Schrein
 - Ofen, Lager, Steg
 
-Ihre Grundfarben für Gelände, Himmel und Bewohner stehen aber schon in der Palette des Themes (`palette`).
-Schritt für Schritt können weitere Farben in die Palette wandern. Einzelne Modelle können auch durch Dateien ersetzt
-werden: Dafür bekommen sie einen Schlüssel im Theme, und der Code-Baustein wird zur Rückfallebene.
+Ihre Grundfarben stehen aber schon in der Palette des Themes (`palette`): Gelände, Himmel, Bewohner sowie die
+Farbrollen der Natur (siehe 4.1). Einzelne Modelle können auch durch Dateien ersetzt werden: Dafür bekommen sie einen
+Schlüssel im Theme, und der Code-Baustein wird zur Rückfallebene.
 
-Die Bewohner sind ein Sonderfall. Sie bestehen aus Einzelteilen (Beine, Arme, Kopf, Werkzeuge), die der Code direkt
-bewegt (`src/village/render.js`). Ein Ersatz per Datei bräuchte entweder genau diese Teile als getrennte Meshes oder
-ein Skelett mit festgelegten Animationen. Das wird festgelegt, sobald es einen Designer dafür gibt.
+### 4.1 Farbrollen (Natur, Felder, Gärten)
+
+Flächen von Bäumen, Büschen, Felsen, Gras, Farnen, Blumenstielen, Feldfrüchten und Gartenpflanzen tragen eine
+Farbrolle. Beispiele: `leaf.oak` (Laub der Eiche), `bark`, `rock`, `moss`, `grass`, `crop`, `wheat`. Alle Rollen und
+ihre Grundfarben stehen in `palette.nature`, der Mechanismus in `src/core/colors.js`.
+
+- **Theme:** legt die Grundfarben fest, mit denen die Formen bemalt werden.
+- **Zur Laufzeit:** `setSlot(rolle, farbe, anteil)` färbt eine Rolle fließend um. Hell-Dunkel-Verläufe und Streuung
+  bleiben erhalten. So entstehen Jahreszeiten ohne Neubau der Formen, siehe `docs/jahreszeiten.md`.
+- **Gelände:** `setTerrainColor(name, farbe)` (`src/world/paths.js`) ändert eine Geländefarbe (`g1`, `g2`, `dry`,
+  `sand` …). Das Gelände wird über einige Bilder verteilt neu gefärbt.
+- **Eigene Modelle per Datei** sollten ihre Materialien später ebenfalls Rollen zuordnen (z. B. Material „Leaves“ →
+  `leaf.oak`), damit sie sich mit den Jahreszeiten verfärben.
+
+### 4.2 Zukünftiger Schritt: Bewohner austauschbar machen (zurückgestellt)
+
+Heute besteht jeder Bewohner aus Einzelteilen, die der Code für jede Tätigkeit selbst stellt (`src/village/villagers.js`,
+`src/village/render.js`):
+- Beine, Körper, Arme, Kopf, Augen
+- vier Frisuren, Bart
+- Werkzeuge: Axt, Spaten, Bogen, Angel, Laterne und Tragelasten
+
+Geplanter Weg (A, Teile-Modell):
+- **Datei mit benannten Teilen:** Ein Designer liefert eine glTF-Datei mit genau diesen Teilen als getrennten Meshes.
+  Jedes Teil hat seinen Ursprung im Gelenk (Bein an der Hüfte, Arm an der Schulter, Kopf am Hals).
+  - Die Bewegung bleibt im Code. Alle Tätigkeiten funktionieren sofort, und die Bewohner werden weiter instanziert
+    gezeichnet (gut fürs Handy).
+  - Im Theme: Schlüssel wie `villager.default`. Ohne Datei bleibt der heutige Code-Bewohner.
+- **Mehrere Bewohner-Modelle:** Varianten wie Frau, Mann, Kind und Alte. Jede Variante ist ein eigener Teilesatz.
+  Jeder Bewohner bekommt fest eine Variante, so wie heute Haut, Haar und Kleidung (nach seinem Platz gewürfelt).
+  Zwei bis vier Varianten sind für die Leistung unkritisch.
+- **Vorlage für Designer:** Die heutigen Teile als glTF-Datei mit richtigen Namen und Gelenkpunkten exportieren, als
+  Ausgangspunkt für Blender.
+- **Farben:** Haut, Haar und Kleidung bleiben je Bewohner einstellbar (Instanzfarben). Die Teile sollten deshalb hell
+  bzw. neutral eingefärbt sein.
+
+Später möglich (Weg B, Skelett-Modell): ein Bewohner mit Skelett und festen Knochennamen. Der Code dreht die Knochen
+mit denselben Haltungswerten, eigene Animationen wären zusätzlich möglich. Freier im Stil, aber mehr Aufwand für
+Designer und nicht mehr instanziert. Weg A und B können nebeneinander bestehen.
 
 ## 5. Grenzen fürs Handy
 
