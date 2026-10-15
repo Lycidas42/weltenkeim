@@ -9,7 +9,7 @@ aus Kernwacht übernommen, aber nicht mit Kernwacht geteilt.
 
 ## 0. Grundsätze (aus Kernwacht übernommen)
 
-- **Alles optional:** Ohne Zugangsdaten in `config.js` oder ohne Netz läuft das Spiel vollständig lokal. Jede
+- **Alles optional:** Ohne Zugangsdaten in `src/online/config.js` oder ohne Netz läuft das Spiel vollständig lokal. Jede
   Online-Funktion zeigt dann einen ruhigen Hinweis („gerade nicht erreichbar“), aber nie einen Fehler, der das Spiel stört.
 - Die Bibliothek `supabase-js` liegt in `vendor/` und wird **erst bei Bedarf** nachgeladen, nicht beim Start, weil
   das Handy schnell starten soll.
@@ -42,7 +42,8 @@ Fleiß. Je Kategorie zählt die beste Welt eines Spielers.
 | **Höchster Tempel** | Tempelstufe | einfach, gut vergleichbar |
 | **Gesammelter Glaube** | Glaube insgesamt verdient (neues Feld, nicht der aktuelle Vorrat) | Langzeitwert |
 | **Gütigster Gott** / **Finsterster Gott** | `S.align` nahe +1 bzw. −1, gewichtet mit der Dauer | passt zu `gott-und-hand.md` Abschnitt 7; zwei Listen, beide gleichwertig |
-| **Klügste Kreatur** | Anzahl gelernter Fertigkeiten | sobald `kreatur-lernen.md` umgesetzt ist |
+| **Klügste Kreatur** | Anzahl gelernter Fähigkeiten | sobald `kreatur-lernen.md` umgesetzt ist |
+| **Fröhlichstes Dorf** | Dorfstimmung, gemittelt über die Zeit | sobald es Bedürfnisse und Laune gibt (`bewohner.md` 3.2) |
 | **Älteste Welt** | gespielte Tage (Spieltage, nicht Kalendertage) | |
 
 - **Woher die Werte kommen:** Wer Cloud-Sicherung nutzt, schickt die Werte mit `meta` sowieso mit. Die Bestenliste
@@ -150,20 +151,22 @@ haben aber bewusst denselben Aufbau wie dort. So lassen sich Verbesserungen leic
 
 ## 10. Repo und Auslieferung
 
-- Passend zum laufenden Modul-Umbau: ein eigenes Modul `online.js` (in Kernwacht ein globales Skript mit
+- Ein eigener Bereich `src/online/` mit dem Modul `online.js` (in Kernwacht ein globales Skript mit
   `window.KW_ONLINE`, hier ein ES-Modul mit `export`), das als Einziges mit Supabase spricht. Darüber schmale Module
   je Funktion (`feedback.js`, `polls.js`, `presence.js`, `board.js`), die nur `online.js` benutzen. Die
+  Modulregeln aus `CLAUDE.md` gelten: Rückmeldungen an die Oberfläche per `emit`, Beitrag zum Spielstand per `onSave`. Die
   Cloud-Sicherung hängt sich in das Speichermodul aus `spielstaende.md` ein.
 - `online.js` lädt `supabase-js` per dynamischem `import()` erst bei Bedarf. Die Bibliothek muss dafür als ES-Modul
   in `vendor/` liegen (Kernwacht nutzt die UMD-Fassung über ein `<script>`-Tag). Alternativ kann der UMD-Weg bleiben.
-- `config.js` (URL + Publishable Key des eigenen Projekts), `admin.html`. Alles außer `admin.html` in die
-  `APP`-Liste von `sw.js`, alles im Pages-Workflow ergänzen.
+- `src/online/config.js` (URL + Publishable Key des eigenen Projekts) und `admin.html` im Wurzelordner. Alles unter
+  `src/` kopiert der Pages-Workflow schon und prüft, dass es in der `APP`-Liste von `sw.js` steht. `admin.html`
+  kommt nicht in die `APP`-Liste, muss aber im Workflow ergänzt werden.
 - `window.__wk.online` für Tests in der Konsole (Verbindungsstatus, Präsenz, letzte Fehler).
 - Neue Texte und Schaltflächen auf Deutsch, Zahlen mit `fmt`.
 
 ## 11. Reihenfolge
 
-0. Voraussetzung: Modul-Umbau (läuft) und eigenes Supabase-Projekt anlegen.
+0. Voraussetzung: eigenes Supabase-Projekt anlegen (der Code liegt schon als Module unter `src/`).
 1. Grundgerüst `online.js` + Identität (gemeinsam mit Etappe 2 aus `spielstaende.md`).
 2. **Feedback** inkl. Kontext und Verwaltung: den größten Nutzen hat es schon in der Testphase.
 3. **Präsenz** („Götter wachen“): klein und schnell gemacht.

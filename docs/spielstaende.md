@@ -45,12 +45,14 @@ localStorage['weltenkeim-profile']  → { v: 1, settings: {…}, cloud: {…} } 
 
 ### 2.2 Welt wechseln
 
-Heute hält `game.js` den Spielzustand in vielen Variablen auf oberster Ebene (Bewohner, Hütten, Felder, Gelände …).
-Der laufende **Umbau auf Module** ist die Grundlage für mehrere Welten. Aus Sicht der Spielstände sollte er Folgendes leisten:
+Der Code liegt inzwischen als ES-Module unter `src/`. Der Spielzustand steckt aber weiter in Modul-Variablen
+(z. B. `villagers`, `huts`, `trees`) und wird beim Laden einmal aufgebaut. Für mehrere Welten ohne Neuladen braucht
+es noch Folgendes:
 
 - **Ein Ort für den Spielzustand:** Alles, was zur Welt gehört, hängt an einem Weltobjekt (bzw. an Modulen mit
   `init(state)`/`dispose()`), nicht an verstreuten Variablen auf oberster Ebene.
-- **Eigenes Speichermodul** (z. B. `save.js`) mit `load(id)`, `save()`, `migrate(S)`, `exportWorld()`, `importWorld()`
+- **Eigenes Speichermodul** (z. B. `src/core/save.js`; heute liegen `save`, `onSave` und `SAVE_KEY` in
+  `src/core/state.js`) mit `load(id)`, `save()`, `migrate(S)`, `exportWorld()`, `importWorld()`
   und dem Weltenindex. Kein anderes Modul greift direkt auf `localStorage` zu. Später hängt sich die Cloud-Sicherung
   genau hier ein.
 - **Trennung Szene ↔ Welt:** Renderer, Kamera, Licht, Wetter-Shader und geladene Modelle gehören nicht zur Welt und
@@ -58,7 +60,7 @@ Der laufende **Umbau auf Module** ist die Grundlage für mehrere Welten. Aus Sic
   und beim Wechsel abgebaut (Geometrien/Materialien freigeben, Instanzen zurücksetzen).
 
 Für die erste Fassung bleibt der Wechsel trotzdem **sichern, `active` setzen, Seite neu laden**. Das ist robust und
-braucht kein vollständiges `dispose()`. Ist der Modul-Umbau so weit, dass sich eine Welt sauber ab- und aufbauen
+braucht kein vollständiges `dispose()`. Ist der Umbau so weit, dass sich eine Welt sauber ab- und aufbauen
 lässt, kann der Wechsel ohne Neuladen kommen, mit Überblendung und ohne erneutes Laden der Modelle.
 
 ### 2.3 Sichern und Laden als Datei
@@ -194,27 +196,26 @@ Je Welt merkt sich das Gerät `cloud: { rev, syncedAt, dirty }`:
 ## 7. Datenschutz und Sicherheit
 
 - Gespeichert werden nur Spieldaten, der Weltname und der Name der Kreatur. Kein Konto, keine E-Mail, keine IP in eigenen Tabellen.
-- Hinweis im Info-Panel (`#sheetInfo`): was online gespeichert wird, wo (Supabase, Region EU wählen) und wie man es
+- Hinweis im Info-Panel (`#sheetInfo`): was online gespeichert wird, wo (Supabase, Region Frankfurt) und wie man es
   löscht („Online-Daten löschen“ im Profil → `wk_account_delete`).
-- Schummeln ist bei einem Einzelspieler-Spiel egal. Sollte es später Ranglisten geben, gelten dieselben Grenzen
-  wie in Kernwacht (Plausibilitätsprüfung serverseitig, Stände mit Admin-Eingriffen ausschließen).
+- Schummeln ist bei einem Einzelspieler-Spiel egal. Für die geplanten Bestenlisten gelten dieselben Grenzen wie in
+  Kernwacht (Plausibilitätsprüfung serverseitig, Stände mit Debug-Eingriffen ausschließen, `online-funktionen.md` 2).
 
 ## 8. Auswirkungen auf das Repo
 
-- Neue Laufzeit-Dateien (z. B. `online.js`, `config.js`, `vendor/supabase-js-*.js`): in die `APP`-Liste in `sw.js`
-  eintragen. `online.js`/`config.js` liegen außerhalb der bisher kopierten Ordner und müssen deshalb auch im
-  Pages-Workflow (`cp …`) ergänzt werden.
-- Nach dem Modul-Umbau: Speichermodul statt `SAVE_KEY` in `game.js`. `save()` schreibt zusätzlich `meta`, die heutigen
+- Neue Module (Speichermodul, Online-Module, `config.js`) unter `src/` anlegen: Der Pages-Workflow kopiert `src/`
+  als Ganzes, sie müssen nur in die `APP`-Liste in `sw.js` (der Workflow prüft das). `vendor/supabase-js-*.js` ebenso
+  in die `APP`-Liste.
+- Speichermodul statt `SAVE_KEY`/`save()` in `src/core/state.js`. `save()` schreibt zusätzlich `meta`, die heutigen
   Lade-Reparaturen werden zu `migrate()`. Das Zurücksetzen (`btnReset`) betrifft nur die aktive Welt.
-- Neue Module sind Laufzeit-Dateien: in die `APP`-Liste von `sw.js` und, falls sie außerhalb der bisher kopierten
-  Ordner liegen, in den Pages-Workflow (am einfachsten ein Ordner `src/` oder `js/`, der als Ganzes kopiert wird).
 - `window.__wk` um die Weltenverwaltung und den Online-Zustand ergänzen (Tests in der Konsole).
 - Neue Felder in `S` wie bisher abwärtskompatibel ergänzen. Für die Weltenverwaltung selbst sind **keine** neuen
   Felder in `S` nötig (Name und id stehen im Index).
 
 ## 9. Umsetzung in Etappen
 
-0. **Modul-Umbau** (läuft): Spielzustand an einem Ort, Speichermodul, Szene und Welt getrennt (siehe 2.2).
+0. **Umbau für Welten:** Code als Module unter `src/` (erledigt); Speichermodul, Spielzustand an einem Ort, Szene und
+   Welt getrennt (offen, siehe 2.2).
 1. **Lokale Welten:** Index und Umstellung des alten Stands, `migrate()`, Weltenliste, Neue Welt, Verzweigen, Löschen,
    Wechsel per Neuladen. Export und Import als Datei. *Bringt schon den Gut/Böse-Vergleich, ganz ohne Server.*
 2. **Cloud-Sicherung:** Supabase-Tabellen und -Funktionen, Geräteschlüssel, Hoch- und Herunterladen je Welt,

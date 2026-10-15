@@ -8,8 +8,7 @@ Verwandt: `nahrung.md` (Essen, Hunger, Dorffest), `gott-und-hand.md` (Hand, Wund
 `jahreszeiten.md` (Winter, Sommer, Kalender), `assets.md` (Bewohner austauschbar machen, Abschnitt 4.2),
 `spielstaende.md` (Bewohner gehören zur Welt).
 
-Stand: **vorhanden** = im Spiel, **teilweise** = angelegt, aber unvollständig, **geplant** = beschlossene Richtung,
-**Idee** = Vorschlag zur Auswahl.
+Stand-Begriffe: siehe `README.md`.
 
 ## 1. Ist-Stand
 
@@ -199,7 +198,7 @@ oder eine Jahreszeit, manchmal Ausrüstung, und sie hat eigene Animationen (Absc
 | Drachen steigen lassen | Herbst, Wind | Wiese, Hügel | Drachen | Idee |
 | Angeln zum Vergnügen | jederzeit | Steg, Ufer | Angel (wie der Fischer) | Idee |
 | Musizieren, Tanzen | Feierabend, Fest | Lagerfeuer am Dorfplatz | Laute, Flöte | Idee |
-| Laub zusammenrechen, in Laubhaufen springen | Herbst, Laub am Boden (`jahreszeiten.md` 3.4) | unter Laubbäumen | Rechen | Idee |
+| Laub zusammenrechen, in Laubhaufen springen | Herbst, Laub am Boden (`jahreszeiten.md` 3, Punkt 4) | unter Laubbäumen | Rechen | Idee |
 | Blumen pflücken, Kränze binden | Frühling, Blumen | Wiese | – | Idee |
 | Ballspiel | tagsüber, trocken | Wiese am Dorf | Ball | Idee |
 | Mit der Kreatur spielen | Kreatur in der Nähe und spielfreudig | wo sie ist | – | teilweise (die Kreatur spielt heute mit dem Dorf, `kreatur.md` 1) |
