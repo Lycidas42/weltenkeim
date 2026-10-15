@@ -7,7 +7,6 @@ import { noise } from '../core/noise.js';
 import { isMobile, scene } from '../core/render.js';
 import { heightAt } from '../world/terrain.js';
 
-/* ------------------------------------------------------------------ Pflanzen und Felsen (im Code erzeugt) */
 // Hilfen: Geometrie ohne Index mit einer Farbe je Dreieck (Verläufe, dunklere Unterseiten, leichte Streuung), leicht verbeult
 const COL = new THREE.Color(), COL2 = new THREE.Color();
 const jit = (x, y, z) => .9 + .2 * (((Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453) % 1 + 1) % 1);

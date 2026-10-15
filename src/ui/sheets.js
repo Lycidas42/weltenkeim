@@ -39,7 +39,6 @@ const HINTS = {
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
 
-/* ------------------------------------------------------------------ sheets */
 function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidden = true); $('app').classList.remove('sheet-open'); }
 function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetWork') renderWork(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));

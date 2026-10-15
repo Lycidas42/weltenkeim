@@ -7,7 +7,6 @@ import { noise } from '../core/noise.js';
 import { camera, hemi, renderer, scene, sun } from '../core/render.js';
 import { toast } from '../ui/feedback.js';
 
-/* ------------------------------------------------------------------ Tag und Nacht */
 // Spielzeit S.hour (0–24): tagsüber dauert eine Stunde 20 s, nachts nur 7 s, damit die Nacht nicht zu lang wird.
 const hourRate = h => (h >= 5.5 && h < 21.5 ? 1 / 20 : 1 / 7);
 // Stützstellen: Stunde, Himmel oben/Mitte/Horizont (= Nebel), Licht (Sonne bzw. Mond) und Stärke, Himmelslicht oben/Boden und Stärke, Nacht 0–1

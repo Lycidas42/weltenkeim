@@ -14,7 +14,6 @@ import { addTree, stumpSwarm, treeMeshes, treeNear, trees } from './trees.js';
 import { sites } from '../village/houses.js';
 import { hutSites, onFarm } from '../village/huts.js';
 
-/* ------------------------------------------------------------------ trees & rocks */
 for (let tries = 0; tries < 4000 && trees.length < 165; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
   if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || onFarm(x, z, .8) || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;

@@ -12,6 +12,11 @@ import { villagers } from '../village/villagers.js';
 import { hand } from './hand.js';
 import { foxIdle } from '../creature/ai.js';
 
+// Mit der Hand einen Baum packen und halten oder nach oben ziehen: er wackelt, reißt samt Wurzeln aus,
+// liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
+// wächst später ein neuer Baum.
+
+// Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
 function treeAt(cx, cy) {
   let best = null, bd = 1e9;
   for (const t of trees) {

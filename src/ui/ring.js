@@ -9,7 +9,6 @@ import { ACT_COL, ACT_DESC, ACT_LABEL, foxPivot } from '../creature/creature.js'
 import { reinforce } from '../creature/ai.js';
 import { follow, foxDoing, openSheet, setFollow } from './sheets.js';
 
-/* ------------------------------------------------------------------ Kreismenü und Einblendung am Tiergeist */
 // Tippt die Hand auf den Tiergeist, öffnet sich um ihn ein Kreis aus Aktionen. Die Liste lässt sich erweitern;
 // icon = SVG-Pfade im 24er-Raster wie bei den Werkzeugen.
 const FOX_ACTIONS = [

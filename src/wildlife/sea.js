@@ -62,7 +62,6 @@ function updateFish(dt, t) {
   ripples.forEach((r, i) => { dummy.position.set(r.x, .02, r.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(.15 + r.t * .9); dummy.updateMatrix(); rippleMesh.setMatrixAt(i, dummy.matrix); });
   rippleMesh.count = ripples.length; rippleMesh.material.opacity = ripples.length ? .5 : 0; rippleMesh.instanceMatrix.needsUpdate = true;
 }
-/* ------------------------------------------------------------------ Haie */
 // Zwei, drei Haie ziehen im tiefen Wasser um die Insel. Meist schwimmen sie tiefer (dunkler Schatten unter Wasser),
 // ab und zu kommen sie hoch, dann schneidet die Rückenflosse durchs Wasser und zieht eine Spur. Manchmal jagen sie
 // am Rand der Fischgründe; Fische fliehen vor ihnen.

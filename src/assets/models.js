@@ -5,7 +5,6 @@ import { $ } from '../core/util.js';
 import { S } from '../core/state.js';
 import { CREATURES } from '../creature/kinds.js';
 
-/* ------------------------------------------------------------------ assets */
 const loader = new GLTFLoader();
 const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, res, undefined, e => rej(new Error(f + ' konnte nicht geladen werden'))));
 $('loadSt').textContent = 'Lade Modelle …';

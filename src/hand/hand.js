@@ -5,7 +5,6 @@ import { S } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { gHand } from '../assets/models.js';
 
-/* ------------------------------------------------------------------ hand */
 // Gotteshand (assets/models/hand/GodHand.glb, Quelle assets/source/GodHand.blend): Skinned-Mesh mit 18 Knochen.
 // Finger zeigen nach -Z, Handfläche nach unten, Daumen nach +X. Gebeugt wird um die lokale X-Achse der Knochen
 // (negativ = zur Handfläche), gespreizt um die lokale Z-Achse.

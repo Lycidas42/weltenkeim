@@ -16,7 +16,6 @@ import { place, statics } from '../village/layout.js';
 import { clearAround } from '../world/trees.js';
 import { FARM, farmPt } from '../village/huts.js';
 
-/* ------------------------------------------------------------------ Bauernhof */
 // Gemüse: wächst unterschiedlich schnell (Sekunden bis zur Reife bei Sonne), Ertrag als Gemüse im Lager
 const CROPS = [
   { label: 'Salat', grow: 85, yield: 2, rows: 4, per: 7, sp: .32 },

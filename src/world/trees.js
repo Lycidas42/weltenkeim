@@ -16,8 +16,7 @@ const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z -
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
 const freeSlot = t => !t.gone && !t.alive && !t.reserved;
-// Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
-const TREE_H = 1.12;
+const TREE_H = 1.12; // Höhe eines ausgewachsenen Baums (Anteil der Baumgröße ST)
 // Gefällte Bäume kippen vom Fäller weg um, bleiben kurz liegen und verschwinden (Stumpf bleibt stehen).
 const fallen = []; // { o, t, dir, x, z, s, life }
 const FALL_T = .7;

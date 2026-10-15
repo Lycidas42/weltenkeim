@@ -26,7 +26,6 @@ const rain = { t: 0, x: 0, z: 0 };
 const ring = new THREE.Mesh(new THREE.RingGeometry(5.4, 6, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf3c04d, transparent: true, opacity: 0, depthWrite: false }));
 scene.add(ring); let ringT = 0;
 
-/* ------------------------------------------------------------------ miracles */
 function castRain(x, z) {
   rain.t = 5.5; rain.x = x; rain.z = z; rainPts.visible = true; rainCloud.visible = true;
   const p = rainGeo.attributes.position;

@@ -8,7 +8,6 @@ import { trees } from '../world/trees.js';
 import { huts } from './huts.js';
 import { villagers } from './villagers.js';
 
-/* ------------------------------------------------------------------ Wald-Warnung der Holzfäller */
 // Gibt es im Umkreis einer bewohnten Holzfällerhütte kaum noch schlagreife Bäume, meldet sich der Holzfäller:
 // Schild über der Hütte, Ring auf der Lichtung. Regen dort lässt den Wald nachwachsen und löst die Warnung auf.
 const FOREST_R = 9, FOREST_LOW = 5;

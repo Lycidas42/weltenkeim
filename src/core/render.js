@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { $ } from './util.js';
 
-/* ------------------------------------------------------------------ renderer */
 const canvas = $('c');
 const isMobile = matchMedia('(pointer: coarse)').matches;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -38,7 +37,6 @@ const tmpV = new THREE.Vector3();
 const tA = new THREE.Vector2(), tB = new THREE.Vector2();
 function toScreen(x, y, z, out) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return out.set((tmpV.x + 1) / 2 * r.width + r.left, (1 - tmpV.y) / 2 * r.height + r.top); }
 
-/* ------------------------------------------------------------------ loop */
 const clock = new THREE.Clock();
 const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }

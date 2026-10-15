@@ -24,7 +24,6 @@ import { CHOP_HIT, CHOP_T, DIG_T, homeSpot, villagers } from './villagers.js';
 import { fish, killAnimal, removeAnimal, wild } from '../wildlife/land.js';
 import { fishGeo, fishMesh, splash } from '../wildlife/sea.js';
 
-/* ------------------------------------------------------------------ villager AI */
 function walk(v, x, z, next) { v.state = 'walk'; v.next = next; v.stalk = next === 'aim'; setGoal(v, x, z, navV); }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
 function goLunch(v) { const a = Math.random() * Math.PI * 2, r = .85 + Math.random() * 1.6; walk(v, LUNCH_AT.x + Math.cos(a) * r, LUNCH_AT.z + Math.sin(a) * r, 'lunch'); }

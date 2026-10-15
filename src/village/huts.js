@@ -10,7 +10,6 @@ import { gBakery, gBarrel, gCrate, gFarmHouse, gHutGreen, gHutRed, gHutYellowA, 
 import { LAGER, MILL_POS, SB, SHRINE_POS, onSacred, statics } from './layout.js';
 import { mill } from './houses.js';
 
-/* ------------------------------------------------------------------ Lager und Werkstätten */
 // Punkt im Modellraum (Einheiten des Modells) eines platzierten Gebäudes in Weltkoordinaten
 function localPt(e, lx, lz, out = {}) { const k = e.o.scale.x, ry = e.o.rotation.y, x = lx * k, z = lz * k; out.x = e.x + x * Math.cos(ry) + z * Math.sin(ry); out.z = e.z - x * Math.sin(ry) + z * Math.cos(ry); return out; }
 // Großes zentrales Lager: offene Halle; draußen wachsen Stammstapel und Bretterstapel mit dem Bestand

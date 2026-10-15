@@ -5,7 +5,6 @@ import { huts } from './huts.js';
 import { villagers } from './villagers.js';
 import { idle, putDown } from './ai.js';
 
-/* ------------------------------------------------------------------ Berufe */
 // Zugewiesene Bewohner je Arbeitsstätte (0 oder mindestens min, höchstens so viele, wie es Bewohner gibt)
 function effJobs() {
   const out = {}; let free = villagers.length;

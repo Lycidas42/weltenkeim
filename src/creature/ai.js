@@ -17,7 +17,6 @@ import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, upd
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, hauling } from '../village/ai.js';
 
-/* ------------------------------------------------------------------ fox AI */
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
 function foxFinish(a) {

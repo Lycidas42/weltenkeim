@@ -11,7 +11,6 @@ import { HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VS, chopPose, digPose, vAll, vAxe, vB
 import { lV, lights } from './night.js';
 import { REEL_T } from './ai.js';
 
-/* ------------------------------------------------------------------ Bewohner zeichnen */
 // Jeder Bewohner besteht aus Teilen (Beine, Arme, Kopf, Werkzeug …), die hier je nach Tätigkeit gestellt werden
 const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
 function renderVillagers(dt, t) {

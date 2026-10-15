@@ -6,17 +6,12 @@ import { heightAt } from '../world/terrain.js';
 import { shadowify } from '../assets/models.js';
 import { TK } from '../models/nature.js';
 
+// Zustand der Bedienung: Werkzeug, gedrückter Zeiger, gehaltener Bewohner, gepackter Baum, Gerätetyp, gewähltes Wunder
 const input = { tool: 'hand', primary: null, pressing: false, grabbed: null, handShown: false, treeGrab: null, ptrType: 'mouse', miracle: 'rain', sculptDir: 1 };
-
-/* ------------------------------------------------------------------ Bäume ausreißen */
-// Mit der Hand einen Baum packen und halten oder nach oben ziehen: er wackelt, reißt samt Wurzeln aus,
-// liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
-// wächst später ein neuer Baum.
 
 const holdOff = new THREE.Vector3(); // Abstand Gehaltenes – Fingerpunkt am Boden beim Zupacken
 // Am Handy verdeckt der Finger, was darunter liegt: Hand und Gehaltenes schweben dort ein Stück über dem Finger.
 // Was angetippt wird (Bewohner, Baum, Tiergeist), zählt weiterhin genau unter dem Finger.
-
 const touchLift = () => input.ptrType === 'touch' ? 90 : 0;
 const setHoldOff = (x, z) => { if (input.ptrType === 'touch') holdOff.set(0, 0, 0); else holdOff.set(x - hit.x, 0, z - hit.z); }
 const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, tilt: 0 };
@@ -24,9 +19,8 @@ const heldObjs = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visib
 const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
 rootBall.castShadow = true; rootBall.visible = false; scene.add(rootBall);
 
-/* ------------------------------------------------------------------ input */
+// Bodenpunkt unter dem Zeiger (Strahl gegen Gelände und Wasser)
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-
 const pointers = new Map(); const pointerXY = { x: 0, y: 0 };
 const hit = new THREE.Vector3(); let hitOk = false;
 function pick(cx, cy) {

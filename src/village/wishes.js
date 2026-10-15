@@ -12,7 +12,6 @@ import { villagers } from './villagers.js';
 import { goBeg, idle, wish } from './ai.js';
 import { roleCount } from './jobs.js';
 
-/* ------------------------------------------------------------------ Bitten am Schrein */
 // Braucht das Dorf ein Wunder, kniet ein freier Bewohner vor dem Schrein und bittet darum. Erfüllt der Spieler die Bitte
 // rechtzeitig, danken die Bewohner mit Glauben (mehr, als das Wunder kostet). Später können kleinere Schreine im Wald
 // eigene Bitten haben; dafür ist `wish.at` der Ort, an dem gebetet wird.

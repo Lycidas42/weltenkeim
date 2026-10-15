@@ -47,7 +47,6 @@ function placeForestUI() {
   B.style.transform = `translate(${clamp(tA.x - r.left - bw / 2, 8, r.width - bw - 8)}px, ${clamp(tA.y - r.top - bh, 120, r.height - bh - 120)}px)`;
 }
 
-/* ------------------------------------------------------------------ Anzeige (Kopfleiste, Lager, Uhr, Wetter) */
 let uiT = 0;
 function updateHud(dt, t) {
   uiT -= dt;

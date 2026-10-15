@@ -4,7 +4,6 @@ import { scene } from '../core/render.js';
 import { SHRINE_AT, heightAt, sacredDist } from '../world/terrain.js';
 import { shadowify } from '../assets/models.js';
 
-/* ------------------------------------------------------------------ village */
 const SB = 1.5, ST = 1.25;
 const statics = [];
 function updateStatics() { for (const s of statics) s.o.position.set(s.x, heightAt(s.x, s.z), s.z); }

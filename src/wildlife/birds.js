@@ -14,7 +14,6 @@ import { blockedAt, navReady, navV } from '../world/nav.js';
 import { villagers } from '../village/villagers.js';
 import { hand } from '../hand/hand.js';
 
-/* ------------------------------------------------------------------ Vögel */
 // Möwen kreisen über dem Meer und setzen sich an den Strand, Krähen ziehen über die Insel und picken auf Wiesen und
 // Feldern, Spatzen fliegen in kleinen Schwärmen tief übers Land. Gelandete Vögel picken, hüpfen und fliegen auf,
 // wenn jemand zu nahe kommt. Nachts schlafen Krähen und Spatzen (unsichtbar im Gehölz), Möwen sitzen am Strand.

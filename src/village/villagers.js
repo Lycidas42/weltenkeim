@@ -8,7 +8,6 @@ import { scene } from '../core/render.js';
 import { surfaceAt } from '../world/terrain.js';
 import { houses } from './houses.js';
 
-/* ------------------------------------------------------------------ villagers */
 // Jeder Bewohner besteht aus instanzierten Einzelteilen (Beine, Rumpf, Arme, Kopf, Augen, Frisur, Bart).
 // Aussehen (Haut, Haar, Frisur, Kleidung, Größe) wird pro Platz deterministisch gewürfelt, bleibt also nach dem Neuladen gleich.
 const VCAP = 300, VS = 1.15;

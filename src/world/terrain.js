@@ -7,15 +7,14 @@ import { fbm, noise } from '../core/noise.js';
 import { scene } from '../core/render.js';
 import { sky, weather } from './sky.js';
 
-/* ------------------------------------------------------------------ terrain */
 const SIZE = 64, SEG = 167, N = SEG + 1, CELL = SIZE / SEG, HALF = SIZE / 2; // Insel etwa ein Drittel größer als anfangs (48)
 // Lage des Schreins: auf einem sanften Hügel nordöstlich vor dem Dorf, mit dem Gebirge dahinter.
 // Der Prozessionsweg führt vom Rand des Dorfplatzes (Inselmitte) den Hügel hinauf.
-var SHRINE_AT = { x: 4.4, z: -7.8 };
-var SACRED_SEG = (() => { const d = Math.hypot(SHRINE_AT.x, SHRINE_AT.z), ux = SHRINE_AT.x / d, uz = SHRINE_AT.z / d; return { ax: ux * 2.95, az: uz * 2.95, bx: SHRINE_AT.x - ux * 2.2, bz: SHRINE_AT.z - uz * 2.2, ux, uz, len: d - 5.15 }; })();
+const SHRINE_AT = { x: 4.4, z: -7.8 };
+const SACRED_SEG = (() => { const d = Math.hypot(SHRINE_AT.x, SHRINE_AT.z), ux = SHRINE_AT.x / d, uz = SHRINE_AT.z / d; return { ax: ux * 2.95, az: uz * 2.95, bx: SHRINE_AT.x - ux * 2.2, bz: SHRINE_AT.z - uz * 2.2, ux, uz, len: d - 5.15 }; })();
 // Runddorf: ein Ringweg läuft um den Dorfplatz, die Häuser stehen gleichmäßig auf einem Kreis dahinter (Tür zum Platz),
 // jeder Garten liegt genau hinter seinem Haus. RING_R = Ringweg, HOUSE_R = Häuser, GARDEN_R = Gärten.
-var RING_R = 3.75, HOUSE_R = 5.7, GARDEN_R = 7.25;
+const RING_R = 3.75, HOUSE_R = 5.7, GARDEN_R = 7.25;
 function laneDist(x, z) { return Math.abs(Math.hypot(x, z) - RING_R); } // Abstand zum Ringweg
 // Abstand zum Weg (Strecke vom Dorfplatz zum Schreinplatz); Breite des Wegs ±0,6
 function sacredDist(x, z) { const S0 = SACRED_SEG, t = clamp(((x - S0.ax) * S0.ux + (z - S0.az) * S0.uz) / S0.len, 0, 1); return Math.hypot(x - (S0.ax + S0.ux * S0.len * t), z - (S0.az + S0.uz * S0.len * t)); }

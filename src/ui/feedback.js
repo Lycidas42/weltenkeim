@@ -5,7 +5,6 @@ import { $, fmt1 } from '../core/util.js';
 import { S, passive } from '../core/state.js';
 import { camera, canvas, tmpV } from '../core/render.js';
 
-/* ------------------------------------------------------------------ UI helpers */
 const fxLayer = $('fx'); const floats = [];
 function floatText(x, y, z, text, cls = 'w') {
   if (floats.length > 28) { floats[0].el.remove(); floats.shift(); }

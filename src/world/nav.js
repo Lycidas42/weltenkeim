@@ -12,7 +12,6 @@ import { FARM, farmPt, huts, lager, localPt, onFarm } from '../village/huts.js';
 import { farms } from '../farm/farm.js';
 import { bushes, rocks } from './nature.js';
 
-/* ------------------------------------------------------------------ Wegfindung */
 // Raster über die ganze Insel (NAV_C Einheiten je Feld). Belegt sind Gebäude (gedrehte Rechtecke aus den Modellmaßen),
 // Felsen, Baumstämme und Wasser. Es gibt zwei Raster: eins für Bewohner und eins mit mehr Abstand für den Tiergeist.
 // Das Raster wird jede Sekunde neu gestempelt (Bäume wachsen und fallen, Häuser entstehen, das Gelände wird geformt).

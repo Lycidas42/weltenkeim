@@ -31,7 +31,6 @@ function updateVillage(dt) {
   } }
 }
 
-/* ------------------------------------------------------------------ offline progress */
 {
   const away = Math.min((Date.now() - (S.ts || Date.now())) / 1000, 8 * 3600);
   if (loaded && away > 30) {

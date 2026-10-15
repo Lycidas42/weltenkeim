@@ -10,7 +10,6 @@ import { TK } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H } from '../world/trees.js';
 
-/* ------------------------------------------------------------------ creature (Ruun) */
 const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^Walk$/, run: /^Gallop$/, attack: /^Attack/, hit: /^Idle_HitReact/, jump: /^Jump/ };
 // fehlt eine Animation, wird eine vorhandene mit anderem Tempo genutzt
 const ANIM_FALLBACK = { idle2: ['idle', .7], eat: ['idle', .5], run: ['walk', 2.1], attack: ['walk', 2.8] };

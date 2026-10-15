@@ -8,7 +8,6 @@ import { glowTex, lightDir, lightRaw, skyTmp, weather } from './sky.js';
 import { surfaceAt, terrainU } from './terrain.js';
 import { COL2, jit, lumpy, paint } from '../models/nature.js';
 
-/* ------------------------------------------------------------------ clouds & effects */
 // Wolken: Haufen aus verbeulten Kugeln, oben weiß, unten grau-blau, flache Unterseite. Wie viele und wie groß, hängt
 // am Wetter; sie ziehen mit dem Wind, werfen Schatten und werden durchsichtig, wenn sie den Blick auf die Insel verdecken.
 function cloudGeo(n) {

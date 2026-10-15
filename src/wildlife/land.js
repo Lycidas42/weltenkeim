@@ -11,7 +11,6 @@ import { blockedAt, followPath, navReady, navV, setGoal, smoothH } from '../worl
 import { villagers } from '../village/villagers.js';
 import { hand } from '../hand/hand.js';
 
-/* ------------------------------------------------------------------ Wildtiere */
 // Rehe und Hasen leben außerhalb des Dorfes, Fische im flachen Wasser rund um die Insel. Später sollen Jäger und Angler
 // sie nutzen: `wild` (Rehe, Hasen) und `fish` stehen dafür bereit.
 const wild = [];

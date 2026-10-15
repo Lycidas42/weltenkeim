@@ -26,8 +26,8 @@ jobs:
       - name: Spieldateien zusammenstellen
         run: |
           mkdir -p _site/assets
-          cp index.html game.js sw.js manifest.webmanifest _site/
-          cp -r icons vendor _site/
+          cp index.html sw.js manifest.webmanifest _site/
+          cp -r src icons vendor _site/
           cp -r assets/models _site/assets/
           cp assets/CREDITS.md _site/assets/
 
@@ -37,6 +37,15 @@ jobs:
           missing=0
           for f in $(grep -oE "'\./[^']+'" sw.js | tr -d "'" | sed 's|^\./||'); do
             if [ ! -e "_site/$f" ]; then echo "::error::Fehlt im Paket: $f"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Alle Module in der Offline-Liste
+        # Ein neues Modul unter src/ ohne Eintrag in APP wäre offline nicht verfügbar.
+        run: |
+          missing=0
+          for f in $(cd _site && find src -name '*.js'); do
+            grep -q "'./$f'" sw.js || { echo "::error::Nicht in der APP-Liste von sw.js: $f"; missing=1; }
           done
           exit $missing
 
