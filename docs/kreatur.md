@@ -135,7 +135,7 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 - Unterscheidung zur heutigen Tipp-Hilfe: Tippen = kleine Arbeit an Ort und Stelle; Packen und Tragen = Transport.
 - **Die Kreatur schaut zu** und lernt so, selbst größere Mengen gezielt zu verteilen (z. B. Stämme zur Säge,
   Bretter zur Baustelle, Korn zur Mühle), statt nur 3 Stück.
-- Gehört zur Hand, nicht zu den Wundern (körperliche Arbeit, siehe `hand-und-wunder.md`).
+- Gehört zur Hand, nicht zu den Wundern (körperliche Arbeit, siehe `gott-und-hand.md` Abschnitt 5).
 
 ### 4.8 Bewohner vorsichtig tragen
 

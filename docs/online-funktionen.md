@@ -41,7 +41,7 @@ Fleiß. Je Kategorie zählt die beste Welt eines Spielers.
 | **Größtes Volk** | Bewohner (heute max. 40, später mehr) | erst sinnvoll, wenn die Höchstzahl steigt |
 | **Höchster Tempel** | Tempelstufe | einfach, gut vergleichbar |
 | **Gesammelter Glaube** | Glaube insgesamt verdient (neues Feld, nicht der aktuelle Vorrat) | Langzeitwert |
-| **Gütigster Gott** / **Finsterster Gott** | `S.align` nahe +1 bzw. −1, gewichtet mit der Dauer | passt zu `gut-und-boese.md`; zwei Listen, beide gleichwertig |
+| **Gütigster Gott** / **Finsterster Gott** | `S.align` nahe +1 bzw. −1, gewichtet mit der Dauer | passt zu `gott-und-hand.md` Abschnitt 7; zwei Listen, beide gleichwertig |
 | **Klügste Kreatur** | Anzahl gelernter Fertigkeiten | sobald `kreatur-lernen.md` umgesetzt ist |
 | **Älteste Welt** | gespielte Tage (Spieltage, nicht Kalendertage) | |
 
