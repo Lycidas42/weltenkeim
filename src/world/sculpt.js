@@ -2,7 +2,7 @@
 
 import { clamp, smooth } from '../core/util.js';
 import { S } from '../core/state.js';
-import { CELL, H, HALF, N, SEG, heightAt, markTerrainDirty, tCol, tPos } from './terrain.js';
+import { CELL, H, HALF, N, SEG, STREAM, fitStream, heightAt, markTerrainDirty, tCol, tPos } from './terrain.js';
 import { vertexColor } from './paths.js';
 
 function sculpt(px, pz, dir, dt) {
@@ -15,7 +15,7 @@ function sculpt(px, pz, dir, dt) {
     const k = j * N + i, h = clamp(H[k] + str * (1 + Math.cos(Math.PI * d)) / 2, -3, 8.5);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty();
+  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty(); followStream(px, pz, R);
 }
 // Bauplatz einebnen: innen ganz auf die Höhe der Mitte, zum Rand hin weich auslaufend
 function flattenAt(px, pz, R) {
@@ -28,7 +28,16 @@ function flattenAt(px, pz, R) {
     const k = j * N + i, h = H[k] + (target - H[k]) * smooth(1, .55, d);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty();
+  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty(); followStream(px, pz, R);
 }
+
+// Wurde Gelände am Bach verändert, passt sich der Bach an (Bett nachgraben, Wasserspiegel nachführen)
+function followStream(px, pz, R) {
+  if (!STREAM.pts.some(p => Math.abs(p.x - px) < R + 2 && Math.abs(p.z - pz) < R + 2)) return;
+  for (const k of fitStream()) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
+  tCol.needsUpdate = true;
+}
+// geformtes Gelände aus dem Spielstand: Bach gleich anpassen
+if (S.terrain && S.terrain.length) followStream(0, 0, 99);
 
 export { flattenAt, sculpt };

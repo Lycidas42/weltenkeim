@@ -85,10 +85,10 @@ const WEATHER = {
   bewoelkt: { cover: .72, rain: 0, wind: .58, p: .25, label: 'bewölkt' },
   regen: { cover: .97, rain: 1, wind: .85, p: .15, label: 'Regen' },
   // Schnee: vorerst nur von Hand (p = 0), später je nach Jahreszeit
-  schnee: { cover: .88, rain: 0, snow: 1, wind: .3, p: 0, label: 'Schnee' },
+  schnee: { cover: .95, rain: 0, snow: 1, wind: .3, p: 0, label: 'Schnee' },
 };
 if (!WEATHER[S.weather]) S.weather = 'heiter';
-const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, snow: WEATHER[S.weather].snow || 0, snowCover: WEATHER[S.weather].snow || 0, wind: WEATHER[S.weather].wind, wet: WEATHER[S.weather].rain, dir: Math.random() * 6.28, lastH: S.hour };
+const weather = { cover: WEATHER[S.weather].cover, rain: WEATHER[S.weather].rain, snow: WEATHER[S.weather].snow || 0, snowCover: WEATHER[S.weather].snow || 0, wind: WEATHER[S.weather].wind, wet: WEATHER[S.weather].rain, flood: 0, dir: Math.random() * 6.28, lastH: S.hour };
 function rollWeather() { let r = Math.random(); for (const k in WEATHER) { r -= WEATHER[k].p; if (r <= 0) return k; } return 'heiter'; }
 function setWeather(k) { if (WEATHER[k]) S.weather = k; }
 function updateWeather(dt, t) {
@@ -101,9 +101,12 @@ function updateWeather(dt, t) {
   weather.cover += (W.cover - weather.cover) * k; weather.rain += (W.rain - weather.rain) * k * 1.5; weather.wind += (W.wind - weather.wind) * k;
   weather.snow += ((W.snow || 0) - weather.snow) * Math.min(1, dt * .35);          // Schneefall setzt schnell ein und hört schnell auf
   // Schneedecke: wächst bei Schneefall in gut einer halben Minute, taut bei Sonne in etwa einer halben Minute, bei Wolken und nachts in einigen Minuten
+  const coverBefore = weather.snowCover;
   if (weather.snow > .3) weather.snowCover = Math.min(1, weather.snowCover + dt * weather.snow / 40);
   else weather.snowCover = Math.max(0, weather.snowCover - dt * ((1 - weather.cover) * (1 - sky.night) / 30 + weather.rain / 15 + 1 / 200));
   snowU.uSnow.value = weather.snowCover;
+  // Hochwasser: Schmelzwasser lässt den Bach anschwellen, danach fällt er in ein, zwei Minuten wieder
+  weather.flood = clamp(weather.flood + Math.max(0, coverBefore - weather.snowCover) * 3 - dt / 100, 0, 1);
   weather.dir += (noise(t * .01, 9.1) * .5) * dt * .05;                               // Windrichtung dreht langsam
   // Nässe: in etwa einer halben Minute Regen voll, bei Sonne in gut einer Minute trocken
   if (weather.rain > .3) weather.wet = Math.min(1, weather.wet + dt * weather.rain / 30);
@@ -135,15 +138,18 @@ function snowify(m) {
 // Himmelsfarben je Wetter: strahlend blau, wenn klar; grau und trüb bei Bewölkung und Regen
 const skyColors = o => Object.fromEntries(Object.entries(o).map(([k, c]) => [k, new THREE.Color(c)]));
 const SKY_CLEAR = skyColors(theme.palette.sky.clear), SKY_OV = skyColors(theme.palette.sky.overcast);
-const SKY_OVN = skyColors(theme.palette.sky.overcastNight), SKY_N = skyColors(theme.palette.sky.night);
+const SKY_OVN = skyColors(theme.palette.sky.overcastNight), SKY_N = skyColors(theme.palette.sky.night), SKY_SN = skyColors(theme.palette.sky.snow);
 const skyTmp = new THREE.Color();
 function applyWeatherSky() {
-  const cv = weather.cover, day = 1 - sky.night, clear = smooth(.35, 0, cv), ov = smooth(.3, .95, cv);
+  const sn = smooth(.1, .7, weather.snow), cv = Math.max(weather.cover, sn), day = 1 - sky.night, clear = smooth(.35, 0, cv), ov = smooth(.3, .95, cv);
   sky.top.lerp(SKY_CLEAR.top, clear * day * .7); sky.mid.lerp(SKY_CLEAR.mid, clear * day * .55); sky.hor.lerp(SKY_CLEAR.hor, clear * day * .4);
   sky.top.lerp(SKY_N.top, clear * sky.night * .8); sky.mid.lerp(SKY_N.mid, clear * sky.night * .6);   // klare Nacht: fast schwarz
   for (const c of ['top', 'mid', 'hor']) sky[c].lerp(skyTmp.copy(SKY_OV[c]).lerp(SKY_OVN[c], sky.night), ov * .85);
   sky.light.lerp(WHITE, ov * .5); sky.li *= 1 - .62 * ov; sky.hi *= 1 + .12 * ov;
   sky.hemiS.lerp(skyTmp.set(0xb9c0c7).lerp(SKY_OVN.mid, sky.night), ov * .6);
+  // Schneefall: fahler, gleichmäßig grauweißer Himmel, kaum Sonne und fast keine Schatten
+  for (const c of ['top', 'mid', 'hor']) sky[c].lerp(skyTmp.copy(SKY_SN[c]).lerp(SKY_OVN[c], sky.night), sn * .9);
+  sky.light.lerp(WHITE, sn); sky.li *= 1 - .55 * sn; sky.hi *= 1 + .18 * sn;
 }
 // Zeitraffer bis zur Zielstunde (Tipp auf die Uhrzeit): Tag <-> Nacht in wenigen Sekunden
 let skipTo = null;
@@ -168,13 +174,13 @@ function updateDay(dt, t) {
   { const Q = .6 * Math.PI / 180, az = Math.round(Math.atan2(lightDir.z, lightDir.x) / Q) * Q, el = Math.round(Math.asin(lightDir.y) / Q) * Q; lightDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); }
   sun.position.copy(lightDir).multiplyScalar(50); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
   hemi.color.copy(sky.hemiS); hemi.groundColor.copy(sky.hemiG); hemi.intensity = sky.hi;
-  scene.fog.color.copy(sky.hor); scene.fog.near = 42 - 18 * weather.rain; scene.fog.far = 105 - 30 * weather.rain; // Regen: diesig
+  scene.fog.color.copy(sky.hor); const snowHaze = smooth(.1, .7, weather.snow); scene.fog.near = 42 - 18 * weather.rain - 20 * snowHaze; scene.fog.far = 105 - 30 * weather.rain - 40 * snowHaze; // Regen und Schneefall: diesig
   skyG.position.copy(camera.position);
   visualDir(sunDir, visSun); visualDir(moonDir, visMoon);
   skyMat.uniforms.sunDir.value.copy(visSun); skyMat.uniforms.sunCol.value.copy(sky.light);
   skyMat.uniforms.glow.value = smooth(-.25, .02, sunDir.y) * (.3 + .9 * (1 - Math.max(0, sunDir.y)) ** 3);
   sunSprite.position.copy(visSun).multiplyScalar(150); sunSprite.material.color.copy(sky.light).lerp(WHITE, .5);
-  sunSprite.material.opacity = smooth(-.04, .02, visSun.y) * (1 - smooth(.4, .9, weather.cover));
+  sunSprite.material.opacity = smooth(-.04, .02, visSun.y) * (1 - smooth(.4, .9, weather.cover)) * (1 - snowHaze);
   moonSprite.position.copy(visMoon).multiplyScalar(150); moonHalo.position.copy(moonSprite.position);
   moonSprite.material.opacity = smooth(-.03, .03, visMoon.y) * (.3 + .7 * sky.night) * (1 - smooth(.4, .9, weather.cover)); moonHalo.material.opacity = moonSprite.material.opacity * .45;
   starMat.uniforms.op.value = smooth(.35, .95, sky.night) * (1 - smooth(.15, .7, weather.cover)) * 1.15; starMat.uniforms.t.value = t;

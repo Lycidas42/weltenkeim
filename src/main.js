@@ -14,6 +14,7 @@ import { updateChips } from './world/particles.js';
 import { fox } from './creature/kinds.js';
 import './assets/models.js';
 import './models/nature.js';
+import './world/spring.js';
 import { heldTree, input } from './hand/pointer.js';
 import { clouds, updateClouds, updatePuddles, updateSnowfall, updateWeatherRain } from './world/weather-fx.js';
 import { updateStatics } from './village/layout.js';
@@ -36,6 +37,7 @@ import './creature/gestures.js';
 import { fish, updateWild, wild } from './wildlife/land.js';
 import { sharks, updateFish, updateSharks } from './wildlife/sea.js';
 import { birds, updateBirds } from './wildlife/birds.js';
+import { updateTracks } from './wildlife/tracks.js';
 import { arrows, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish } from './village/ai.js';
 import { reconcileJobs } from './village/jobs.js';
 import { placeWishUI, startWish, updateWish } from './village/wishes.js';
@@ -92,6 +94,7 @@ function tick(dt, t) {
 
   updateFox(dt, t);
   updateWild(dt, t); updateFish(dt, t); updateFarm(dt, t); updateBirds(dt, t); updateSharks(dt, t);
+  updateTracks(dt);
   updateTrees(dt, t);
   updateHand(dt, t);
   updateMiracleFx(dt, t);

@@ -66,12 +66,13 @@ export default {
       [21.2, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
       [24, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
     ],
-    // Himmel bei Bewölkung: klar, bedeckt, bedeckt in der Nacht, Nacht
+    // Himmel bei Bewölkung: klar, bedeckt, bedeckt in der Nacht, Nacht, Schneefall (fahles Grauweiß)
     sky: {
       clear: { top: '#2f86d4', mid: '#86c3ec', hor: '#d3eaf3' },
       overcast: { top: '#87919b', mid: '#a3abb3', hor: '#bdc3c8' },
       overcastNight: { top: '#0c0e12', mid: '#14171c', hor: '#1d2128' },
       night: { top: '#000105', mid: '#03060f' },
+      snow: { top: '#a3abb4', mid: '#bec4ca', hor: '#d6dade' },
     },
     // Gelände: Ufer (tief, nass, Sand), Gras (zwei Töne), trocken, kahl, Fels, Schnee
     // Bachbett und Ufergras, Trampelpfade (zwei Töne). Zur Laufzeit änderbar: setTerrainColor (src/world/paths.js)

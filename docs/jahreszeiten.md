@@ -43,6 +43,12 @@ Strand, Kleidung je Jahreszeit). Stand der Features: siehe `README.md`.
 - **Geländefarben** (`src/world/paths.js`): `setTerrainColor('g1', farbe)` usw. Das Gelände wird schrittweise neu gefärbt.
 - Eine Jahreszeit ist damit zunächst eine Tabelle von Zielfarben je Rolle und Geländefarbe, zwischen denen über
   Spieltage überblendet wird.
+- **Schnee** (Wetter `schnee`, `src/world/sky.js`): Schneedecke auf allem, was nach oben zeigt; bei Schneefall
+  fahler, grauweißer Himmel mit wenig Licht und Dunst.
+  - **Fußspuren** (`src/wildlife/tracks.js`): Bewohner, Kreatur, Wild und Vieh hinterlassen Abdrücke, solange Schnee
+    liegt. Sie rieseln bei Schneefall schneller zu und verschwinden mit der Schneedecke.
+  - **Schmelzwasser:** Taut der Schnee, schwillt der Bach an (`weather.flood`): höher, breiter, trüb, mehr Schaum.
+    Nach ein, zwei Minuten fällt er wieder. Regen lässt ihn leicht anschwellen.
 
 ## 3. Noch zu bauen
 
