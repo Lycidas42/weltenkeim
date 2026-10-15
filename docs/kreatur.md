@@ -7,6 +7,19 @@ Verwandt: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` (Essen, Lie
 `gott-und-hand.md` (Hand, Wunder, Waage), `gut-und-boese.md`, `bewohner.md` (wie das Dorf auf die Kreatur reagiert).
 Stand der Features: siehe `README.md`.
 
+## Leitbild: Bindung
+
+Der Spieler soll sich mit seiner Kreatur verbinden, sich mit ihr identifizieren und sich um sie sorgen – wie in
+Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Kreatur:
+
+- **Sie lebt sichtbar:** Kopf und Blick folgen dem, was sie interessiert, sie blinzelt, Ohren und Schwanz zeigen ihre
+  Stimmung, das Gesicht zeigt Gefühle (Freude, Ärger, Trauer, Müdigkeit), kurze Laute statt Text.
+- **Sie bemerkt den Spieler:** schaut zur Hand, freut sich über Zuwendung, begrüßt ihn nach einer Pause, vermisst ihn
+  (sichtbar, nicht als Strafe).
+- **Sie braucht ihn:** Hunger, Müdigkeit, Spieltrieb und Laune (3.2) sind an ihr ablesbar; Fürsorge zeigt Wirkung.
+- **Sie wird zu seiner:** lernt erkennbar aus seiner Erziehung (3.11, „Warum?“), wächst (3.1), behält Erinnerungen.
+- Nahe Ansicht mit Detail (Fell, Mimik) dort, wo man hinschaut: zuerst das Gesicht.
+
 ## 1. Ist-Stand
 
 - **Gestalten:** Fuchs (eigene Reaktionen; Fell-Modell vorhanden, derzeit nicht geladen), Wolf, Hirsch, Stier, Alpaka,
