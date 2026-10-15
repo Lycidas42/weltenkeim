@@ -303,8 +303,13 @@ nicht als Ersatz.
     Fischen, passend zum Lernen durch Vormachen. Liefert die Animationen, nicht die Figur.
   - **KayKit „Character Animations“**: CC0, 133 Animationen für menschenähnliche Skelette (Interagieren, Aufheben …).
     Eine Tierfigur gibt es bei KayKit nicht, am nächsten käme ein Werwolf (eigene Lizenz prüfen).
-  - Vorschlag: Yeti oder Panda aus „Ultimate Monsters“ als Figur, Arbeits- und Trageanimationen aus der „Universal
-    Animation Library“ in Blender übertragen.
+  - **Geprüft und verworfen (Optik):** drei Yetis, Monkroose und Tribal aus „Ultimate Monsters“ (über Poly Pizza
+    geladen, CC0). Technisch geeignet: Yeti und Monkroose haben ein menschenähnliches Skelett mit 43 Knochen samt
+    Fingern, 14 Animationen (u. a. Winken, Ja, Nein, Ducken) und etwa 6.000 Dreiecke. Sie wirken aber grob und passen
+    nicht zum weichen Stil der Insel.
+  - **Nächster Ansatz:** ein aufgerichtetes Tier im Stil der vorhandenen Gestalten (wie in Black & White), selbst in
+    Blender gebaut oder erzeugt und dann mit einem menschenähnlichen Skelett versehen, damit Animationen aus der
+    „Universal Animation Library“ passen.
 - **Benötigte Animationen:** Stehen, Gehen, Rennen, Aufheben, Gehen mit Last (vor dem Körper bzw. auf der Schulter),
   am Boden arbeiten (säen, ernten, pflanzen), Werfen, Wunder wirken, Sitzen bzw. Dösen, Freuen (Lob), Ducken (Tadel),
   später Winken. Die Namen kommen in `docs/assets.md` (Abschnitt „Animationen der Kreaturen“) dazu.
@@ -339,7 +344,7 @@ nicht als Ersatz.
 #### G. Reihenfolge
 
 1. **Modelle sichten:** zwei bis drei Kandidaten mit Lizenz, Dreiecken, Animationen und Screenshot im Spiel; Wahl
-   gemeinsam mit dem Nutzer. 🟡 Kandidaten gesichtet (C), Test im Spiel steht aus.
+   gemeinsam mit dem Nutzer. 🟡 Fertige Monster gesichtet und verworfen (C), eigener Entwurf steht aus.
 2. **Einbauen** mit Stehen, Gehen, Rennen, Sitzen; Theme-Einträge `body`, `hands`, `carry`; Treffen und Streicheln
    angepasst.
 3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
