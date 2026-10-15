@@ -36,7 +36,7 @@ Stand der Features: siehe `README.md`.
 | Leine | der Hand folgen, an einem Pfahl anbinden | 3.5 | 🔵 geplant |
 | Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` | 🔵 geplant |
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
-| Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | 🟡 teilweise |
+| Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | ✅ vorhanden |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
@@ -177,7 +177,7 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 ### 3.11 Erleben in der Welt, Charakterbogen und „Warum?“
 
-**Stand:** 🟡 teilweise – A bis E vorhanden (F 1–5), Fell-Fuchs in der Nahsicht (F 6) offen
+**Stand:** ✅ vorhanden (F 1–5); Fell-Fuchs in der Nahsicht (F 6) ⏸️ zurückgestellt
 
 Leitgedanke: **Beobachten und Erziehen passieren in der Welt**, nicht in einem Fenster mit eigenem Modell. Dort sieht
 man, wie die Kreatur einen Baum umwirft, wie das Dorf reagiert, was sie umgibt. Der **Charakterbogen** bleibt, aber als
@@ -260,7 +260,10 @@ Je Schritt ein Commit auf `develop`, im Spiel geprüft (`__wk`, eigene Prüfung 
    Tadel (C).
 4. **Gesten** Streicheln und Klaps (B), Kreismenü öffnet beim Loslassen.
 5. **Doku und Hinweise:** Stand-Marken, Info-Panel (`#sheetInfo`), Hinweistexte.
-6. **Fell-Fuchs in der Nahsicht** nur nach Messung auf dem Handy (Bildrate mit und ohne), sonst 💡 zurückstellen.
+6. **Fell-Fuchs in der Nahsicht** ⏸️ zurückgestellt. Gemessen: Das Fell-Modell hat mit 16 Fellschichten rund
+   200.000 Dreiecke in 21 animierten Meshes, der Fuchs in der Welt 1.848 (Vorgabe für Kreaturen: bis etwa 10.000).
+   Mit Schattendurchgang ist das auf dem Handy zu schwer. Denkbar später: in Blender auf etwa 5.000 Dreiecke
+   reduzieren und nur 4 bis 6 Fellschichten, erst dann auf dem Handy messen.
 7. **Zweibeinige Gestalt** (3.12), in eigenen Schritten (3.12 G).
 
 ### 3.12 Zweibeinige Gestalt
@@ -348,7 +351,7 @@ nicht als Ersatz.
 
 ## 5. Vorgeschlagene Reihenfolge
 
-0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar. 🟡
+0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar. ✅
 1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur. ✅
 2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst). Davor die zweibeinige Gestalt (3.12 G 1–3), damit Arbeiten
    mit den Händen gleich mitgebaut werden kann.
