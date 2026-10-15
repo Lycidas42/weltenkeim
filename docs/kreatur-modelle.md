@@ -110,7 +110,8 @@ Ziel: Der Spieler soll sich mit dem Tier verbinden und identifizieren; heute wir
 6. **Geräusche**: kurze Fuchslaute (Fiepen, Keckern, Bellen), freie Lizenz (CC0), synchron zum Maul.
 7. **Fell in der Nahsicht**: Schalen-Fell wie beim alten Fell-Fuchs (`addFur`, Maske `_FUR`), aber nur 4–6 Schalen
    (etwa 30.000–40.000 Dreiecke) und nur zugeschaltet, wenn die Kamera nah ist; Fellmaske: buschig an Schwanz,
-   Wangen, Brust, kurz an Schnauze und Pfoten. Auf dem Handy messen.
+   Wangen, Brust, kurz an Schnauze und Pfoten. Auf dem Handy messen. **Erste Stufe: Fell nur im Gesicht** (Wangen,
+   Stirn, Ohren, Kehle) – kostet einen Bruchteil und wirkt dort, wo man hinschaut; der ganze Körper nur, wenn es reicht.
 
 ## 6. Offene Punkte (Stand Ende 16.10.)
 
