@@ -67,7 +67,18 @@ const GROW_TEXT = { ok: 'Wachstum: Das Dorf wächst', food: `Wachstum stockt: zu
 function renderWork() {
   const eff = effJobs(); let used = 0; for (const id in eff) used += eff[id];
   const free = villagers.length - used, carriers = villagers.filter(v => !v.role && v.haul).length;
-  $('workFree').innerHTML = `<b>${free}</b> von ${villagers.length} Bewohnern sind frei${carriers ? ` · ${carriers} ${carriers === 1 ? 'trägt' : 'tragen'} gerade` : ''}`;
+  // Wer tut gerade was? Gruppen, die zusammen die Gesamtzahl ergeben (nachts zusätzlich die Schlafenden)
+  const G = { work: 0, pray: 0, carry: 0, sleep: 0, idle: 0 };
+  for (const v of villagers) {
+    if (v.state === 'sleep' || (v.state === 'walk' && v.next === 'sleep')) G.sleep++;
+    else if (v.role) G.work++;
+    else if (v.haul) G.carry++;
+    else if (v.state === 'pray' || (v.state === 'walk' && v.next === 'pray')) G.pray++;
+    else G.idle++;
+  }
+  const grp = [[G.work, 'Arbeiter', 'Arbeiter'], [G.pray, 'Betender', 'Betende'], [G.carry, 'Träger', 'Träger'], [G.idle, 'Nichtstuer', 'Nichtstuer'], [G.sleep, 'Schlafender', 'Schlafende']]
+    .filter(([n], i) => n || i < 4).map(([n, one, many]) => `<b>${n}</b> ${n === 1 ? one : many}`);
+  $('workFree').innerHTML = `${villagers.length} Bewohner: ${grp.join(' · ')}`;
   { const fd = foodDays(), hungry = villagers.filter(v => v.food === 'hungrig').length;
     const care = hungry ? `${hungry} ${hungry === 1 ? 'Bewohner hatte' : 'Bewohner hatten'} mittags nichts zu essen und ${hungry === 1 ? 'betet' : 'beten'} weniger.` : food.varied ? 'Abwechslungsreich versorgt: Die Bewohner arbeiten schneller und beten mehr.' : 'Für den Bonus braucht das Dorf mindestens drei Sorten in drei Tagen.';
     $('workFood').innerHTML = `<b class="${fd.low ? 'low' : ''}">${fd.text}</b> (${fmt(portions())} Portionen). ${GROW_TEXT[food.growth]}. ${care}`; }
