@@ -199,7 +199,7 @@ function visualDir(d, out) {
   const el = Math.asin(clamp(d.y, -1, 1)), ve = el > 0 ? el * .2 + .04 * Math.min(1, el * 10) : el, hz = Math.hypot(d.x, d.z) || 1;
   return out.set(d.x / hz * Math.cos(ve), Math.sin(ve), d.z / hz * Math.cos(ve));
 }
-const lightDir = new THREE.Vector3(), WHITE = new THREE.Color(1, 1, 1);
+const lightDir = new THREE.Vector3(), lightRaw = new THREE.Vector3(0, 1, 0), WHITE = new THREE.Color(1, 1, 1);
 // Wetter: jeden Morgen (5 Uhr) neu gewürfelt, mittags manchmal ein Umschwung. cover = Bewölkung, rain = Regen, wind = Grundwind.
 const WEATHER = {
   klar: { cover: 0, rain: 0, wind: .22, p: .22, label: 'klar' },
@@ -287,7 +287,7 @@ function updateDay(dt, t) {
   sunDir.set(Math.cos(ts), Math.sin(ts) * .9, .4).normalize(); moonDir.set(-Math.cos(tm), Math.sin(tm) * .8, -.3).normalize();
   const sunUp = sunDir.y >= moonDir.y, body = sunUp ? sunDir : moonDir;
   // Licht fällt nie flacher als etwa 20°, sonst werden die Schatten endlos; am Horizont blendet es aus, damit der Wechsel Sonne/Mond nicht springt
-  lightDir.copy(body); lightDir.y = Math.max(lightDir.y, .35); lightDir.normalize();
+  lightDir.copy(body); lightDir.y = Math.max(lightDir.y, .35); lightDir.normalize(); lightRaw.copy(lightDir);
   // in kleinen Stufen nachführen: wandert das Licht in jedem Frame ein winziges Stück, flimmern die Schattenkanten
   { const Q = .6 * Math.PI / 180, az = Math.round(Math.atan2(lightDir.z, lightDir.x) / Q) * Q, el = Math.round(Math.asin(lightDir.y) / Q) * Q; lightDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); }
   sun.position.copy(lightDir).multiplyScalar(50); sun.color.copy(sky.light); sun.intensity = sky.li * smooth(0, .12, body.y);
@@ -1855,11 +1855,20 @@ function cloudGeo(n) {
   return paint(g, (x, y, z, ny, c) => c.set(0xc5cfdb).lerp(COL2.set(0xffffff), clamp(smooth(-.1, .9, y) * .8 + (ny > .4 ? .25 : 0), 0, 1)).multiplyScalar(.97 + .05 * jit(x, y, z)));
 }
 const CLOUD_GEOS = [5, 7, 9, 11].map(cloudGeo);
+// Schatten hoher Dinge wirft ein unsichtbarer Stellvertreter (schreibt weder Farbe noch Tiefe). Das Licht springt in
+// 0,6°-Stufen (gegen flimmernde Kanten); in 20 m Höhe wären das Schattensprünge von bis zu 2 m. Der Stellvertreter
+// wird so verschoben, dass sein Schatten dort liegt, wo ihn das stufenlose Licht hinwerfen würde.
+const shadowProxyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+function shadowProxy(geo) { const p = new THREE.Mesh(geo, shadowProxyMat); p.castShadow = true; p.visible = false; p.userData.noSnow = true; scene.add(p); return p; }
+function placeProxy(p, src, s) { // s: Schattengröße 0..1 (wächst beim Aufziehen mit)
+  const h = src.position.y, kx = lightRaw.x / lightRaw.y - lightDir.x / lightDir.y, kz = lightRaw.z / lightRaw.y - lightDir.z / lightDir.y;
+  p.position.set(src.position.x - h * kx, h, src.position.z - h * kz); p.rotation.copy(src.rotation); p.scale.copy(src.scale).multiplyScalar(s); p.visible = s > .02;
+}
 const CLOUD_N = 30, clouds = [], cloudCol = new THREE.Color();
 for (let i = 0; i < CLOUD_N; i++) {
   const m = new THREE.Mesh(CLOUD_GEOS[i % 4], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, transparent: true, opacity: 0, depthWrite: false }));
-  m.castShadow = true; m.renderOrder = 3; scene.add(m);
-  clouds.push({ m, x: rnd(52), z: rnd(52), y: 21 + Math.random() * 5, s: 2.2 + Math.random() * 2, rot: Math.random() * 6.28, rank: Math.random(), vis: 0 });
+  m.renderOrder = 3; scene.add(m);
+  clouds.push({ m, sh: shadowProxy(CLOUD_GEOS[i % 4]), x: rnd(52), z: rnd(52), y: 21 + Math.random() * 5, s: 2.2 + Math.random() * 2, rot: Math.random() * 6.28, rank: Math.random(), vis: 0 });
 }
 const cloudDummy = new THREE.Vector3(), segA = new THREE.Vector3(), segB = new THREE.Vector3();
 function updateClouds(dt) {
@@ -1881,7 +1890,7 @@ function updateClouds(dt) {
     const above = .15 + .85 * smooth(c.y - 1, c.y - 6, camera.position.y); // Kamera auf Wolkenhöhe oder darüber: Wolken fast durchsichtig
     c.m.material.opacity = c.vis * Math.min(near, block, above) * (.9 - .1 * weather.rain);
     c.m.material.color.copy(cloudCol); c.m.visible = c.m.material.opacity > .01;
-    c.m.castShadow = c.vis > .5;
+    placeProxy(c.sh, c.m, smooth(.05, .95, c.vis)); // Schatten unabhängig davon, ob die Wolke zur Sicht durchsichtig ist
   });
 }
 // Regen über der ganzen Insel (Wetter): kurze Striche, die um den Blickpunkt fallen
@@ -2244,7 +2253,7 @@ function updateWild(dt, t) {
 }
 // Regenwolke des Wunders: eine dunkle Wolke aus denselben Formen
 const rainCloud = new THREE.Mesh(CLOUD_GEOS[2], new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, color: 0x8d98a4, transparent: true, opacity: .55, depthWrite: false })); // halb durchsichtig, damit man sieht, wo es regnet
-rainCloud.castShadow = true; rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
+const rainCloudSh = shadowProxy(CLOUD_GEOS[2]); rainCloud.visible = false; rainCloud.scale.setScalar(1.6); scene.add(rainCloud);
 const RAIN_N = 450;
 const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAIN_N * 3), 3));
 const rainPts = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xbfe4ff, size: .09, transparent: true, opacity: .8 }));
@@ -4455,9 +4464,9 @@ function frame() {
   if (rain.t > 0) {
     rain.t -= dt; const p = rainGeo.attributes.position;
     for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i) - dt * 11; if (y < surfaceAt(p.getX(i), p.getZ(i))) y = 6.5; p.setY(i, y); }
-    p.needsUpdate = true; rainCloud.position.set(rain.x, 6.6 + Math.sin(t) * .1, rain.z);
+    p.needsUpdate = true; rainCloud.position.set(rain.x, 6.6 + Math.sin(t) * .1, rain.z); placeProxy(rainCloudSh, rainCloud, 1);
     rainPts.material.opacity = Math.min(.8, rain.t);
-    if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; }
+    if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; rainCloudSh.visible = false; }
   }
   if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
   updateClouds(dt); updateWeatherRain(dt); updateSnowfall(dt, t); updatePuddles(dt, t);
@@ -4526,7 +4535,7 @@ function frame() {
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = { S, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
