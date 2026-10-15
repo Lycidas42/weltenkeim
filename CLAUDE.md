@@ -1,5 +1,6 @@
 # Weltenkeim – Hinweise für Claude
 
+- **Antworten an den Nutzer immer auf Deutsch**, auch Zusammenfassungen am Ende einer Aufgabe, Rückfragen und Commit-Nachrichten. Fachbegriffe und Bezeichner im Code bleiben, wie sie sind.
 - Statische PWA ohne Build-Schritt: `index.html` (Markup, Styles), Spielcode als ES-Module unter `src/`, `sw.js`, `manifest.webmanifest`. Three.js r170 liegt lokal unter `vendor/three-0.170.0/` und wird per Import-Map als `three` bzw. `three/addons/` geladen. Keine CDN-Abhängigkeiten außer Google Fonts.
 - Aufbau von `src/` (Einstieg `src/boot.js` → `src/main.js`, Hauptschleife `tick`):
   - `core/` Grundlagen: `util` (Hilfen, `fmt`/`fmt1` mit Komma), `state` (Spielstand `S`, `save`/`onSave`, Ereignisse `on`/`emit`, Wirtschaftstabellen), `render` (Renderer, Szene, Kamera, Licht), `noise`.
