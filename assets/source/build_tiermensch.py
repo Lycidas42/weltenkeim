@@ -50,7 +50,8 @@ def smooth(a, b, x):
 # Aufheben vom Boden mit beiden Händen und Halten der Last vor dem Bauch.
 CURL = {'spine_01': [('x', 18)], 'spine_02': [('x', 18)], 'spine_03': [('x', 14)], 'neck_01': [('x', 10)], 'Head': [('x', 12)],
         'thigh_l': [('x', -105)], 'thigh_r': [('x', -105)], 'calf_l': [('x', 135)], 'calf_r': [('x', 135)],
-        'upperarm_l': [('x', -30)], 'upperarm_r': [('x', -30)], 'lowerarm_l': [('x', -50)], 'lowerarm_r': [('x', -50)],
+        # er rollt auf die linke Seite: der linke (untere) Arm liegt vor der Brust statt unter dem Körper
+        'upperarm_l': [('x', -85), ('y', 65)], 'upperarm_r': [('x', -30)], 'lowerarm_l': [('x', -40), ('y', 55)], 'lowerarm_r': [('x', -50)],
         'tail_01': [('x', 30), ('z', 30)], 'tail_02': [('z', 55)], 'tail_03': [('z', 60)], 'tail_04': [('z', 55)]}
 BEND = {'spine_01': [('x', 34)], 'spine_02': [('x', 28)], 'spine_03': [('x', 14)], 'neck_01': [('x', -10)], 'Head': [('x', -14)],
         'thigh_l': [('x', -72)], 'thigh_r': [('x', -72)], 'calf_l': [('x', 112)], 'calf_r': [('x', 112)], 'foot_l': [('x', -40)], 'foot_r': [('x', -40)],
@@ -78,9 +79,14 @@ def posen(arm, body):
             h = pb.head.copy(); pb.matrix = Matrix.Translation(h) @ R @ Matrix.Translation(-h) @ pb.matrix
         bpy.context.view_layer.update()
         for n, v in (move or {}).items(): pb = arm.pose.bones[n]; pb.matrix = Matrix.Translation(Vector(v)) @ pb.matrix; bpy.context.view_layer.update()
-    def on_ground():  # tiefsten Punkt des Körpers auf den Boden
-        ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
-        z = min((body.matrix_world @ v.co).z for v in me.vertices); ev.to_mesh_clear(); apply({}, {'pelvis': (0, 0, -z + 0.01)})
+    # Rumpf auf den Boden: tiefster Punkt der Vertices, die vor allem an Becken, Rücken, Beinen oder Kopf hängen
+    # (nicht an Armen, Händen, Schwanz – sonst ruht er auf der Hand und schwebt)
+    TORSO = ('pelvis', 'spine', 'thigh', 'calf', 'neck', 'Head')
+    def on_ground():
+        ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh(); zs = []
+        for v, vr in zip(body.data.vertices, me.vertices):
+            if v.groups and body.vertex_groups[max(v.groups, key=lambda e: e.weight).group].name.startswith(TORSO): zs.append((body.matrix_world @ vr.co).z)
+        ev.to_mesh_clear(); apply({}, {'pelvis': (0, 0, -min(zs) + 0.01)})
     def curl(breath=0):
         base(); c = dict(CURL); c['spine_02'] = [('x', 18 + breath)]; apply(c); apply({'pelvis': [('y', 90)]}); on_ground()
     bend = lambda: (base(), apply(BEND, {'pelvis': (0, 0.1, -0.42)}))
@@ -180,6 +186,14 @@ def build(kind='fox', out=None):
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); arm.select_set(True); bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    # Gewichte glätten und auf 4 Knochen je Punkt begrenzen (so viele nutzt das Spiel): sonst ziehen die Schultern
+    # beim Tragen die Haut am oberen Rücken zu einem Buckel hoch
+    bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); bpy.context.view_layer.objects.active = body
+    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+    bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', factor=0.6, repeat=4)
+    bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+    bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
 
     # 4. Farben als Vertexfarben mit weichen Übergängen (Masken in der T-Pose)
     FUR, LIGHT, DARK = srgb(A['fur']), srgb(A['light']), srgb(A['dark'])
