@@ -307,9 +307,17 @@ nicht als Ersatz.
     geladen, CC0). Technisch geeignet: Yeti und Monkroose haben ein menschenähnliches Skelett mit 43 Knochen samt
     Fingern, 14 Animationen (u. a. Winken, Ja, Nein, Ducken) und etwa 6.000 Dreiecke. Sie wirken aber grob und passen
     nicht zum weichen Stil der Insel.
-  - **Nächster Ansatz:** ein aufgerichtetes Tier im Stil der vorhandenen Gestalten (wie in Black & White), selbst in
-    Blender gebaut oder erzeugt und dann mit einem menschenähnlichen Skelett versehen, damit Animationen aus der
-    „Universal Animation Library“ passen.
+  - **Gewählter Ansatz, erster Entwurf ✅:** Skelett und Bewegungen menschlich, Körper tierisch. Das Skelett stammt von
+    der Schaufensterpuppe aus der „Universal Animation Library 2“ (CC0, 65 Knochen im Unreal-Schema, auch für die
+    „Universal Base Characters“). Den Körper eines aufrechten Fuchses habe ich in Blender aus runden Grundformen gebaut
+    (dicker Bauch, großer Kopf, Schnauze, Ohren, buschiger Schwanz), zu einem Stück verschmolzen und auf 7.000 Dreiecke
+    reduziert. Farben in drei Flächen (rotbraun, hell, dunkel), automatische Gewichte. Die 43 Animationen der freien
+    „Universal Animation Library“ laufen ohne Umrechnen, u. a. Gehen, Rennen, Aufheben, Interagieren, Zaubern,
+    Sitzen, Knien, Schieben, Tanzen; Teil 2 bringt Landwirtschaft und Fischen. Im Spiel geprüft: passt in Stil und
+    Größe zu Insel, Fuchs und Bewohnern. Rohdaten nur lokal (`dev/assets-raw/`, nicht im Repo).
+  - Noch offen: Schwanz schwingt nur mit dem Becken (eigene Schwanzknochen fehlen), Farbgrenzen gezackt, Gesicht
+    schlicht (keine Mimik), Hände ohne Finger-Form. Die freien „Universal Base Characters“ enthalten nur zwei
+    muskulöse Superhelden-Figuren, als Körper ungeeignet.
 - **Benötigte Animationen:** Stehen, Gehen, Rennen, Aufheben, Gehen mit Last (vor dem Körper bzw. auf der Schulter),
   am Boden arbeiten (säen, ernten, pflanzen), Werfen, Wunder wirken, Sitzen bzw. Dösen, Freuen (Lob), Ducken (Tadel),
   später Winken. Die Namen kommen in `docs/assets.md` (Abschnitt „Animationen der Kreaturen“) dazu.
@@ -344,7 +352,7 @@ nicht als Ersatz.
 #### G. Reihenfolge
 
 1. **Modelle sichten:** zwei bis drei Kandidaten mit Lizenz, Dreiecken, Animationen und Screenshot im Spiel; Wahl
-   gemeinsam mit dem Nutzer. 🟡 Fertige Monster gesichtet und verworfen (C), eigener Entwurf steht aus.
+   gemeinsam mit dem Nutzer. ✅ Fertige Monster verworfen, eigener Entwurf (aufrechter Fuchs auf menschlichem Skelett) im Spiel geprüft (C).
 2. **Einbauen** mit Stehen, Gehen, Rennen, Sitzen; Theme-Einträge `body`, `hands`, `carry`; Treffen und Streicheln
    angepasst.
 3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
