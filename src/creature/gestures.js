@@ -5,15 +5,14 @@ import { clamp } from '../core/util.js';
 import { floatText } from '../ui/feedback.js';
 import { CREATURES, fox } from './kinds.js';
 import { HAND_POSES, hand, poseHand } from '../hand/hand.js';
-import { FUR, foxModel, foxPivot, portrait } from './creature.js';
+import { FUR, foxModel, foxPivot } from './creature.js';
 
 // Gesten der Hand am Tiergeist: Streicheln (über den Rücken streichen) und Klaps (ausholen, zuschlagen)
 const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
 const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: 2.05, slap: .62 }; // HIT: Reaktion, sobald die Hand weg ist
 const BACK_Z = [-.3, -.15, 0, .15, .3]; // Messstellen entlang des Rückens (Anteile der Tierhöhe, + = Kopf)
 function playHand(kind, onHit) {
-  const P = portrait;
-  Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile(), pback: P.rig ? backProfile(P.rig.model, P.pivot) : null });
+  Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile() });
 }
 // höchster Punkt nahe der Mittellinie an den Messstellen, im Raum des Tiers (foxPivot), damit die Hand auf dem
 // Rücken aufliegt statt einzusinken
@@ -59,14 +58,7 @@ function updateHandAnim(dt, t) {
   hand.g.position.set(0, backAt(A.back, along * C.h, C.h) + .07 * s + lift, along * C.h); foxPivot.localToWorld(hand.g.position);
   hand.g.rotation.set(tilt, fox.h + Math.PI, 0, 'YXZ'); // Finger zeigen zum Kopf
   poseHand(hand, pose, dt, t, 18);
-  // dieselbe Geste an der zweiten Hand im Porträt (Tier steht dort im Ursprung, Blick nach +Z)
-  const P = portrait, ph = P.hand;
-  if (ph && A.pback) {
-    ph.g.visible = true; ph.g.scale.setScalar(s); ph.g.rotation.set(tilt, Math.PI, 0, 'YXZ');
-    ph.g.position.set(0, backAt(A.pback, along * C.h, C.h) + .07 * s + lift, along * C.h); P.pivot.localToWorld(ph.g.position);
-    poseHand(ph, pose, dt, t, 18);
-  }
-  if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); if (ph) ph.g.visible = false; }
+  if (A.t >= HAND_DUR[A.kind]) { A.kind = null; hand.g.visible = false; hand.g.scale.setScalar(1); hand.g.rotation.set(0, 0, 0); }
 }
 
 export { HAND_DUR, handAnim, playHand, updateHandAnim };

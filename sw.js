@@ -30,7 +30,6 @@ const APP = [
   './src/models/nature.js',
   './src/ui/feedback.js',
   './src/ui/hud.js',
-  './src/ui/portrait.js',
   './src/ui/ring.js',
   './src/ui/sheets.js',
   './src/village/ai.js',

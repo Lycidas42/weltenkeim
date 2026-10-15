@@ -247,15 +247,25 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 /* Name des Tiergeists direkt im Titel umbenennen */
 .title-in{font:inherit;color:inherit;background:none;border:0;border-bottom:1px dashed rgba(243,192,77,.45);padding:0 2px 2px;margin:0;width:min(11ch,60vw);user-select:text;-webkit-user-select:text}
 .title-in:focus{outline:none;border-bottom:1px solid var(--glaube)}
-.portrait{height:clamp(130px,23vh,210px);margin:8px -16px 10px;background:radial-gradient(ellipse at 50% 35%,#3d6a74 0%,#1d3638 75%);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.portrait canvas{display:block;width:100%;height:100%}
 .now{display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 10px;color:var(--ink)}
 .now .dot{width:8px;height:8px;border-radius:50%;background:var(--soul);flex:none;animation:pulse 1.6s ease-out infinite;box-shadow:0 0 0 0 rgba(165,216,201,.7)}
 .act[aria-pressed="true"]{background:var(--soul);color:#10302a;border-color:var(--soul)}
-.bar{display:grid;grid-template-columns:7.5em 1fr 3em;gap:8px;align-items:center;font-size:13.5px}
+.bar{display:grid;grid-template-columns:7.5em 1fr minmax(3em,auto);gap:8px;align-items:center;font-size:13.5px}
 .bar .track{height:9px;background:rgba(244,239,225,.12);border-radius:9px;overflow:hidden}
 .bar .fill{height:100%;border-radius:9px;transition:width .5s}
-.bar .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim)}
+.bar .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim);white-space:nowrap}
+.bar .delta{font-size:11.5px;margin-left:3px}
+.bar .delta.up{color:#8fcf7b}.bar .delta.down{color:#ee8a72}
+.formsLbl .sub{text-transform:none;letter-spacing:0;font-size:11px;opacity:.75;margin-left:4px}
+.why{font-size:13.5px;margin:-4px 0 10px;color:var(--ink-dim);line-height:1.35}
+.xp{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0;font-size:13.5px}
+.xp dt{font-variant-numeric:tabular-nums;text-align:right;font-weight:700}
+.xp dd{margin:0;color:var(--ink-dim)}
+.chron{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px;line-height:1.35}
+.chron li{background:rgba(244,239,225,.06);border-radius:8px;padding:6px 9px}
+.chron time{display:block;font-size:11.5px;color:var(--ink-dim)}
+.chron .empty{background:none;padding:0;color:var(--ink-dim)}
+.chron b.pet{color:#f6b3c0}.chron b.slap{color:#f2c27a}
 .last{font-size:14px;background:rgba(244,239,225,.06);border-radius:10px;padding:8px 10px;margin-bottom:10px;line-height:1.35}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .act{flex:1;min-width:110px;border-radius:10px;padding:10px 12px;font-weight:800;border:1px solid var(--line);background:rgba(244,239,225,.06)}
@@ -363,18 +373,20 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <section class="sheet" id="sheetFox" hidden aria-label="Fenja">
     <header><h2><input class="title-in" id="foxName" maxlength="16" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Name des Tiergeists"></h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <div class="gender" id="foxGender" role="radiogroup" aria-label="Geschlecht"><button role="radio" data-g="w" aria-checked="true">♀ weiblich</button><button role="radio" data-g="m" aria-checked="false">♂ männlich</button></div>
-    <div class="portrait" id="foxPortrait" aria-hidden="true"></div>
     <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
+    <p class="why" id="foxWhy" hidden></p>
+    <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button></div>
+    <p class="formsLbl">Neigungen <span class="sub">seit Tagesbeginn</span></p>
     <div class="bars" id="foxBars"></div>
-    <div class="last" id="foxLast"></div>
-    <div class="row">
-      <button class="act pet" id="btnPet">Streicheln</button>
-      <button class="act" id="btnSlap">Klaps</button>
-      <button class="act" id="btnFocus" aria-pressed="false">Folgen</button>
-    </div>
+    <p class="formsLbl">Erfahrung</p>
+    <dl class="xp" id="foxXp"></dl>
+    <p class="formsLbl">Gelernt</p>
+    <ol class="chron" id="foxLearn"></ol>
+    <p class="formsLbl">Zuletzt entschieden</p>
+    <ol class="chron" id="foxLog"></ol>
     <p class="formsLbl">Gestalt</p>
     <div class="forms" id="foxForms" role="group" aria-label="Gestalt"></div>
-    <p class="formsHint">★ Bisher hat nur der Fuchs ein Fell-Modell und eigene Reaktionen auf Lob und Tadel. Streicheln und Klaps gehen mit allen Gestalten.</p>
+    <p class="formsHint">★ Bisher hat nur der Fuchs eigene Reaktionen auf Lob und Tadel. Streicheln und Klaps wirken bei allen Gestalten.</p>
   </section>
 
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">

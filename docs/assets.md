@@ -47,7 +47,7 @@ Stand der Features: siehe `README.md`.
 | `foot` | Grundriss für die Wegfindung im Modellraum: `[Mitte x, Mitte z, halbe Breite, halbe Tiefe]` |
 | `parts` | Teile, die das Spiel bewegt: Knotenname (Text) oder Muster (RegExp), z. B. `saw` (Sägeblatt dreht beim Sägen), `fan` (Windrad), `wheel` (Mühlrad) |
 | `sacks` | Mehlsäcke neben einer Mühle: Liste `[x, z, Drehung]` im Modellraum |
-| Kreatur: `hd` | höher aufgelöstes Modell mit Fell fürs Porträt im Charakter-Blatt |
+| Kreatur: `hd` | höher aufgelöstes Modell mit Fell, geplant für die Nahsicht in der Welt (`kreatur.md` 3.11); wird derzeit nicht geladen |
 | Kreatur: `head` | Name des Kopfknochens (Blickrichtung, Tragen im Maul, Augen) |
 | Kreatur: `eyes` | Augen am Kopfknochen ergänzen, falls das Modell keine hat |
 | Kreatur: `rest` | Liegepose (nur für Tiere mit dem Quaternius-Skelett „AnimalArmature“) |
@@ -148,7 +148,7 @@ Designer und nicht mehr instanziert. Weg A und B können nebeneinander bestehen.
 
 - Möglichst wenige Materialien je Modell. KayKit nutzt eine gemeinsame Textur (`hexagons_medieval.png`); neue Modelle
   sollten ebenfalls eine Atlas-Textur oder Vertexfarben nutzen.
-- Gebäude bis etwa 2.000 Dreiecke, Requisiten bis etwa 500, Kreaturen bis etwa 10.000 (Fell-Modell fürs Porträt darf
+- Gebäude bis etwa 2.000 Dreiecke, Requisiten bis etwa 500, Kreaturen bis etwa 10.000 (Fell-Modell für die Nahsicht darf
   mehr haben).
 - Texturen höchstens 1024 × 1024.
 - Schatten werfen alle Meshes; sehr dünne Teile flimmern im Schatten, besser etwas kräftiger bauen.

@@ -9,7 +9,7 @@
 //   foot     Grundriss für die Wegfindung im Modellraum: [Mitte x, Mitte z, halbe Breite, halbe Tiefe]
 //   parts    Teile, die das Spiel bewegt: Knotenname oder RegExp (z. B. Säge, Windrad, Mühlrad)
 //   sacks    Mehlsäcke neben der Mühle: [x, z, Drehung] im Modellraum
-//   Kreaturen: hd = Fell-Modell fürs Porträt, head = Kopfknochen, eyes = Augen am Kopfknochen ergänzen,
+//   Kreaturen: hd = Fell-Modell (geplant für die Nahsicht), head = Kopfknochen, eyes = Augen am Kopfknochen ergänzen,
 //   rest = Liegepose (nur Quaternius-Skelett „AnimalArmature“), react = eigene Lob-/Tadel-Animationen (Fuchs),
 //   ws = Tempo der Laufanimation
 //   Hand: materials = Rolle → Materialname im Modell und Oberfläche (Farben setzt der Spieler, S.handStyle)

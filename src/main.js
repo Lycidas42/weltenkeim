@@ -32,7 +32,6 @@ import { spawnVillager, vAll, villagers } from './village/villagers.js';
 import { updateLights } from './village/night.js';
 import { hand } from './hand/hand.js';
 import './creature/creature.js';
-import { renderPortrait } from './ui/portrait.js';
 import './creature/gestures.js';
 import { fish, updateWild, wild } from './wildlife/land.js';
 import { sharks, updateFish, updateSharks } from './wildlife/sea.js';
@@ -118,7 +117,6 @@ function tick(dt, t) {
 
   if (!drawFrames) { camera.updateMatrixWorld(); return; } // sonst erst beim Zeichnen: Zeiger und Bildschirmpunkte nutzen die Kamera
   renderer.render(scene, camera);
-  if (!$('sheetFox').hidden) renderPortrait(dt, t);
 }
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);

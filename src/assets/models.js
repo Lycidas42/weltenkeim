@@ -19,7 +19,7 @@ await Promise.all(startKeys.map(async k => { loaded[k] = await load(modelInfo(k)
 
 // geladenes Modell (glTF) zu einem Schlüssel
 function model(key) { const g = loaded[key]; if (!g) throw new Error('Modell nicht geladen: ' + key); return g; }
-// Modell nachladen, z. B. eine andere Gestalt der Kreatur; variant 'hd' = Fell-Modell fürs Porträt, falls vorhanden
+// Modell nachladen, z. B. eine andere Gestalt der Kreatur; variant 'hd' = Fell-Modell (für die geplante Nahsicht, kreatur.md 3.11), falls vorhanden
 const loadModel = (key, variant = 'file') => load(modelInfo(key)[variant] || modelInfo(key).file);
 // Teil eines Modells finden, das das Spiel bewegt (Knotenname oder RegExp aus dem Theme)
 function findPart(obj, key, part) {

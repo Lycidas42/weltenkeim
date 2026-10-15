@@ -17,7 +17,7 @@ const foxPivot = new THREE.Group(); scene.add(foxPivot);
 const creatureCache = { [S.creature]: model('creature.' + S.creature) };
 let foxModel = null, foxMixer = null, foxActs = {};
 // Modell eines Tiers aufbereiten: skalieren, nach +Z ausrichten, Animationen (inkl. Posen) und ggf. Fell/Augen.
-// Liefert ein „Rig“ { model, mixer, acts, cur }; genutzt für die Welt und für das Porträt im Panel.
+// Liefert ein „Rig“ { model, mixer, acts, cur }; genutzt für die Welt (später auch für das Fell-Modell in der Nahsicht).
 function buildRig(id, gltf, fur = false) {
   const C = CREATURES[id], model = shadowify(gltf.scene);
   model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
@@ -240,16 +240,12 @@ function addEyes(model, head, e) {
 function foxAnim(name) {
   if (fox.cur === name) return; const a = foxActs[name]; if (!a) return;
   a.reset().fadeIn(.25).play(); if (fox.cur && foxActs[fox.cur]) foxActs[fox.cur].fadeOut(.25); fox.cur = name;
-  rigPlay(portrait.rig, name);
 }
 // einmalige Reaktion (Treffer, Freudensprung), danach übernimmt wieder der Zustand
-function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; rigPlay(portrait.rig, name, true); }
+function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; }
 async function loadCreature(id) {
   return creatureCache[id] || (creatureCache[id] = await loadModel('creature.' + id));
 }
-// Porträt im Charakter-Blatt: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das
-// Fell-Modell), die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, die Weltkamera bleibt unberührt.
-const portrait = { hand: null, renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, look: new THREE.Vector3(), dist: 4 };
 useCreature(S.creature, model('creature.' + S.creature));
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
 // Fürwörter nach dem gewählten Geschlecht der Kreatur (S.gender: 'w' oder 'm')
@@ -283,4 +279,4 @@ function updateMouthTree() {
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, portrait, pron, rigPlay, updateFur, updateMouthTree, useCreature };
+export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };

@@ -2,7 +2,7 @@
 
 import { $, clamp, fmt, fmt1 } from '../core/util.js';
 import { MAX_POP, PROC, ROLES, S, SAVE_KEY, SOUL_COST, WORKS, cap, handCost, on, passive, prayYield, resText, save, stopSaving, templeCost } from '../core/state.js';
-import { camera, clock, controls, isMobile } from '../core/render.js';
+import { camera, controls, isMobile } from '../core/render.js';
 import { floatText, toast } from './feedback.js';
 import { WEATHER, isDaytime, setWeather, skipTo, toggleDayNight } from '../world/sky.js';
 import { resetTerrain } from '../world/terrain.js';
@@ -14,11 +14,10 @@ import { build } from '../village/houses.js';
 import { farmSites, huts } from '../village/huts.js';
 import { fields, stock } from '../farm/farm.js';
 import { spawnVillager, villagers } from '../village/villagers.js';
-import { ACT_COL, ACT_DESC, ACT_LABEL, loadCreature, pron, useCreature } from '../creature/creature.js';
-import { showPortrait } from './portrait.js';
+import { ACT_COL, ACT_LABEL, loadCreature, pron, useCreature } from '../creature/creature.js';
+import { XP, mind, share, why } from '../creature/mind.js';
 import { fish, wild } from '../wildlife/land.js';
 import { effJobs, reconcileJobs, roleCount } from '../village/jobs.js';
-import { reinforce } from '../creature/ai.js';
 import { GROW_DAYS, days, food, portions } from '../village/food.js';
 
 let creatureLoading = null;
@@ -27,7 +26,7 @@ async function setCreature(id) {
   creatureLoading = id; renderForms();
   try {
     const g = await loadCreature(id);
-    useCreature(id, g); S.creature = id; save(); if (!$('sheetFox').hidden) showPortrait();
+    useCreature(id, g); S.creature = id; save();
     floatText(fox.x, CREATURES[id].h + .6, fox.z, `${S.name} wird ${CREATURES[id].label}`, 's');
   } catch (e) { toast('Diese Gestalt konnte nicht geladen werden. Bist du offline?'); }
   creatureLoading = null; renderForms(); renderFox();
@@ -41,7 +40,7 @@ const HINTS = {
 };
 
 function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidden = true); $('app').classList.remove('sheet-open'); }
-function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetWork') renderWork(); if (id === 'sheetFox') { renderFox(); showPortrait(); } } }
+function openSheet(id) { const s = $(id), was = !s.hidden; closeSheets(); s.hidden = was; $('app').classList.toggle('sheet-open', !s.hidden); if (!s.hidden) { if (id === 'sheetShrine') renderShrine(); if (id === 'sheetWork') renderWork(); if (id === 'sheetFox') renderFox(); } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
 $('btnShrine').addEventListener('click', () => openSheet('sheetShrine'));
 $('btnWork').addEventListener('click', () => openSheet('sheetWork'));
@@ -144,7 +143,7 @@ $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
 function setFollow(on) { follow = on; renderFollow(); }
-function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
+function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Beobachten beenden' : 'Beobachten'; }
 // Kamera: folgt dem Tiergeist, bleibt über der Insel
 function updateCamera(dt) {
   if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
@@ -154,8 +153,6 @@ function updateCamera(dt) {
   controls.target.y = 1;
   controls.update();
 }
-$('btnPet').addEventListener('click', () => reinforce('pet'));
-$('btnSlap').addEventListener('click', () => reinforce('slap'));
 $('btnFocus').addEventListener('click', () => { setFollow(!follow); if (follow) closeSheets(); });
 $('btnFollow').addEventListener('click', () => setFollow(false));
 let resetArmed = false;
@@ -187,10 +184,29 @@ function renderShrine() {
     if (S.glaube < c || (it.ok && !it.ok())) return; S.glaube -= c; it.buy(); renderShrine(); save(); }));
 }
 on('fox', () => renderFox());
+// Charakterbogen (kreatur.md 3.11 D): Tätigkeit und Grund, Neigungen mit Änderung seit Tagesbeginn, Erfahrung,
+// Lernchronik und letzte Entscheidungen. Läuft alle 0,25 s: Listen nur neu setzen, wenn sich etwas geändert hat.
+const setHTML = (id, html) => { const el = $(id); if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; } };
+const clockText = h => `${Math.floor(h)}:${String(Math.floor(h % 1 * 60)).padStart(2, '0')} Uhr`;
+const whenText = (day, h) => `${day === S.day ? 'heute' : day === S.day - 1 ? 'gestern' : `Tag ${day + 1}`}, ${clockText(h)}`;
+const pc = p => `${Math.round(p * 100)} %`;
 function renderFox() {
-  $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
-  const t = clock.elapsedTime;
-  $('foxLast').textContent = fox.last && t - fox.lastT < 25 ? `Gerade eben hat ${S.name} ${fox.lastDesc || ACT_DESC[fox.last]}. Deine Reaktion prägt ${pron().ihn}.` : `Warte auf die nächste Tat von ${S.name}, dann lobe oder tadle ${pron().ihn}.`;
+  const base = S.cDay && S.cDay.w, bsum = base ? base.help + base.play + base.mischief : 1;
+  setHTML('foxBars', ['help', 'play', 'mischief'].map(k => {
+    const p = share(k), d = base ? Math.round(p * 100) - Math.round(base[k] / bsum * 100) : 0;
+    const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d)}</span>` : '';
+    return `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(p * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(p * 100)} %${delta}</span></div>`;
+  }).join(''));
+  setHTML('foxXp', Object.keys(XP).map(k => `<dt>${fmt(S.cXp[k])}</dt><dd>${XP[k]}</dd>`).join(''));
+  setHTML('foxLearn', S.cLearn.length ? S.cLearn.slice(0, 12).map(e => {
+    const what = e.kind === 'pet' ? '<b class="pet">Lob</b>' : '<b class="slap">Tadel</b>';
+    const txt = e.act ? `${what} für „${e.desc}“: ${ACT_LABEL[e.act]} ${pc(e.from)} → ${pc(e.to)}` : `${what} ohne Tat: ${S.name} wusste nicht, wofür`;
+    return `<li><time>${whenText(e.day, e.hour)}</time>${txt}</li>`;
+  }).join('') : `<li class="empty">Noch nichts. Lobe oder tadle ${S.name} gleich nach einer Tat, dann steht hier, was ${pron().er} daraus lernt.</li>`);
+  setHTML('foxLog', mind.log.length ? mind.log.slice(0, 8).map((e, i) =>
+    `<li><time>${whenText(e.day, e.hour)}</time>${e.done ? `hat ${e.done}` : `${i ? 'wollte' : 'will'} ${e.intent}`}. Warum: ${e.reasons.map(r => r.label).join('; ')}</li>`).join('')
+    : `<li class="empty">Seit dem Laden noch keine Entscheidung.</li>`);
+  const w = why(); $('foxWhy').hidden = !w; if (w) $('foxWhy').textContent = `Warum: ${w}`;
   $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
   renderForms();
 }

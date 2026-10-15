@@ -327,7 +327,7 @@ damit 40 Bewohner bei derselben Arbeit nicht wie Klone wirken:
 
 Ein kleines Blatt (wie das Kreatur-Blatt, am Handy unten, halbe Höhe, Spielwelt bleibt sichtbar):
 
-- Kopf: **Porträt** (kleine 3D-Ansicht wie `src/ui/portrait.js` für die Kreatur, Kopf und Oberkörper mit Mimik),
+- Kopf: **Porträt** (kleine 3D-Ansicht, wie es sie bis zu `kreatur.md` 3.11 für die Kreatur gab, Kopf und Oberkörper mit Mimik),
   Name, Beruf mit Hut-Symbol, Wesenszug.
 - **Jetzt:** Tätigkeit als Satz („Mira sägt einen Stamm“, „Jorin hat frei und fährt Ski“), Laune als Symbol und Wort.
 - **Bedürfnisse:** drei kurze Balken (Müdigkeit, Hunger, Freude) mit Symbolen statt Zahlen.
