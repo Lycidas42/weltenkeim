@@ -112,13 +112,14 @@ function heightAt(x, z) {
   const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * N + i;
   return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + N] * (1 - u) + H[k + N + 1] * u) * v;
 }
-const surfaceAt = (x, z) => Math.max(heightAt(x, z), -0.12);
+const surfaceAt = (x, z) => { const h = heightAt(x, z); return h < -.12 && seaAt(x, z) ? -.12 : h; }; // im Meer: Wasseroberfläche
 const C = Object.fromEntries(Object.entries(theme.palette.terrain).map(([k, c]) => [k, new THREE.Color(c)]));
 const tc = new THREE.Color(), tg = new THREE.Color();
 function terrainColor(h, jit, k = -1) {
   tg.copy(C.g1).lerp(C.g2, jit);
-  if (h < -.02) return tc.copy(C.deep).lerp(C.wet, smooth(-1.4, -.02, h));
+  if (h < -.02 && (k < 0 || SEA[k])) return tc.copy(C.deep).lerp(C.wet, smooth(-1.4, -.02, h));
   tc.copy(C.wet).lerp(C.sand, smooth(-.02, .1, h));                         // nasser Sand an der Wasserlinie
+  if (h < -.02) tc.lerp(C.bare, smooth(-.02, -.4, h) * .85);                // trockene Grube im Inland: Erde
   const sg = .3 + (jit - .5) * .14; tc.lerp(tg, smooth(sg, sg + .14, h));   // unregelmäßige Grenze Sand/Gras
   if (k >= 0) { // erdiger Boden unter Weg, Dorfplatz und Schreinplatz (Fugen zwischen den Platten)
     const x = -HALF + (k % N) * CELL, z = -HALF + Math.floor(k / N) * CELL;
@@ -137,6 +138,31 @@ function terrainColor(h, jit, k = -1) {
 // Vom Spieler geformtes Gelände: gespeichert als Abweichung von der erzeugten Insel (Punkt, Höhe in cm), hier wieder aufgetragen
 const BASE_H = H.slice();
 if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d)) H[k] = clamp(H[k] + d, -3, 8.5); }
+// Meer: nur wo Gelände unter dem Meeresspiegel mit dem offenen Meer verbunden ist (Flutfüllung vom Inselrand).
+// Eine Grube im Inland bleibt trocken, ein Graben bis zur Küste läuft voll. Im Bachbett steht Bachwasser: Das Meer
+// dringt nur dort ein, wo der Bachspiegel unter dem Meeresspiegel liegt (Mündung), nicht gegen die Fließrichtung
+// bergauf. SEA[k] = 1: Meer. Liefert die Punkte, deren Zustand sich geändert hat (neu färben).
+const SEA_LV = -.02, SEA = new Uint8Array(N * N);
+function updateSea() {
+  const old = SEA.slice(), q = []; SEA.fill(0); const P = STREAM.pts, C4 = STREAM.cells;
+  for (let c = 0; c < C4.length; c += 4) { const a = P[C4[c + 1] - 1], b = P[C4[c + 1]]; if (a.y + (b.y - a.y) * C4[c + 2] > SEA_LV) SEA[C4[c]] = 2; } // 2: Bach, kein Meer
+  for (let k = 0; k < N * N; k++) { const i = k % N, j = (k / N) | 0; if ((i === 0 || j === 0 || i === N - 1 || j === N - 1) && H[k] < SEA_LV) { SEA[k] = 1; q.push(k); } }
+  while (q.length) {
+    const k = q.pop(), i = k % N, j = (k / N) | 0;
+    if (i > 0 && !SEA[k - 1] && H[k - 1] < SEA_LV) { SEA[k - 1] = 1; q.push(k - 1); }
+    if (i < N - 1 && !SEA[k + 1] && H[k + 1] < SEA_LV) { SEA[k + 1] = 1; q.push(k + 1); }
+    if (j > 0 && !SEA[k - N] && H[k - N] < SEA_LV) { SEA[k - N] = 1; q.push(k - N); }
+    if (j < N - 1 && !SEA[k + N] && H[k + N] < SEA_LV) { SEA[k + N] = 1; q.push(k + N); }
+  }
+  const changed = []; for (let k = 0; k < N * N; k++) { if (SEA[k] === 2) SEA[k] = 0; if (SEA[k] !== old[k]) changed.push(k); }
+  return changed;
+}
+updateSea();
+// Steht hier Meerwasser (tiefer als lv unter dem Spiegel und mit dem Meer verbunden)? Außerhalb der Insel immer.
+function seaAt(x, z, lv = -.05) {
+  const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
+  return i < 0 || j < 0 || i >= N || j >= N || (SEA[j * N + i] === 1 && heightAt(x, z) < lv);
+}
 let terrainReset = false; // nach dem Zurücksetzen nichts mehr übernehmen, die Seite lädt neu
 function resetTerrain() { terrainReset = true; S.terrain = []; S.terrainN = N; }
 onSave(saveTerrain);
@@ -240,7 +266,14 @@ function fitStream() {
 // Höhen als Textur für das Wasser (Tiefe: Farbe, Brandung, flache Wellen am Ufer)
 const hTexData = new Uint8Array(N * N), hTex = new THREE.DataTexture(hTexData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
 hTex.magFilter = hTex.minFilter = THREE.LinearFilter;
-function updateHTex() { for (let k = 0; k < N * N; k++) hTexData[k] = clamp(Math.round((H[k] + 3) / 5 * 255), 0, 255); hTex.needsUpdate = true; }
+// Meeresmaske fürs Wasser, um einen Punkt verbreitert: am Ufer endet das Wasser unter dem Gelände, nicht davor
+const seaTexData = new Uint8Array(N * N), seaTex = new THREE.DataTexture(seaTexData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+seaTex.magFilter = seaTex.minFilter = THREE.LinearFilter;
+function updateHTex() {
+  for (let k = 0; k < N * N; k++) hTexData[k] = clamp(Math.round((H[k] + 3) / 5 * 255), 0, 255); hTex.needsUpdate = true;
+  for (let k = 0; k < N * N; k++) { const i = k % N, j = (k / N) | 0; seaTexData[k] = SEA[k] || i > 0 && SEA[k - 1] || i < N - 1 && SEA[k + 1] || j > 0 && SEA[k - N] || j < N - 1 && SEA[k + N] ? 255 : 0; }
+  seaTex.needsUpdate = true;
+}
 updateHTex();
 // Muldentiefe für Pfützen: wie weit liegt ein Geländepunkt unter dem Mittel seiner Umgebung (Radius etwa 2,3 Einheiten).
 // Nur echte Mulden an Land bekommen Wasser; mit der Nässe steigt der Wasserspiegel, Pfützen wachsen und fließen ineinander.
@@ -273,4 +306,4 @@ function updateTerrain(dt) {
   const sw = Math.max(weather.flood, weather.wet * .3); streamU.uSwell.value = sw; if (Math.abs(sw - streamSwell) > .004) layStream(sw);
   terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 
-export { BARE, C, CELL, GARDEN_R, H, HALF, HOUSE_R, J, N, NOISE_GLSL, SACRED_SEG, SEG, SHRINE_AT, SIZE, STREAM, depData, fitStream, hTex, heightAt, laneDist, markTerrainDirty, resetTerrain, sacredDist, streamDist, streamMat, streamU, surfaceAt, tCol, tPos, terrainColor, terrainU, tg, updateTerrain };
+export { BARE, C, CELL, GARDEN_R, H, HALF, HOUSE_R, J, N, NOISE_GLSL, SACRED_SEG, SEG, SHRINE_AT, SIZE, STREAM, depData, fitStream, hTex, heightAt, laneDist, markTerrainDirty, resetTerrain, sacredDist, updateSea, streamDist, streamMat, seaAt, seaTex, streamU, surfaceAt, tCol, tPos, terrainColor, terrainU, tg, updateTerrain };

@@ -7,7 +7,7 @@ import { PROC, RES, S, prayYield, resText } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { addGlaube, addHolz, addLogs, floatText } from '../ui/feedback.js';
 import { BED, LUNCH, WAKE } from '../world/sky.js';
-import { HALF, heightAt, streamDist, surfaceAt } from '../world/terrain.js';
+import { HALF, heightAt, seaAt, streamDist, surfaceAt } from '../world/terrain.js';
 import { addWear } from '../world/paths.js';
 import { spawnChips } from '../world/particles.js';
 import { fox } from '../creature/kinds.js';
@@ -383,7 +383,7 @@ function updateVillager(v, dt, t) {
       const g = surfaceAt(v.x, v.z);
       if (v.y <= g && v.vy < 0) {
         v.y = g; const spd = Math.hypot(v.vx, v.vy, v.vz); v.vx = v.vz = v.vy = 0;
-        if (heightAt(v.x, v.z) < -.1) { floatText(v.x, v.y + .6, v.z, 'Platsch!', 'w'); walk(v, v.x * .55, v.z * .55, 'rest'); }
+        if (seaAt(v.x, v.z, -.1)) { floatText(v.x, v.y + .6, v.z, 'Platsch!', 'w'); walk(v, v.x * .55, v.z * .55, 'rest'); }
         else if (spd > 7.5) { floatText(v.x, v.y + .6, v.z, 'Uff!', 'w'); v.state = 'dizzy'; v.timer = 1.8; addGlaube(1, v.x, v.y + .3, v.z); }
         else idle(v, .5);
       }

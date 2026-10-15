@@ -5,7 +5,7 @@ import { $, clamp, rnd } from '../core/util.js';
 import { PROC, RES, ROLES, S, resText } from '../core/state.js';
 import { camera, canvas, controls, tmpV } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
-import { heightAt } from '../world/terrain.js';
+import { heightAt, seaAt } from '../world/terrain.js';
 import { sculpt } from '../world/sculpt.js';
 import { spawnChips } from '../world/particles.js';
 import { treeKindAt } from '../models/nature.js';
@@ -94,7 +94,7 @@ function helpAt(cx, cy, picked = false) {
     return { label: null, pose: 'relax', run() { toast(P ? `${ROLES[hb.role].hut}: Es fehlt ${RES[P.inp][1]}.` : hb.role === 'sawyer' ? 'Sägemühle: Es fehlen Stämme.' : `${ROLES[hb.role].hut}: Gerade nichts abzuholen.`, 2); } };
   }
   // Wasser: einen Fisch greifen
-  if (heightAt(hit.x, hit.z) < -.05) {
+  if (seaAt(hit.x, hit.z)) {
     let fi = -1, fd = 1.1 * 1.1; fish.forEach((f, i) => { const d = (f.x - hit.x) ** 2 + (f.z - hit.z) ** 2; if (d < fd && !f.jump) { fd = d; fi = i; } });
     if (fi < 0) return null;
     const f = fish[fi];

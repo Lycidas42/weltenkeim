@@ -2,7 +2,7 @@
 
 import { clamp } from '../core/util.js';
 import { S } from '../core/state.js';
-import { HALF, SIZE, heightAt } from './terrain.js';
+import { HALF, SIZE, seaAt } from './terrain.js';
 import { CREATURES, fox } from '../creature/kinds.js';
 import { modelInfo } from '../assets/models.js';
 import { LAGER, MILL_POS, PLAZA, SB, SHRINE_POS, WELL } from '../village/layout.js';
@@ -77,7 +77,7 @@ function updateNav(dt) {
   navBudget = 30000;
 }
 function buildNav() {
-  for (let c = 0; c < NAV_SZ; c++) navWater[c] = heightAt(cellX(c), cellZ(c)) < -.05 ? 1 : 0;
+  for (let c = 0; c < NAV_SZ; c++) navWater[c] = seaAt(cellX(c), cellZ(c)) ? 1 : 0;
   const obs = navObstacles();
   navF.m = clamp(CREATURES[fox.kind || S.creature].h * .15, .22, .42); // großer Hirsch braucht mehr Platz als die Katze
   stampNav(navV, obs); stampNav(navF, obs); navReady = true;
