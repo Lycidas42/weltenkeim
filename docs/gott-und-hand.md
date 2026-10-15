@@ -74,7 +74,10 @@ Waren kommen mit 5.2
 Die Hand hält, was sie gegriffen hat, **so lange, bis der Spieler es bewusst absetzt oder wirft** – unabhängig davon,
 ob der Finger noch auf dem Bildschirm ist.
 
-- **Greifen:** wie bisher – Druck auf Bewohner oder Baum (ausreißen); später Stapel und Waren (Abschnitt 5).
+- **Greifen:** drücken und kurz halten (0,25 s) oder gleich ziehen packt einen Bewohner; währenddessen schließt sich
+  die Hand und er zuckt. Ein kurzer Tipp packt nicht – er bleibt frei für das Auswählen (`bewohner.md` 8.1) und
+  zeigt bis dahin „Halten zum Aufnehmen“. Bäume reißt man wie bisher durch Halten bzw. nach oben Ziehen aus.
+  Später auch Stapel und Waren (Abschnitt 5). Regel: Tippen = etwas an dieser Stelle tun, Halten = nehmen.
 - **Halten:** Finger anheben lässt nichts fallen. Die Hand bleibt an ihrer Stelle auf dem Bildschirm und trägt das
   Gegriffene sichtbar (Haltung `hold`). Ein kleines Symbol am Werkzeugknopf „Hand“ zeigt, was gehalten wird
   (Bewohner bzw. Baum).

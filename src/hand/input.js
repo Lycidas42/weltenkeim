@@ -140,8 +140,10 @@ function updateHandHover(dt) {
 // Die Hand ist dort, wo der Zeiger ist – leer wie voll: am Rechner folgt sie dem Mauszeiger, am Handy dem ziehenden
 // Finger und bleibt nach dem Anheben dort stehen. Beim Halten merkt sie sich diesen Bildschirmpunkt (input.hold) und
 // gleitet bei Kamerabewegung mit über die Welt. Ein Tipp (bzw. Klick) ohne Ziehen setzt ab.
-const TAP_PX = 10, TAP_T = .3, THROW_PX = 700; // Tipp: kaum bewegt und kurz; Wurf: Wischen schneller als 700 px/s
-const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, trail: [] }; // mode: 'move' (mit voller Hand angesetzt) oder 'direct'
+// Packen: Drücken und kurz halten (GRAB_T) oder gleich ziehen; ein kurzer Tipp packt nicht (später: Auswählen).
+const TAP_PX = 10, TAP_T = .3, THROW_PX = 700, GRAB_T = .25; // Tipp: kaum bewegt und kurz; Wurf: Wischen schneller als 700 px/s
+// mode: 'move' (mit voller Hand angesetzt) oder 'direct'; cand: Bewohner unter dem Finger, der gleich gepackt wird
+const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, trail: [], cand: null };
 const carrying = () => heldKind() && (input.tool === 'hand' || input.tool === 'blick');
 function updatePointer(dt) {
   if (input.primary !== null) { // Spur des Fingers in Spielzeit, für Tipp und Wischgeschwindigkeit
@@ -155,6 +157,16 @@ function updatePointer(dt) {
     if (!input.drop) pick(input.hold.x, input.hold.y);
   } else if (input.primary !== null || (input.handShown && input.tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
   if (input.pressing && input.tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, input.sculptDir, dt);
+  if (press.cand) { // Bewohner unter dem Finger zuckt, bis er gepackt wird
+    const v = press.cand;
+    if (['grabbed', 'falling', 'sleep'].includes(v.state)) press.cand = null;
+    else if (press.t >= GRAB_T || press.moved) { press.cand = null; grab(v); }
+    else v.h += Math.sin(press.t * 45) * dt * 5;
+  }
+}
+function grab(v) {
+  input.grabbed = v; setHoldOff(v.x, v.z); v.state = 'grabbed';
+  if (v.tree) { v.tree.reserved = null; v.tree = null; } if (v.carry) { v.carry = 0; v.drop = null; }
 }
 // Gehaltener Bewohner hängt unter der Hand
 function carryGrabbed() {
@@ -213,7 +225,7 @@ function onToolDown(cx, cy) {
     if (foxUnder(cx, cy)) { openRing(); input.pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
-    if (best) { input.grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; best.drop = null; } best.state = 'grabbed'; }
+    if (best) press.cand = best; // gepackt wird nach kurzem Halten oder beim Ziehen (updatePointer)
     else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) input.treeGrab = { tr, prog: 0, lastY: cy }; }
   } else if (input.tool === 'miracle' && hitOk) { tryMiracle(hit); input.pressing = false; return; }
   input.pressing = true;
@@ -221,6 +233,7 @@ function onToolDown(cx, cy) {
 // Finger angehoben: kurzer Tipp mit voller Hand setzt dort ab, schnelles Wischen wirft, sonst hält die Hand weiter
 function onToolUp() {
   if (input.treeGrab) input.treeGrab = null; // losgelassen, bevor der Baum nachgab
+  if (press.cand) { const v = press.cand; press.cand = null; floatText(v.x, v.y + .75, v.z, 'Halten zum Aufnehmen', 's'); } // kurzer Tipp auf einen Bewohner
   if (input.tool === 'hand' && heldKind() && press.mode) {
     if (press.mode === 'move' && !press.moved && press.t < TAP_T) setDownAt(press.x0, press.y0);
     else if (swipeSpeed() > THROW_PX) letGo('throw');
@@ -229,7 +242,7 @@ function onToolUp() {
 }
 // Zweiter Finger (Zoomen, Verschieben): der Druck endet, ohne dass etwas fällt
 function cancelPress() {
-  if (input.treeGrab) input.treeGrab = null;
+  if (input.treeGrab) input.treeGrab = null; press.cand = null;
   input.pressing = false; press.mode = null;
 }
 function swipeSpeed() {

@@ -27,6 +27,7 @@ export default async (page, wk) => {
   const near = (a, b, d) => Math.hypot(a.x - b.x, a.y - b.y) < d;
 
   // Ereignisse mitschreiben; Kamera etwas näher, Kreatur weit weg, Tag, kein Menü offen
+  let lp;
   const setup = () => wk.eval(w => {
     window.__ev = []; window.__ptr = 0;
     for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) addEventListener(t, () => window.__ptr++, true);
@@ -59,18 +60,18 @@ export default async (page, wk) => {
   async function landPoint(avoid) {
     const cands = await wk.eval(w => {
       const o = { set: (a, b) => ({ x: a, y: b }) }, out = [], fx = w.toScreen(w.fox.x, w.heightAt(w.fox.x, w.fox.z) + .4, w.fox.z, o), t = w.controls.target;
-      for (let r = 1; r < 9; r += 1.5) for (let a = 0; a < 6.28; a += .8) {
+      for (let r = 1; r < 16; r += 1.5) for (let a = 0; a < 6.28; a += .5) {
         const x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r, y = w.heightAt(x, z); if (y < .2 || w.nearBuilding(x, z, .8)) continue;
-        const s = w.toScreen(x, y, z, o); if (Math.hypot(s.x - fx.x, s.y - fx.y) > 110 && s.y > 330 && s.y < innerHeight - 200) out.push({ x, z, sx: s.x, sy: s.y });
+        const s = w.toScreen(x, y, z, o); if (Math.hypot(s.x - fx.x, s.y - fx.y) > 110 && s.y > 200 && s.y < innerHeight - 200) out.push({ x, z, sx: s.x, sy: s.y });
       }
       return out;
     });
     for (const c of cands) if ((!avoid || Math.hypot(c.sx - avoid.x, c.sy - avoid.y) > 80) && await onCanvas({ x: c.sx, y: c.sy })) return c;
-    fail('kein freier Landpunkt auf dem Bildschirm');
+    fail(`kein freier Landpunkt auf dem Bildschirm (${cands.length} Kandidaten)`);
   }
   async function tap(p, n = 3) { await touch('touchStart', [[p.x, p.y]]); await wk.step(n); await touch('touchEnd'); await wk.step(2); }
   async function grabVillager() {
-    const p = await freeVillager(); await tap(p);
+    const p = await freeVillager(); await tap(p, 20); // drücken und kurz halten (0,33 s) packt
     const h = await hold(); if (h.kind !== 'villager') fail(`Bewohner bei (${Math.round(p.x)}, ${Math.round(p.y)}) nicht gepackt (Hand: ${h.kind})`);
     return grabbedIndex();
   }
@@ -78,8 +79,16 @@ export default async (page, wk) => {
   const vil = i => wk.eval((w, i) => { const v = w.villagers[i]; return { x: v.x, y: v.y, z: v.z, state: v.state, hidden: !!v.hidden }; }, i);
 
   mark('vor 1');
-  // 1. Packen, Finger anheben: bleibt in der Hand, die Hand steht still
+  // 1. Kurzer Tipp packt nicht; Ziehen packt sofort; Packen, Finger anheben: bleibt in der Hand, die Hand steht still
+  let pv = await freeVillager(); await tap(pv, 3);
+  if ((await hold()).kind) fail('kurzer Tipp auf einen Bewohner packt ihn (soll erst nach kurzem Halten)');
+  pv = await freeVillager();
+  await touch('touchStart', [[pv.x, pv.y]]); await wk.step(2); await touch('touchMove', [[pv.x + 15, pv.y - 5]]); await wk.step(1);
+  if ((await hold()).kind !== 'villager') fail('Ziehen auf einem Bewohner packt ihn nicht sofort');
+  await wk.step(20); await touch('touchEnd'); await wk.step(5); // stillhalten, sonst zählt es als Wurf
+  lp = await landPoint((await hold()).screen); await tap({ x: lp.sx, y: lp.sy }, 2); await wk.step(60);
   let vi = await grabVillager();
+  await wk.step(60); // die Hand gleitet nach dem Zupacken noch an ihren Platz
   const h0 = await hold(); await wk.step(240); let h1 = await hold();
   if (h1.kind !== 'villager' || (await vil(vi)).state !== 'grabbed') fail('Bewohner nach 4 s nicht mehr in der Hand');
   if (Math.hypot(h1.hand.x - h0.hand.x, h1.hand.z - h0.hand.z) > .05) fail('Hand bewegt sich ohne Finger');
@@ -119,7 +128,7 @@ export default async (page, wk) => {
 
   mark('vor 4');
   // 4. Tipp auf den Boden: steht dort auf den Füßen, nicht schwindelig, arbeitet weiter
-  let lp = await landPoint(h.screen);
+  lp = await landPoint(h.screen);
   await tap({ x: lp.sx, y: lp.sy }, 2); await wk.step(60);
   v = await vil(vi); let ev = await lastEv();
   if ((await hold()).kind) fail('Tipp auf den Boden hat nicht abgesetzt');
@@ -233,8 +242,10 @@ export default async (page, wk) => {
 
   mark('vor 9');
   // 9. Maus: Klick packt, Schild „Absetzen“, Klick setzt ab, schnelles Ziehen wirft
-  const click = async p => { await mouse.move(p.x, p.y); await mouse.down(); await wk.step(2); await mouse.up(); await wk.step(2); };
-  let p = await freeVillager(); await click(p); vi = await grabbedIndex();
+  const click = async (p, n = 2) => { await mouse.move(p.x, p.y); await mouse.down(); await wk.step(n); await mouse.up(); await wk.step(2); };
+  let p = await freeVillager(); await click(p);
+  if ((await hold()).kind) fail('Maus: kurzer Klick auf einen Bewohner packt ihn (soll erst nach kurzem Halten)');
+  await click(p, 20); vi = await grabbedIndex();
   if ((await hold()).kind !== 'villager') fail('Maus: Klick packt den Bewohner nicht');
   lp = await landPoint((await hold()).screen);
   await mouse.move(lp.sx, lp.sy); await wk.step(12);
@@ -245,7 +256,7 @@ export default async (page, wk) => {
   await click({ x: lp.sx, y: lp.sy }); await wk.step(60);
   v = await vil(vi); ev = await lastEv();
   if ((await hold()).kind || !ev?.soft || Math.hypot(v.x - lp.x, v.z - lp.z) > .6) fail('Maus: Klick setzt nicht am Zeiger ab');
-  p = await freeVillager(); await click(p); vi = await grabbedIndex(); await wk.step(10);
+  p = await freeVillager(); await click(p, 20); vi = await grabbedIndex(); await wk.step(10);
   await mouse.move(195, 560); await mouse.down(); await wk.step(1);
   for (let k = 1; k <= 5; k++) { await mouse.move(195, 560 - 35 * k); await wk.step(1); }
   await mouse.up(); await wk.step(1);
