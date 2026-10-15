@@ -135,6 +135,37 @@ ob der Finger noch auf dem Bildschirm ist.
   - Inseln und Ufer gestalten: Senken unter Wasser schafft Buchten (Fische), Heben schafft Land für das Dorf.
   - Die Kreatur kann Formen nicht lernen (bleibt göttliches Werkzeug der Hand).
 
+### 4.1 Größe und Kraft selbst wählen
+
+**Stand:** 🔵 geplant
+
+Heute bestimmt allein die Stufe der Hand, wie groß und wie kräftig Formen wirkt (`sculpt`: Radius `2,6 · pw`,
+Kraft `2,6 · pw`, `pw = 1 + 0,35 · (Stufe − 1)`). Nach einigen Stufen reißt schon ein kurzer Druck ganze Hügel
+hoch, und kleine Senken, Mulden für Teiche oder ein sanfter Wall lassen sich nicht mehr gestalten. Die Stufe soll
+deshalb nur noch die **Obergrenze** festlegen. Wie viel davon er nutzt, wählt der Spieler selbst.
+
+- **Zwei Regler** in der Formen-Leiste (`#ctxSculpt`) neben Heben und Senken:
+  - **Größe:** Radius von 0,8 (etwa zwei Rasterzellen, `CELL` ≈ 0,38) bis zur Höchstgröße der Stufe
+    (Stufe 1: 2,6, jede Stufe +35 %).
+  - **Kraft:** Hebe- bzw. Senkgeschwindigkeit von 0,4 bis zur Höchstkraft der Stufe (Stufe 1: 2,6, jede Stufe +35 %).
+  - Auf dem Handy als zwei schmale Schieber, die bei schmalem Bildschirm unter die Richtungsknöpfe umbrechen. Am
+    Rechner zusätzlich: **Mausrad bei gedrückter Umschalttaste** ändert die Größe, **mit Strg** die Kraft.
+  - Die Schieber sind gleichmäßig über den Bereich verteilt. Kleine Werte liegen damit nicht zusammengedrängt am Rand.
+- **Werte bleiben beim Aufstieg gleich:** Gespeichert werden die echten Werte, nicht der Anteil an der Höchstgrenze.
+  „Hand stärken“ hebt nur die Obergrenze, die gewählte Pinselgröße wächst nicht ungefragt mit. Der Text im
+  Schrein-Panel lautet entsprechend „Formen: größte Reichweite und Kraft +35 %“.
+- **Vorschau:** Solange das Werkzeug Formen aktiv ist, zeigt ein flacher Ring auf dem Gelände den Wirkbereich unter dem
+  Zeiger bzw. Finger (wie die Absetz-Markierung beim Halten), beim Ziehen eines Reglers auch ohne Druck in der
+  Bildmitte. Die Ringfarbe zeigt die Richtung: hell für Heben, dunkel für Senken.
+- **Hand:** Die Hand wird mit der Pinselgröße etwas größer oder kleiner (z. B. 70 % bis 130 %), so dass man auch
+  ohne Ring die Größe erkennt.
+- **Feine Arbeit:** Bei kleinem Radius bleibt die weiche Kosinus-Spitze erhalten. Unter etwa zwei Rasterzellen wird
+  sie eckig, daher die Untergrenze 0,8.
+- **Spielstand:** `S.sculpt = { r, k }` (Radius und Kraft als echte Werte, Standard `{ r: 2,6, k: 2,6 }`, also wie
+  heute auf Stufe 1). Beim Laden werden beide Werte auf den Bereich der aktuellen Stufe begrenzt.
+- **Offen:** Sollen Senken unter den Meeresspiegel (Buchten) oder hohe Berge eine Mindest-Stufe brauchen, statt nur
+  von der Pinselgröße abzuhängen? Vorerst nein. Die Grenzen −3 bis 8,5 bleiben wie heute für alle Stufen gleich.
+
 ## 5. Mit Ressourcen helfen und Ressourcen tragen
 
 ### 5.1 Hilfe an Ort und Stelle (Tippen)
@@ -180,7 +211,7 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 
 | Bereich | pro Stufe (Vorschlag) |
 |---|---|
-| Formen | Reichweite und Kraft +35 % (wie heute) |
+| Formen | größte Reichweite und Kraft +35 %; Größe und Kraft wählt der Spieler darunter selbst (4.1) |
 | Tragen | Stufe 1: 6 Stück, jede Stufe +4 |
 | Waren von Hütten ins Lager | Menge je Stufe; höhere Stufen leeren auch Nachbarhütten |
 | Felder | ab Stufe 2 auch angrenzende Felder in einem Zug |
@@ -278,6 +309,7 @@ Die Veränderung ist langsam und weich (einige Minuten), damit sie wie Entwicklu
 | `S.hand` | Ausbaustufe der Hand (Zahl ab 1) | ✅ vorhanden |
 | `S.handStyle` | `skin`, `nails`, `sleeve`, `trim`; künftig ergänzt um z. B. `nailShape`, `fabric`, `pattern`, `jewelry` (Liste), `paint`, `glow` | ✅ vorhanden, wird erweitert |
 | `S.terrain`, `S.terrainN` | geformte Höhen | ✅ vorhanden |
+| `S.sculpt` | gewählte Größe und Kraft beim Formen `{ r, k }` (4.1) | 🔵 geplant |
 | `S.align` | Waage −1 … +1 | 🔵 geplant |
 | `S.deeds` | letzte Taten (kurze Liste für das Schrein-Panel) | 🔵 geplant |
 | `S.held` | gehaltene Waren `{ kind, n }` oder `null` | 🔵 geplant |
@@ -288,6 +320,7 @@ Standardwerten zusammengeführt. Hand und Waage gehören zur Welt, nicht zum Pro
 ## 11. Vorgeschlagene Reihenfolge
 
 1. **Halten als Zustand** (3.2) ✅: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten.
+   - Klein und unabhängig davon jederzeit möglich: **Größe und Kraft beim Formen** (4.1).
 2. **Waage** (`S.align`, `S.deeds`) mit Anzeige; vorhandene Taten zählen (Werfen, sanft Absetzen, Helfen, Bitten,
    Regen, Bäume ausreißen).
 3. **Abgrenzung Hand/Wunder** umsetzen: Gießen und Sofort-Verarbeitung aus `helpAt` entfernen, Bann als Wunder.
