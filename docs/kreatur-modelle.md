@@ -96,9 +96,17 @@ Spuren behalten, ausgewählt exportieren (`export_animation_mode='NLA_TRACKS'`).
 5. Prüfen: `__wk.setCreature('<id>')`, Zustände durchlaufen lassen (`__wk.step`), Tragen, Liegen, Lob/Tadel;
    `node dev/check.mjs kreatur zielen`.
 
-## 5. Offene Punkte
+## 5. Offene Punkte (Stand Ende 16.10.)
 
-- Fuchsmensch: Gesicht ohne Mimik, Hände ohne Finger-Form; beim Liegen hängt der Schwanz in den Boden.
-- Tragkraft und Werfen der Zweibeiner noch wie beim Fuchs (3.12 G 3).
-- Die vierbeinige Fuchs-Reaktion (Schwanz wedeln) gibt es für Zweibeiner nicht; dort Animationen `Yes`/`Idle_No_Loop`
-  bzw. `Cheer`/`Hit_B`.
+Vereinbart: **vorerst nur am Fuchsmenschen arbeiten**, bis er richtig gut ist; erst dann auf andere Arten (Bär, Löwe …)
+übertragen.
+
+- Werkzeuge zum Ansehen im Spiel: Charakterbogen → „Animationen testen“ (Kreatur hält an, jede Animation einzeln,
+  `src/ui/animtest.js`); Schrein → „Nur gewählte Gestalt“ / „Alle Gestalten“ (Statisten, `src/creature/parade.js`).
+- Dösen: Rumpf liegt jetzt auf, die untere Hand ragt noch etwas in den Boden; im Spiel nachprüfen.
+- Übergang Stehen → Einrollen kippt eher seitlich um; schöner wäre: erst hinsetzen, dann einrollen.
+- Aufheben: Hände reichen noch nicht ganz bis zum Boden; Baum wechselt beim Greifen in die Hände.
+- Weitere eigene Bewegungen per Pose im Bauskript (`posen()`): z. B. Jubeln, Springen, beleidigt wegdrehen, wütend
+  aufstampfen. Tanzen gibt es fertig (`Dance_Loop` in UAL1, noch nicht exportiert).
+- Gesicht: ohne Mimik; Hände ohne Finger-Form; Tragkraft und Werfen noch wie beim Fuchs (3.12 G 3).
+- Fuchs-Reaktion auf Lob/Tadel (Schwanz wedeln) gibt es für Zweibeiner nicht; dort `Yes`/`Idle_No_Loop`.
