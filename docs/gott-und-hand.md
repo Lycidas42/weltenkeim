@@ -5,7 +5,7 @@ ihn verändern.
 
 Verwandt: `gut-und-boese.md` (Folgen der Waage für Welt und Schrein), `bewohner.md` (wie die Bewohner auf Hand und
 Waage reagieren), `kreatur.md` und `kreatur-lernen.md` (die Kreatur lernt von der Hand), `spielstaende.md` (Hand und
-Waage gehören zur Welt). Stand-Begriffe: siehe `README.md`.
+Waage gehören zur Welt). Stand der Features: siehe `README.md`.
 
 ## 1. Der Gott
 
@@ -24,10 +24,10 @@ Waage gehören zur Welt). Stand-Begriffe: siehe `README.md`.
 
 | Werkzeug | Zweck | Stand |
 |---|---|---|
-| Blick | Kamera drehen, verschieben, zoomen; die Hand ist ausgeblendet | vorhanden |
-| Hand | greifen, halten, absetzen, werfen, helfen, Bäume ausreißen, Kreatur antippen | vorhanden |
-| Formen | Land heben und senken | vorhanden |
-| Wunder | Wunder wählen und auf die Welt tippen | vorhanden |
+| Blick | Kamera drehen, verschieben, zoomen; die Hand ist ausgeblendet | ✅ vorhanden |
+| Hand | greifen, halten, absetzen, werfen, helfen, Bäume ausreißen, Kreatur antippen | ✅ vorhanden |
+| Formen | Land heben und senken | ✅ vorhanden |
+| Wunder | Wunder wählen und auf die Welt tippen | ✅ vorhanden |
 
 ## 2. Wunder
 
@@ -39,16 +39,16 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
 
 | Wunder | Wirkung | Kosten | Richtung | Stand |
 |---|---|---|---|---|
-| Regen | Fläche: Bäume wachsen, Setzlinge sprießen, Felder werden gegossen (wachsen eine Weile doppelt so schnell), Pfützen | 20 Glaube | gut | vorhanden (`castRain`) |
-| Eile | Fläche: Bewohner gehen und arbeiten schneller, auch in Werkstätten | 12 Glaube | gut | vorhanden (`castHaste`) |
-| Bann | Fläche: Wild erstarrt eine Weile, Jäger treffen sicher | ca. 10 | neutral | geplant (heute Hand-Hilfe „Bannen“) |
-| Wirbelsturm | Ein Wirbel zieht über eine kurze Bahn: reißt Bäume aus, wirbelt Waren und Bewohner durch die Luft, deckt Dächer ab. Spielerisch nutzbar zum Roden. Bahn per Wischgeste | teuer | böse (im Dorf), neutral (im leeren Wald) | geplant |
-| Blitz / Feuer | ein Ziel: Gebäude brennt, Baum wird zu Asche | mittel | böse | geplant |
-| Dürre | Fläche: Felder welken, Bäume wachsen nicht | mittel | böse | geplant |
-| Plage | Schädlinge auf Feldern, Ernte halbiert | mittel | böse | geplant |
-| Segen der Ernte | Fläche: Felder reifen ein Stück weiter / Ertrag +50 % | teuer | gut | Idee |
-| Fischzug | ruft einen Schwarm an eine Küstenstelle | mittel | gut | Idee |
-| Wildlocken | lockt Wild an einen Ort | mittel | neutral | Idee |
+| Regen | Fläche: Bäume wachsen, Setzlinge sprießen, Felder werden gegossen (wachsen eine Weile doppelt so schnell), Pfützen | 20 Glaube | gut | ✅ vorhanden (`castRain`) |
+| Eile | Fläche: Bewohner gehen und arbeiten schneller, auch in Werkstätten | 12 Glaube | gut | ✅ vorhanden (`castHaste`) |
+| Bann | Fläche: Wild erstarrt eine Weile, Jäger treffen sicher | ca. 10 | neutral | 🔵 geplant (heute Hand-Hilfe „Bannen“) |
+| Wirbelsturm | Ein Wirbel zieht über eine kurze Bahn: reißt Bäume aus, wirbelt Waren und Bewohner durch die Luft, deckt Dächer ab. Spielerisch nutzbar zum Roden. Bahn per Wischgeste | teuer | böse (im Dorf), neutral (im leeren Wald) | 🔵 geplant |
+| Blitz / Feuer | ein Ziel: Gebäude brennt, Baum wird zu Asche | mittel | böse | 🔵 geplant |
+| Dürre | Fläche: Felder welken, Bäume wachsen nicht | mittel | böse | 🔵 geplant |
+| Plage | Schädlinge auf Feldern, Ernte halbiert | mittel | böse | 🔵 geplant |
+| Segen der Ernte | Fläche: Felder reifen ein Stück weiter / Ertrag +50 % | teuer | gut | 💡 Idee |
+| Fischzug | ruft einen Schwarm an eine Küstenstelle | mittel | gut | 💡 Idee |
+| Wildlocken | lockt Wild an einen Ort | mittel | neutral | 💡 Idee |
 
 - Bitten der Bewohner (Wunsch-Anzeige) verlangen bestimmte Wunder; Erfüllen zählt gut, Verstreichen leicht böse,
   das Gegenteil tun stark böse (Abschnitt 7).
@@ -58,7 +58,9 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
 
 ## 3. Greifen, Halten, Absetzen, Werfen
 
-### 3.1 Heute (vorhanden)
+### 3.1 Heute
+
+**Stand:** ✅ vorhanden
 
 - Hand-Werkzeug: Druck auf einen Bewohner packt ihn, er hängt zappelnd unter der Hand und folgt dem Finger.
 - Beim Loslassen wird er **immer geworfen**, mit der Geschwindigkeit der Hand (`onToolUp`); er fällt und landet.
@@ -66,7 +68,9 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
   wird bei der Landung zu Holz (`uprootTree`, `throwTree`).
 - Ein zweiter Finger (Zoomen) oder ein Werkzeugwechsel lässt das Gehaltene sofort los (= Wurf).
 
-### 3.2 Künftig: Halten ist ein Zustand, kein gedrückter Finger
+### 3.2 Halten ist ein Zustand, kein gedrückter Finger
+
+**Stand:** 🔵 geplant
 
 Die Hand hält, was sie gegriffen hat, **so lange, bis der Spieler es bewusst absetzt oder wirft** – unabhängig davon,
 ob der Finger noch auf dem Bildschirm ist.
@@ -93,6 +97,8 @@ ob der Finger noch auf dem Bildschirm ist.
 
 ### 3.3 Gut und böse beim Tragen
 
+**Stand:** 🔵 geplant – setzt die Waage voraus (7)
+
 - **Sanft absetzen** zählt gut, wenn es dem Bewohner nützt: am Arbeitsplatz, am eigenen Haus am Abend, aus dem
   Wasser oder aus einer Gefahr gerettet. Nur ein kleines Gewicht, und es nimmt ab, wenn man denselben Bewohner
   ständig hin und her trägt (kein Punkte-Sammeln).
@@ -100,6 +106,8 @@ ob der Finger noch auf dem Bildschirm ist.
 - Die Kreatur sieht zu und lernt beides (`kreatur.md` 3.8).
 
 ## 4. Landschaft formen
+
+**Stand:** 🟡 teilweise – Heben und Senken vorhanden, Rest geplant
 
 - **Heute (vorhanden):** Werkzeug „Formen“, Richtung Heben oder Senken wählen, gedrückt halten: Das Land hebt bzw.
   senkt sich weich um den Finger (`sculpt`). Reichweite und Kraft wachsen mit der Stufe der Hand (+35 % je Stufe).
@@ -114,6 +122,8 @@ ob der Finger noch auf dem Bildschirm ist.
 ## 5. Mit Ressourcen helfen und Ressourcen tragen
 
 ### 5.1 Hilfe an Ort und Stelle (Tippen)
+
+**Stand:** 🟡 teilweise – alle Hilfen vorhanden; die Spalte „künftig“ ist geplant
 
 Die Hand nimmt den Bewohnern einen Arbeitsschritt ab – ein Ziel je Tipp (`handHelp`/`helpAt`). Am Rechner zeigt
 ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende Haltung an.
@@ -131,7 +141,9 @@ ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende 
 | Säge/Mühle/Bäckerei sofort verarbeiten | Hand | **entfällt** → Wunder Eile | Sofort-Produktion ist übernatürlich |
 | Bäume ausreißen | Hand | **Hand** | Kraft der Hand |
 
-### 5.2 Ressourcen aufnehmen und tragen (geplant)
+### 5.2 Ressourcen aufnehmen und tragen
+
+**Stand:** 🔵 geplant
 
 - Am Lager, an einer Hütte oder an einem Holzstapel gedrückt halten: Die Hand packt einen Stapel – je länger, desto
   mehr, bis zur Tragkraft der Stufe. Sichtbar als Bündel, Sack oder Kiste in der Hand.
@@ -144,6 +156,8 @@ ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende 
 - Gehaltene Waren zählen nicht zum Lager, bis sie abgesetzt sind (Anzeige oben zeigt sie nicht doppelt).
 
 ## 6. Hand stärken (Schrein)
+
+**Stand:** 🟡 teilweise – nur Formen wird stärker
 
 Heute erhöht „Hand stärken“ (`S.hand`, Kosten `handCost`) nur Reichweite und Kraft beim Formen. Künftig macht jede
 Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesserung der nächsten Stufe.
@@ -160,6 +174,8 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 | Bewohner tragen | mehrere auf einmal |
 
 ## 7. Die Waage
+
+**Stand:** 🔵 geplant
 
 - Ausrichtung des Gottes `S.align` von −1 (böse) bis +1 (gut), Start 0 oder leicht gut. **geplant**
 - Jede Tat verschiebt die Waage ein wenig, große Taten mehr. Ältere Taten verblassen langsam, die Waage pendelt also
@@ -191,6 +207,8 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 
 ## 8. Aussehen der Hand: Editor
 
+**Stand:** 🟡 teilweise – Farben im Spielstand, kein Panel
+
 - **Heute (vorhanden, ohne Oberfläche):** Modell `GodHand.blend` mit den Materialien `Skin`, `Nails`, `Sleeve`,
   `Trim`; `styleHand` färbt sie aus `S.handStyle` (`skin`, `nails`, `sleeve`, `trim`). Ein Panel zum Ändern gibt es
   noch nicht.
@@ -216,6 +234,8 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 
 ## 9. Aussehen der Hand: Veränderung durch die Waage
 
+**Stand:** 🔵 geplant
+
 Das Styling des Spielers bleibt die Grundlage; die Ausrichtung legt sich automatisch und stufenweise darüber.
 Die Veränderung ist langsam und weich (einige Minuten), damit sie wie Entwicklung wirkt und nicht wie ein Schalter.
 
@@ -239,12 +259,12 @@ Die Veränderung ist langsam und weich (einige Minuten), damit sie wie Entwicklu
 
 | Feld | Inhalt | Stand |
 |---|---|---|
-| `S.hand` | Ausbaustufe der Hand (Zahl ab 1) | vorhanden |
-| `S.handStyle` | `skin`, `nails`, `sleeve`, `trim`; künftig ergänzt um z. B. `nailShape`, `fabric`, `pattern`, `jewelry` (Liste), `paint`, `glow` | vorhanden, wird erweitert |
-| `S.terrain`, `S.terrainN` | geformte Höhen | vorhanden |
-| `S.align` | Waage −1 … +1 | geplant |
-| `S.deeds` | letzte Taten (kurze Liste für das Schrein-Panel) | geplant |
-| `S.held` | gehaltene Waren `{ kind, n }` oder `null` | geplant |
+| `S.hand` | Ausbaustufe der Hand (Zahl ab 1) | ✅ vorhanden |
+| `S.handStyle` | `skin`, `nails`, `sleeve`, `trim`; künftig ergänzt um z. B. `nailShape`, `fabric`, `pattern`, `jewelry` (Liste), `paint`, `glow` | ✅ vorhanden, wird erweitert |
+| `S.terrain`, `S.terrainN` | geformte Höhen | ✅ vorhanden |
+| `S.align` | Waage −1 … +1 | 🔵 geplant |
+| `S.deeds` | letzte Taten (kurze Liste für das Schrein-Panel) | 🔵 geplant |
+| `S.held` | gehaltene Waren `{ kind, n }` oder `null` | 🔵 geplant |
 
 Alle neuen Felder abwärtskompatibel mit Standardwert in `S`; `handStyle` wird beim Laden wie heute mit den
 Standardwerten zusammengeführt. Hand und Waage gehören zur Welt, nicht zum Profil (`spielstaende.md`).

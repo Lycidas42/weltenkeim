@@ -10,6 +10,8 @@ Themes mit eigenem Stil geben.
 - Modellverzeichnis: `src/assets/models.js` (`model(key)`, `modelInfo(key)`, `findPart(obj, key, part)`)
 - Dateien: `assets/models/`, Blender-Quellen: `assets/source/`
 
+Stand der Features: siehe `README.md`.
+
 ## 1. Ein Modell austauschen
 
 1. Neue Datei nach `assets/models/` legen (glTF `.gltf` + `.bin` oder `.glb`).
@@ -95,6 +97,8 @@ Schlüssel im Theme, und der Code-Baustein wird zur Rückfallebene.
 
 ### 4.1 Farbrollen (Natur, Felder, Gärten)
 
+**Stand:** ✅ vorhanden
+
 Flächen von Bäumen, Büschen, Felsen, Gras, Farnen, Blumenstielen, Feldfrüchten und Gartenpflanzen tragen eine
 Farbrolle. Beispiele: `leaf.oak` (Laub der Eiche), `bark`, `rock`, `moss`, `grass`, `crop`, `wheat`. Alle Rollen und
 ihre Grundfarben stehen in `palette.nature`, der Mechanismus in `src/core/colors.js`.
@@ -107,7 +111,9 @@ ihre Grundfarben stehen in `palette.nature`, der Mechanismus in `src/core/colors
 - **Eigene Modelle per Datei** sollten ihre Materialien später ebenfalls Rollen zuordnen (z. B. Material „Leaves“ →
   `leaf.oak`), damit sie sich mit den Jahreszeiten verfärben.
 
-### 4.2 Zukünftiger Schritt: Bewohner austauschbar machen (zurückgestellt)
+### 4.2 Bewohner austauschbar machen
+
+**Stand:** ⏸️ zurückgestellt
 
 Heute besteht jeder Bewohner aus Einzelteilen, die der Code für jede Tätigkeit selbst stellt (`src/village/villagers.js`,
 `src/village/render.js`):

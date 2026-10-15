@@ -6,9 +6,11 @@ Veränderung der Hand stehen in `gott-und-hand.md` (Abschnitte 7 und 9). Hier ge
 Schrein und Kreatur auf die Ausrichtung reagieren.
 
 Verwandt: `gott-und-hand.md` (Waage, Taten, Hand, Wunder), `bewohner.md` (Gefühle und Verhalten der Bewohner je
-Ausrichtung, Abschnitt 9), `kreatur.md` (Ausrichtung der Kreatur).
+Ausrichtung, Abschnitt 9), `kreatur.md` (Ausrichtung der Kreatur). Stand der Features: siehe `README.md`.
 
 ## 1. Was sich mit der Waage verändert
+
+**Stand:** 🔵 geplant – setzt die Waage voraus (`gott-und-hand.md` 7)
 
 - **Bewohner:** gut → Liebe und Dank, böse → Furcht; Beten, Arbeit, Pausen und Freizeit ändern sich entsprechend.
   Einzelheiten in `bewohner.md` Abschnitt 9.

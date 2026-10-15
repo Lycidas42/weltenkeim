@@ -8,7 +8,7 @@ Verwandt: `nahrung.md` (Essen, Hunger, Dorffest), `gott-und-hand.md` (Hand, Wund
 `jahreszeiten.md` (Winter, Sommer, Kalender), `assets.md` (Bewohner austauschbar machen, Abschnitt 4.2),
 `spielstaende.md` (Bewohner gehören zur Welt).
 
-Stand-Begriffe: siehe `README.md`.
+Stand der Features: siehe `README.md`.
 
 ## 1. Ist-Stand
 
@@ -49,7 +49,9 @@ Leitlinien:
 
 ## 3. Identität und Bedürfnisse
 
-### 3.1 Wer ein Bewohner ist (geplant)
+### 3.1 Wer ein Bewohner ist
+
+**Stand:** 🔵 geplant
 
 - **Name:** aus einer Liste deutscher, märchenhafter Vornamen (Mira, Jorin, Ilse, Bent …), beim Entstehen gewürfelt.
 - **Wesenszug** (einer, selten zwei): fleißig, verträumt, gesellig, ängstlich, fromm, abenteuerlustig, gemütlich,
@@ -62,7 +64,9 @@ Leitlinien:
 - Aussehen bleibt wie heute gewürfelt, aber mit festem Saatwert je Bewohner statt je Platz, damit es beim Wegfallen
   eines Bewohners nicht auf die anderen überspringt.
 
-### 3.2 Bedürfnisse (geplant)
+### 3.2 Bedürfnisse
+
+**Stand:** 🔵 geplant
 
 Drei Werte von 0 bis 1, bewusst wenige:
 
@@ -80,6 +84,8 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 ## 4. Emotionen und Ausdruck
 
+**Stand:** 🟡 teilweise – Jubel, Flucht, „Uff!“ und „Zzz“ vorhanden, alles Weitere geplant
+
 ### 4.1 Gefühle
 
 | Gefühl | Auslöser (Beispiele) | Symbol | Mimik | Körper | Ton |
@@ -94,7 +100,9 @@ Drei Werte von 0 bis 1, bewusst wenige:
 | Trauer | Haus zerstört, Freund weg (später) | Träne | Mundwinkel unten | Kopf gesenkt | Schniefen |
 | Dank / Liebe zum Gott | gute Tat, Rettung, sanft abgesetzt | Herz zum Schrein hin | Lächeln | winken zur Hand, Verbeugung | Ruf „Danke!“ in Brabbelsprache |
 
-### 4.2 Symbole über dem Kopf (geplant, erster Schritt)
+### 4.2 Symbole über dem Kopf
+
+**Stand:** 🔵 geplant
 
 - Kleines Bild über dem Kopf, sitzt etwa 0,25 über dem Kopf, steigt kurz auf und verblasst nach 2 bis 4 s.
 - **Technik:** ein Sprite-Atlas (eine Textur, wenige Dutzend Bilder) und **eine** `InstancedMesh` aus Flächen, die
@@ -103,7 +111,9 @@ Drei Werte von 0 bis 1, bewusst wenige:
 - Wiederkehrende Zustände (hungrig, müde) zeigen das Symbol in Abständen, nicht dauerhaft.
 - Ersetzt den heutigen Schwebetext „Zzz“ über dem Haus nicht, ergänzt ihn.
 
-### 4.3 Mimik (geplant)
+### 4.3 Mimik
+
+**Stand:** 🔵 geplant
 
 - Der Kopf bekommt **Mund** und **Augenbrauen** als weitere instanzierte Teile. Je Gefühl eine Form: Mund als
   kleiner Bogen (lächeln, schief, rund, nach unten), Brauen als zwei flache Kästchen mit Neigung. Augen schließen
@@ -112,7 +122,9 @@ Drei Werte von 0 bis 1, bewusst wenige:
 - Erst ab mittlerer Zoomstufe sichtbar sinnvoll; aus der Ferne reicht die Körperhaltung. Ab großer Entfernung die
   Gesichtsteile ganz abschalten (Leistung).
 
-### 4.4 Sprechblasen (geplant)
+### 4.4 Sprechblasen
+
+**Stand:** 🔵 geplant
 
 - Kurze deutsche Sätze in einer Blase über dem Kopf, als DOM-Element über dem Canvas (wie die Schwebetexte), höchstens
   **drei gleichzeitig**, und nur für Bewohner im Bild und nahe genug.
@@ -122,7 +134,9 @@ Drei Werte von 0 bis 1, bewusst wenige:
 - Satzvorlagen mit Platzhaltern (Name, Beruf, Ware), je Wesenszug eigene Färbung. Sprechblasen ersetzen nicht die
   Hinweise (`toast`), die dem Spieler Spielregeln erklären.
 
-### 4.5 Ton (geplant, eigenes Vorhaben)
+### 4.5 Ton
+
+**Stand:** 🔵 geplant – eigenes Vorhaben, im Spiel gibt es noch keinen Ton
 
 - Es gibt noch kein Tonsystem. Vorschlag: ein kleines Modul `src/core/audio.js` mit Web Audio, das erst nach der
   ersten Berührung startet (Vorgabe der Mobilbrowser), mit Lautstärke für Musik, Umgebung und Stimmen und einem
@@ -137,6 +151,8 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 ### 4.6 Regeln gegen Gewimmel
 
+**Stand:** 🔵 geplant
+
 - Je Bewohner höchstens ein Ausdruck zur Zeit; ein neuer verdrängt einen älteren nur mit höherer Wichtigkeit
   (Angst > Dank > Ärger > Hunger > Müdigkeit > Freude).
 - Höchstzahl gleichzeitiger Symbole (etwa 8) und Sprechblasen (3); Bewohner nahe der Bildmitte und im Fokus zuerst.
@@ -149,25 +165,29 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 | Pause | Wann | Was | Stand |
 |---|---|---|---|
-| Mittagspause | feste Zeit (`LUNCH`) | sitzen auf dem Dorfplatz, essen | vorhanden; künftig mit echtem Essen (`nahrung.md`) |
-| Verschnaufen | Müdigkeit hoch | stehen bleiben, Schweiß abwischen, strecken, auf einen Baumstumpf setzen | geplant |
-| Trinken | ab und zu, im Sommer öfter | zum Brunnen, Schöpfen, trinken | geplant |
-| Plausch | zwei Bewohner begegnen sich, einer davon gesellig | stehen bleiben, Sprechblasen hin und her, lachen | geplant |
-| Nickerchen | nach dem Mittag bei großer Müdigkeit | im Schatten eines Baums dösen (sichtbar, nicht in der Hütte) | Idee |
+| Mittagspause | feste Zeit (`LUNCH`) | sitzen auf dem Dorfplatz, essen | 🟡 teilweise – feste Zeit vorhanden, echtes Essen fehlt (`nahrung.md`) |
+| Verschnaufen | Müdigkeit hoch | stehen bleiben, Schweiß abwischen, strecken, auf einen Baumstumpf setzen | 🔵 geplant |
+| Trinken | ab und zu, im Sommer öfter | zum Brunnen, Schöpfen, trinken | 🔵 geplant |
+| Plausch | zwei Bewohner begegnen sich, einer davon gesellig | stehen bleiben, Sprechblasen hin und her, lachen | 🔵 geplant |
+| Nickerchen | nach dem Mittag bei großer Müdigkeit | im Schatten eines Baums dösen (sichtbar, nicht in der Hütte) | 💡 Idee |
 
 - Pausen kosten kurz Arbeitszeit und bringen Freude und Erholung; unter dem Strich arbeitet ein ausgeruhtes Dorf
   schneller (Abschnitt 3.2).
 - Wunder **Eile** macht schnell, aber müde: Danach folgt eine längere Pause. So wird Eile eine Abwägung statt immer
   richtig.
 
-### 5.2 Feierabend (geplant)
+### 5.2 Feierabend
+
+**Stand:** 🔵 geplant
 
 - Zwischen Arbeitsende und Schlafenszeit (`BED`) eine **freie Stunde**: Bewohner gehen nicht sofort heim, sondern
   sitzen am Lagerfeuer auf dem Dorfplatz, musizieren, spazieren am Ufer, schauen Sterne oder gehen ihrer Vorliebe
   nach (Abschnitt 6).
 - Laternen wie heute; das Lagerfeuer ist zugleich Lichtquelle (`src/village/night.js`).
 
-### 5.3 Urlaub (geplant)
+### 5.3 Urlaub
+
+**Stand:** 🔵 geplant
 
 - Jeder Bewohner hat in regelmäßigen Abständen einen **freien Tag** (Vorschlag: alle 6 bis 8 Spieltage, nach
   Wesenszug etwas früher oder später). Nicht alle gleichzeitig: höchstens etwa ein Zehntel des Dorfes hat frei.
@@ -184,25 +204,27 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 ## 6. Freizeit und Sport
 
+**Stand:** 🔵 geplant – Thema beschlossen, einzelne Beschäftigungen siehe Tabelle
+
 Was die Bewohner in Pausen, am Feierabend und im Urlaub tun. Jede Beschäftigung braucht einen Ort, oft ein Wetter
 oder eine Jahreszeit, manchmal Ausrüstung, und sie hat eigene Animationen (Abschnitt 7).
 
 | Beschäftigung | Bedingung | Ort | Ausrüstung | Stand |
 |---|---|---|---|---|
-| **Skifahren** | Winter, Schneedecke (`weather.snowCover`) | Hang mit Gefälle; hoch gelegenes Land ist ohnehin verschneit | Ski und Stöcke (im Code gebaut) | Idee, Wunsch des Spielers |
-| Rodeln | Winter, Schneedecke | flacher Hang nahe dem Dorf | Schlitten | Idee |
-| Schneemann bauen, Schneeballschlacht | Winter, Schneedecke | Dorfplatz, Wiese | – | Idee |
-| **Surfen** | Wind (`weather.wind`), tagsüber, kein Gewitter | Strand an der Küste | Brett | Idee, Wunsch des Spielers |
-| Schwimmen, Planschen | Sommer, sonnig | flaches Ufer | – | Idee |
-| Sandburg bauen | Sommer, sonnig | Strand | – | Idee |
-| Drachen steigen lassen | Herbst, Wind | Wiese, Hügel | Drachen | Idee |
-| Angeln zum Vergnügen | jederzeit | Steg, Ufer | Angel (wie der Fischer) | Idee |
-| Musizieren, Tanzen | Feierabend, Fest | Lagerfeuer am Dorfplatz | Laute, Flöte | Idee |
-| Laub zusammenrechen, in Laubhaufen springen | Herbst, Laub am Boden (`jahreszeiten.md` 3, Punkt 4) | unter Laubbäumen | Rechen | Idee |
-| Blumen pflücken, Kränze binden | Frühling, Blumen | Wiese | – | Idee |
-| Ballspiel | tagsüber, trocken | Wiese am Dorf | Ball | Idee |
-| Mit der Kreatur spielen | Kreatur in der Nähe und spielfreudig | wo sie ist | – | teilweise (die Kreatur spielt heute mit dem Dorf, `kreatur.md` 1) |
-| Sterne schauen | klare Nacht, Feierabend | Hügel am Schrein | – | Idee |
+| **Skifahren** | Winter, Schneedecke (`weather.snowCover`) | Hang mit Gefälle; hoch gelegenes Land ist ohnehin verschneit | Ski und Stöcke (im Code gebaut) | 💡 Idee, Wunsch des Spielers |
+| Rodeln | Winter, Schneedecke | flacher Hang nahe dem Dorf | Schlitten | 💡 Idee |
+| Schneemann bauen, Schneeballschlacht | Winter, Schneedecke | Dorfplatz, Wiese | – | 💡 Idee |
+| **Surfen** | Wind (`weather.wind`), tagsüber, kein Gewitter | Strand an der Küste | Brett | 💡 Idee, Wunsch des Spielers |
+| Schwimmen, Planschen | Sommer, sonnig | flaches Ufer | – | 💡 Idee |
+| Sandburg bauen | Sommer, sonnig | Strand | – | 💡 Idee |
+| Drachen steigen lassen | Herbst, Wind | Wiese, Hügel | Drachen | 💡 Idee |
+| Angeln zum Vergnügen | jederzeit | Steg, Ufer | Angel (wie der Fischer) | 💡 Idee |
+| Musizieren, Tanzen | Feierabend, Fest | Lagerfeuer am Dorfplatz | Laute, Flöte | 💡 Idee |
+| Laub zusammenrechen, in Laubhaufen springen | Herbst, Laub am Boden (`jahreszeiten.md` 3, Punkt 4) | unter Laubbäumen | Rechen | 💡 Idee |
+| Blumen pflücken, Kränze binden | Frühling, Blumen | Wiese | – | 💡 Idee |
+| Ballspiel | tagsüber, trocken | Wiese am Dorf | Ball | 💡 Idee |
+| Mit der Kreatur spielen | Kreatur in der Nähe und spielfreudig | wo sie ist | – | 🟡 teilweise (die Kreatur spielt heute mit dem Dorf, `kreatur.md` 1) |
+| Sterne schauen | klare Nacht, Feierabend | Hügel am Schrein | – | 💡 Idee |
 
 - **Skifahren im Detail:** Bewohner stapfen mit geschulterten Ski den Hang hinauf, schnallen an, fahren in Bögen
   bergab (Pfad aus der Wegfindung entlang der Falllinie, Körper in die Kurve geneigt), stürzen ab und zu lachend in
@@ -226,6 +248,8 @@ oder eine Jahreszeit, manchmal Ausrüstung, und sie hat eigene Animationen (Absc
 
 ## 7. Animationen je Tätigkeit
 
+**Stand:** 🟡 teilweise – je Tätigkeit eine Pose vorhanden, Varianten und Einschübe geplant
+
 ### 7.1 Ziel
 
 Heute hat jeder Zustand genau eine Pose. Künftig hat jede Tätigkeit **mehrere Varianten** und **kleine Einschübe**,
@@ -243,23 +267,23 @@ damit 40 Bewohner bei derselben Arbeit nicht wie Klone wirken:
 
 | Tätigkeit | Varianten der Grundbewegung | Einschübe | Stand |
 |---|---|---|---|
-| Gehen | normal, schlendern, eilig (Eile), schlurfend (müde), hüpfend (fröhlich), geduckt (Angst, Anpirschen) | umschauen, winken, stolpern | eine Gangart + Anpirschen + Flucht |
-| Stehen | gerade, Gewicht auf einem Bein, Arme verschränkt | umschauen, strecken, gähnen, Kopf kratzen | eine Pose |
-| Holz fällen | weit ausholen, kurze schnelle Hiebe | Schweiß abwischen, in die Hände spucken, „Baum fällt!“ rufen | ein Hieb (`chopPose`) |
-| Säen, Pflanzen, Ernten | Spaten, Körner werfen, bücken und pflücken | Rücken strecken | eine Grabpose (`digPose`) |
-| Sägen | ziehen und schieben, Brett prüfen | Sägemehl abklopfen | eine Pose |
-| Mahlen, Backen | Korn schütten, kneten, Teig formen, Brot aus dem Ofen ziehen | Mehl von der Schürze klopfen | je Beruf eine Pose |
-| Vieh versorgen | Futter streuen, Eimer tragen, Tier streicheln | – | eine Pose (`tend`) |
-| Jagen | anpirschen, zielen, Treffer bzw. Daneben mit Reaktion | Pfeil holen | vorhanden, ohne Reaktion |
-| Fischen | auswerfen, warten, Biss, einholen | warten: gähnen, Beine baumeln lassen, pfeifen; Fang hochhalten | vorhanden ohne Einschübe |
-| Tragen | vor dem Bauch, auf der Schulter, schwer (gebeugt) | absetzen und durchschnaufen | eine Haltung |
-| Beten | knien, Arme heben, verbeugen, stehend mit gefalteten Händen | – | eine Abfolge (`prayPose`) |
-| Bitten | kniend mit erhobenen Armen | aufstehen und zum Himmel zeigen | eine Pose |
-| Essen | ins Brot beißen, trinken, mit Nachbarn reden | Brot teilen | eine Pose |
-| Schlafen | in der Hütte (unsichtbar); Nickerchen im Freien | – | unsichtbar |
-| Gegriffen werden | zappeln (heute), bei guter Hand still staunen, bei finsterer Hand strampeln | – | eine Pose |
-| Landen | auf den Füßen, auf dem Hosenboden, Purzelbaum | Staub abklopfen, Faust schütteln | Schwindel |
-| Freizeit (Abschnitt 6) | je Beschäftigung eigene Abfolge | – | Idee |
+| Gehen | normal, schlendern, eilig (Eile), schlurfend (müde), hüpfend (fröhlich), geduckt (Angst, Anpirschen) | umschauen, winken, stolpern | 🟡 teilweise – eine Gangart + Anpirschen + Flucht |
+| Stehen | gerade, Gewicht auf einem Bein, Arme verschränkt | umschauen, strecken, gähnen, Kopf kratzen | 🟡 teilweise – eine Pose |
+| Holz fällen | weit ausholen, kurze schnelle Hiebe | Schweiß abwischen, in die Hände spucken, „Baum fällt!“ rufen | 🟡 teilweise – ein Hieb (`chopPose`) |
+| Säen, Pflanzen, Ernten | Spaten, Körner werfen, bücken und pflücken | Rücken strecken | 🟡 teilweise – eine Grabpose (`digPose`) |
+| Sägen | ziehen und schieben, Brett prüfen | Sägemehl abklopfen | 🟡 teilweise – eine Pose |
+| Mahlen, Backen | Korn schütten, kneten, Teig formen, Brot aus dem Ofen ziehen | Mehl von der Schürze klopfen | 🟡 teilweise – je Beruf eine Pose |
+| Vieh versorgen | Futter streuen, Eimer tragen, Tier streicheln | – | 🟡 teilweise – eine Pose (`tend`) |
+| Jagen | anpirschen, zielen, Treffer bzw. Daneben mit Reaktion | Pfeil holen | 🟡 teilweise – ohne Reaktion auf Treffer |
+| Fischen | auswerfen, warten, Biss, einholen | warten: gähnen, Beine baumeln lassen, pfeifen; Fang hochhalten | 🟡 teilweise – ohne Einschübe |
+| Tragen | vor dem Bauch, auf der Schulter, schwer (gebeugt) | absetzen und durchschnaufen | 🟡 teilweise – eine Haltung |
+| Beten | knien, Arme heben, verbeugen, stehend mit gefalteten Händen | – | 🟡 teilweise – eine Abfolge (`prayPose`) |
+| Bitten | kniend mit erhobenen Armen | aufstehen und zum Himmel zeigen | 🟡 teilweise – eine Pose |
+| Essen | ins Brot beißen, trinken, mit Nachbarn reden | Brot teilen | 🟡 teilweise – eine Pose |
+| Schlafen | in der Hütte (unsichtbar); Nickerchen im Freien | – | 🟡 teilweise – nur unsichtbar in der Hütte |
+| Gegriffen werden | zappeln (heute), bei guter Hand still staunen, bei finsterer Hand strampeln | – | 🟡 teilweise – eine Pose |
+| Landen | auf den Füßen, auf dem Hosenboden, Purzelbaum | Staub abklopfen, Faust schütteln | 🟡 teilweise – Schwindel |
+| Freizeit (Abschnitt 6) | je Beschäftigung eigene Abfolge | – | 💡 Idee |
 
 ### 7.3 Technik
 
@@ -280,6 +304,8 @@ damit 40 Bewohner bei derselben Arbeit nicht wie Klone wirken:
   bei 40 Bewohnern unkritisch, Teile ohne Nutzen (Ski im Sommer) bleiben bei `count = 0` bzw. Nullmatrix.
 
 ## 8. Fokus auf einen Bewohner
+
+**Stand:** 🔵 geplant
 
 ### 8.1 Auswählen
 
@@ -316,6 +342,8 @@ Ein kleines Blatt (wie das Kreatur-Blatt, am Handy unten, halbe Höhe, Spielwelt
 
 ## 9. Gut und Böse aus Sicht der Bewohner
 
+**Stand:** 🔵 geplant – setzt die Waage voraus (`gott-und-hand.md` 7)
+
 Die Waage (`gott-und-hand.md` 7) bestimmt, wie die Bewohner zu ihrem Gott stehen. Wie Welt und Schrein sich
 verändern, steht in `gut-und-boese.md`.
 
@@ -338,8 +366,8 @@ verändern, steht in `gut-und-boese.md`.
 
 | Feld | Inhalt | Stand |
 |---|---|---|
-| `S.pop` | Anzahl der Bewohner | vorhanden |
-| `S.folk` | Liste je Bewohner: `{ id, name, seed, trait, like, needs: { tired, hunger, joy }, off }` (`off` = nächster freier Tag) | geplant |
+| `S.pop` | Anzahl der Bewohner | ✅ vorhanden |
+| `S.folk` | Liste je Bewohner: `{ id, name, seed, trait, like, needs: { tired, hunger, joy }, off }` (`off` = nächster freier Tag) | 🔵 geplant |
 
 - `S.folk` ist im Spielstand noch frei. Beim Laden alter Stände ohne `S.folk` werden für `S.pop` Bewohner Namen und
   Eigenschaften gewürfelt; der Saatwert ist dann der bisherige Platz, damit sich das Aussehen nicht ändert.

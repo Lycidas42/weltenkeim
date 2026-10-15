@@ -23,16 +23,51 @@ Jedes Thema hat genau ein Zuhause. Berührt ein Dokument ein fremdes Thema, verw
 dorthin, statt es zu wiederholen (z. B. die Waage steht nur in `gott-und-hand.md` 7, die Gefühle der Bewohner nur in
 `bewohner.md`).
 
-## Stand-Begriffe
+## Stand der Features
 
-In Tabellen und Listen der Konzepte:
+Jedes Feature in den Konzepten trägt seinen Stand, damit die Docs zugleich Planungsgrundlage sind:
 
-| Begriff | Bedeutung |
+| Marke | Bedeutung |
 |---|---|
-| **vorhanden** | im Spiel |
-| **teilweise** | angelegt, aber unvollständig |
-| **geplant** | beschlossene Richtung, noch nicht gebaut |
-| **Idee** | Vorschlag zur Auswahl, noch nicht entschieden |
+| ✅ vorhanden | im Spiel |
+| 🟡 teilweise | angelegt, aber unvollständig |
+| 🔵 geplant | beschlossen, noch nicht gebaut |
+| 💡 Idee | Vorschlag, noch nicht entschieden |
+| ⏸️ zurückgestellt | beschlossen, aber bewusst auf später verschoben |
+| ⛔ verworfen | bewusst nicht vorgesehen (bleibt notiert, damit die Frage nicht wiederkommt) |
+
+**So wird markiert:**
+
+- Unter der Überschrift eines Feature-Abschnitts steht eine Zeile `**Stand:** 🔵 geplant`, bei Bedarf mit kurzer
+  Erläuterung („– setzt die Waage voraus“). Unterabschnitte erben den Stand, solange sie keinen eigenen haben.
+- Tabellen mit mehreren Features haben eine Spalte „Stand“ mit denselben Marken.
+- Einzelne Punkte in Listen bekommen die Marke vorn (`- 💡 Lern-Leine: …`), wenn sie vom Abschnitt abweichen.
+- Abschnitte „Ist-Stand“ beschreiben, was heute im Spiel ist, und brauchen keine Marke.
+
+**Pflege:** Wird ein Feature gebaut, die Marke im Konzept auf ✅ bzw. 🟡 setzen und es unten aus „Als Nächstes“
+streichen. Wird eine Idee entschieden, wird sie 🔵 oder ⛔.
+
+**Überblick in der Konsole:**
+
+```sh
+grep -rn "🔵" docs/    # alles Geplante
+grep -rn "🟡" docs/    # Angefangenes
+grep -rn "💡" docs/    # offene Ideen, die eine Entscheidung brauchen
+```
+
+## Als Nächstes
+
+Die nächsten Schritte über alle Dokumente hinweg, in dieser Reihenfolge. Die Reihenfolge ist ein Vorschlag aus den
+Reihenfolgen der einzelnen Dokumente und den Abhängigkeiten unten; der Spieler legt sie fest.
+
+| # | Schritt | Konzept | Stand |
+|---|---|---|---|
+| 1 | Halten als Zustand: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten | `gott-und-hand.md` 3.2 | 🔵 geplant |
+| 2 | Waage mit Anzeige; vorhandene Taten zählen | `gott-und-hand.md` 7 | 🔵 geplant |
+| 3 | Bewohner essen mittags aus dem Lager, Gaben am Schrein | `nahrung.md` 1 und 3 | 💡 Idee (empfohlen) |
+| 4 | Bewohner mit Namen, Auswahl und Karte, Symbole über dem Kopf | `bewohner.md` 3.1, 8, 4.2 | 🔵 geplant |
+| 5 | Kalender und Überblenden der Jahreszeiten | `jahreszeiten.md` 3, Punkt 1–2 | 🔵 geplant |
+| 6 | Lokale Welten: Weltenliste, Verzweigen, Export und Import | `spielstaende.md` 9, Etappe 1 | 🔵 geplant |
 
 ## Abhängigkeiten zwischen den Vorhaben
 

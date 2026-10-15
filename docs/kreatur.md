@@ -5,7 +5,7 @@ Launen hat und durch die Erziehung gut oder böse wird – passend zu einem ents
 
 Verwandt: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` (Essen, Lieblingsessen je Art),
 `gott-und-hand.md` (Hand, Wunder, Waage), `gut-und-boese.md`, `bewohner.md` (wie das Dorf auf die Kreatur reagiert).
-Stand-Begriffe: siehe `README.md`.
+Stand der Features: siehe `README.md`.
 
 ## 1. Ist-Stand
 
@@ -22,17 +22,17 @@ Stand-Begriffe: siehe `README.md`.
 
 ## 2. Überblick: was dazukommt
 
-| Bereich | Kurz | Abschnitt |
-|---|---|---|
-| Alter und Wachstum | Jungtier → ausgewachsen → altehrwürdig | 3.1 |
-| Bedürfnisse und Launen | Hunger, Müdigkeit, Spieltrieb treiben die Laune | 3.2 |
-| Ausrichtung | eigene Waage mit sichtbarer Veränderung | 3.3 |
-| Eigenwille | zögern oder sich weigern | 3.4 |
-| Leine | der Hand folgen, an einem Pfahl anbinden | 3.5 |
-| Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` |
-| Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 |
+| Bereich | Kurz | Abschnitt | Stand |
+|---|---|---|---|
+| Alter und Wachstum | Jungtier → ausgewachsen → altehrwürdig | 3.1 | 🔵 geplant |
+| Bedürfnisse und Launen | Hunger, Müdigkeit, Spieltrieb treiben die Laune | 3.2 | 🔵 geplant |
+| Ausrichtung | eigene Waage mit sichtbarer Veränderung | 3.3 | 🔵 geplant |
+| Eigenwille | zögern oder sich weigern | 3.4 | 🔵 geplant |
+| Leine | der Hand folgen, an einem Pfahl anbinden | 3.5 | 🔵 geplant |
+| Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` | 🔵 geplant |
+| Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
 
-**Bewusst nicht vorgesehen** (passt nicht zum Ton des Spiels):
+**Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
 - Die Kreatur frisst keine Bewohner. Eine böse Kreatur erschreckt sie, stiehlt Essen und zertrampelt Felder.
 - Keine Kämpfe gegen andere Kreaturen; allenfalls später freundliche Wettkämpfe.
@@ -43,6 +43,8 @@ Stand-Begriffe: siehe `README.md`.
 
 ### 3.1 Alter und Wachstum
 
+**Stand:** 🔵 geplant
+
 - **Lebensabschnitte:** Jungtier (klein, verspielt, lernt schnell, vergisst leicht) → ausgewachsen (volle Größe,
   stark, lernt normal) → altehrwürdig (etwas grau, weise: lernt langsamer, vergisst nichts, Wunder günstiger).
 - Fortschritt über **Spielzeit** (Spieltage) und **Erfahrung** (ausgeführte Tätigkeiten).
@@ -51,6 +53,8 @@ Stand-Begriffe: siehe `README.md`.
 - Kein Tod; „altehrwürdig“ ist das Endstadium.
 
 ### 3.2 Bedürfnisse und Launen
+
+**Stand:** 🔵 geplant – heute nur gelegentliches Dösen
 
 - **Bedürfnisse** (0…1, steigen mit der Zeit): Hunger, Müdigkeit, Spieltrieb.
   - Hunger → frisst aus dem Lager (Lieblingsessen je Art), Fisch am Ufer, Obst von Obstbäumen.
@@ -61,6 +65,8 @@ Stand-Begriffe: siehe `README.md`.
 - Laune wirkt auf: Lerntempo, Gehorsam, Wahl der Tätigkeiten (mürrisch → mehr Unfug, übermütig → mehr Spiel).
 
 ### 3.3 Gut und Böse (Ausrichtung)
+
+**Stand:** 🔵 geplant
 
 - **Ausrichtung** `-1 … +1`, bewegt sich langsam durch:
   - ihre Taten: helfen, ernten, Bewohner schützen (+); Bäume umwerfen, Felder zertrampeln, Bewohner
@@ -77,6 +83,8 @@ Stand-Begriffe: siehe `README.md`.
 
 ### 3.4 Verweigern (Eigenwille)
 
+**Stand:** 🔵 geplant
+
 - Befiehlt der Spieler etwas (Kreismenü, Leine), kann sie **zögern oder sich weigern**:
   - wenn ein Bedürfnis drängt (zu hungrig, zu müde),
   - wenn die Laune schlecht ist (kurz zuvor oft getadelt),
@@ -86,6 +94,8 @@ Stand-Begriffe: siehe `README.md`.
 - Seltenes Verweigern macht sie lebendig; zu häufiges frustriert – Wahrscheinlichkeit gering halten.
 
 ### 3.5 Leine
+
+**Stand:** 🔵 geplant – Entscheidungen unten; Lern-Leine und Ziel zeigen sind 💡 Idee
 
 Einziger Ort für die Leine; die anderen Dokumente verweisen hierher.
 
@@ -105,11 +115,13 @@ Einziger Ort für die Leine; die anderen Dokumente verweisen hierher.
 
 - Bedienung am Handy zusammen mit „Halten als Zustand“ (`gott-und-hand.md` 3.2): Die Leine wäre etwas, das die Hand
   hält; Anbinden = Leine an einer Stelle absetzen.
-- Lern-Leine (Idee): Solange sie angelegt ist, schaut die Kreatur besonders genau zu und Vorführungen zählen
+- 💡 Lern-Leine: Solange sie angelegt ist, schaut die Kreatur besonders genau zu und Vorführungen zählen
   doppelt (`kreatur-lernen.md` 1). Oder reicht es, sie zum Zusehen mitzunehmen?
-- Ziel zeigen (Idee): An der Leine auf ein Feld oder einen Baum tippen, und sie tut dort, was sie kann.
+- 💡 Ziel zeigen: An der Leine auf ein Feld oder einen Baum tippen, und sie tut dort, was sie kann.
 
 ### 3.6 Was die Kreatur von Anfang an kann
+
+**Stand:** 💡 Idee – Vorschlag zur Aufteilung
 
 Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
@@ -121,11 +133,15 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 ### 3.7 Große Transporte
 
+**Stand:** 🔵 geplant
+
 - Wie die Hand Stapel packt, trägt und absetzt, steht in `gott-und-hand.md` 5.2.
 - **Die Kreatur schaut zu** und lernt so, selbst größere Mengen gezielt zu verteilen (z. B. Stämme zur Säge,
   Bretter zur Baustelle, Korn zur Mühle), statt nur 3 Stück.
 
 ### 3.8 Bewohner vorsichtig tragen
+
+**Stand:** 🔵 geplant
 
 - Die Kreatur kann Bewohner behutsam im Maul (am Kragen) tragen und an einem Ort absetzen – z. B. einen Holzfäller
   zum Wald, einen Bauern zum Hof, einen Erschöpften nach Hause.
@@ -135,12 +151,16 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 ### 3.9 Lernen, Fähigkeiten, Wunder
 
+**Stand:** 🔵 geplant
+
 - Siehe `kreatur-lernen.md`: Zuschauen → Fortschritt → gelernt → selbst anwenden → Lob/Tadel je Fähigkeit und je Ziel
   (z. B. „Regen aufs Feld“ gut, „Regen ins Dorf“ schlecht).
 - Wunder: Regen, Eile, später weitere; kosten Glaube; Erlaubnis-Schalter im Kreatur-Panel.
 - Böse Kreatur kann Wunder auch böswillig einsetzen (Regen aufs Fest), wenn so erzogen.
 
 ### 3.10 Persönlichkeit je Gestalt
+
+**Stand:** 🟡 teilweise – nur der Fuchs hat eigene Reaktionen auf Lob und Tadel
 
 - Startwerte je Art, z. B.: Fuchs (verspielt, schlau, lernt schnell), Wolf (treu, kräftig, neigt zu Jagd),
   Hirsch (sanft, groß, langsam), Stier (stark, stur – verweigert öfter), Alpaka (freundlich, eigensinnig),

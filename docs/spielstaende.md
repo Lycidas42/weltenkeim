@@ -7,6 +7,7 @@ Ziel: Ein Spieler kann **mehrere Welten** haben (z. B. eine gute und eine böse,
 
 Vorbild ist die Online-Anbindung in Kernwacht (`kernwacht/online.js`, `kernwacht/supabase/migrations/`).
 Was davon übernommen wird, steht in Abschnitt 5.
+Stand der Features: siehe `README.md`.
 
 ## 1. Begriffe
 
@@ -21,6 +22,8 @@ Wichtig ist die Trennung **Welt ↔ Profil**: Alles, was heute in `S` steht, geh
 die Kreatur gehören dazu, denn beides soll sich mit Gut/Böse je Welt verändern. Das Profil ist neu und klein.
 
 ## 2. Lokale Spielstände (ohne Online-Dienst)
+
+**Stand:** 🔵 geplant – heute eine Welt je Gerät
 
 ### 2.1 Ablage
 
@@ -74,6 +77,8 @@ lässt, kann der Wechsel ohne Neuladen kommen, mit Überblendung und ohne erneut
 
 ## 3. Mehrere Welten (gut/böse ausprobieren)
 
+**Stand:** 🔵 geplant
+
 - **Neue Welt:** Name der Welt, Kreatur wählen (wie heute), Rest Standardstart. Keine feste Wahl „gut“ oder
   „böse“: Die Ausrichtung entsteht durch das Spielen. Optional kann der Spieler beim Anlegen einen „Vorsatz“ angeben,
   der nur als Etikett in der Liste dient.
@@ -90,6 +95,8 @@ lässt, kann der Wechsel ohne Neuladen kommen, mit Überblendung und ohne erneut
 
 ## 4. Profil (welt-übergreifend)
 
+**Stand:** 🔵 geplant
+
 Klein halten. Vorerst nur:
 
 - `settings`: Ton, Grafikqualität, Hinweise gesehen. Was davon heute in `S` steht, bleibt zunächst dort, damit nichts
@@ -99,6 +106,8 @@ Klein halten. Vorerst nur:
   über alle Welten, Erfolge.
 
 ## 5. Online mit Supabase
+
+**Stand:** 🔵 geplant – eigenes Supabase-Projekt ist entschieden, im Code noch nichts
 
 ### 5.1 Identität: Kernwacht-Modell übernehmen
 
@@ -166,6 +175,8 @@ einfache Ratenbremse (z. B. höchstens 1 Sicherung je Welt alle 20 s). Papierkor
 Die Migrationen kommen wie in Kernwacht unter `supabase/migrations/` und werden über die GitHub-Integration eingespielt.
 
 ## 6. Abgleich zwischen Gerät und Cloud
+
+**Stand:** 🔵 geplant
 
 Grundsatz: **Lokal zuerst.** Das Spiel läuft immer auf der lokalen Kopie, auch offline. Die Cloud ist eine Sicherung und
 dient zum Gerätewechsel. Es gibt kein gleichzeitiges Spielen derselben Welt auf zwei Geräten und keine Zusammenführung

@@ -6,6 +6,7 @@ Kategorien, Tageslauf mit Tagesliste, Feedback, Umfragen und eine Verwaltungssei
 Hier steht, was davon für Weltenkeim passt, was angepasst werden muss und was neu dazukommt.
 Weltenkeim bekommt ein **eigenes Supabase-Projekt** (siehe `spielstaende.md`, 5.1). Code und Datenbankaufbau werden
 aus Kernwacht übernommen, aber nicht mit Kernwacht geteilt.
+Stand der Features: siehe `README.md`.
 
 ## 0. Grundsätze (aus Kernwacht übernommen)
 
@@ -22,6 +23,8 @@ aus Kernwacht übernommen, aber nicht mit Kernwacht geteilt.
 
 ## 1. Profil
 
+**Stand:** 🔵 geplant
+
 - **Göttername** (1 bis 16 Zeichen, optional) und **Zeichen** (Profilbild): kleine SVG-Symbole passend zum Spiel
   (Sonne, Mond, Blatt, Flamme, Hand, Auge, Waage …) und eine Farbe. In Kernwacht genauso gelöst (`avatar`, `color` als
   Zahl).
@@ -32,6 +35,8 @@ aus Kernwacht übernommen, aber nicht mit Kernwacht geteilt.
   einen Namen ausblenden (`hidden`-Spalte), ohne den Spieler zu löschen.
 
 ## 2. Bestenlisten
+
+**Stand:** 🔵 geplant
 
 Weltenkeim ist ein Aufbau- und Idle-Spiel ohne „Welle“. Ranglisten sollen daher **Spielweisen** zeigen, nicht nur
 Fleiß. Je Kategorie zählt die beste Welt eines Spielers.
@@ -55,7 +60,9 @@ Fleiß. Je Kategorie zählt die beste Welt eines Spielers.
   Debug-Eingriffen werden markiert (`S.tainted`, sobald über `__wk` geschrieben wird) und nicht eingetragen.
 - Anzeige: neues Panel „Ruhmeshalle“ mit Reitern je Kategorie, eigene Zeile hervorgehoben, Top 25.
 
-### 2.1 Gegenstück zum Tageslauf: Wochenwunsch (optional, später)
+### 2.1 Gegenstück zum Tageslauf: Wochenwunsch
+
+**Stand:** 💡 Idee – eher später
 
 Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt eher ein **Wochenwunsch**: Jede Woche
 äußert „die Welt“ einen Wunsch für alle Spieler, z. B. „Backt 200 Brote“, „Pflanzt 50 Setzlinge“ oder „Wirkt 30 Regenwunder“.
@@ -68,6 +75,8 @@ Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt
 - Tabellen: `wk_weekly (week, player_id, amount)`, Ziel und Fortschritt per Funktion.
 
 ## 3. Präsenz („Götter wachen“)
+
+**Stand:** 🔵 geplant
 
 - Wie in Kernwacht über **Supabase Realtime Presence**: Kanal `weltenkeim-lobby`, Schlüssel = öffentliche Spieler-ID.
   Oben eine kleine Pille „3 Götter wachen“.
@@ -83,6 +92,8 @@ Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt
 
 ## 4. Feedback
 
+**Stand:** 🔵 geplant
+
 - Panel „Rückmeldung“ (im Info-Panel und im Pausenmenü), Art wählen: **Fehler**, **Idee**, **Sonstiges**, Freitext (3 bis 2000 Zeichen).
 - Automatisch mitgeschickt (`ctx`, für den Spieler sichtbar aufgelistet): Spielversion (`wk-version`), Gerät und
   Bildschirmgröße, Browser-Kennung (gekürzt), aktuelle Welt-`meta`, Tageszeit und Wetter im Spiel, Kamera-Position.
@@ -96,6 +107,8 @@ Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt
 
 ## 5. Umfragen
 
+**Stand:** 🔵 geplant
+
 - Wie in Kernwacht: Die Verwaltung legt eine Frage mit 2 bis 8 Antworten an. Im Spiel erscheint ein dezenter Hinweis
   („Neue Umfrage“), ein Tipp öffnet sie, nach dem Abstimmen erscheint das Ergebnis in Prozent. Die eigene Antwort lässt
   sich ändern.
@@ -105,7 +118,9 @@ Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt
 - Neu: optional **mehrere Antworten** erlaubt (`multi`), da es bei Ideensammlungen oft mehr als eine Vorliebe gibt.
 - Neu: optional eine **Laufzeit** (`closes_at`). Danach ist die Umfrage geschlossen und zeigt nur noch das Ergebnis.
 
-## 6. Neuigkeiten (neu)
+## 6. Neuigkeiten
+
+**Stand:** 🔵 geplant
 
 - Kurze Meldungen der Entwicklung im Spiel („Neu in 0.3: mehrere Welten“), gepflegt über die Verwaltung statt per
   Code. Erscheinen einmal als Hinweis und dann im Info-Panel.
@@ -114,6 +129,8 @@ Kernwacht hat einen Tageslauf mit Tagesliste. Für ein ruhiges Aufbauspiel passt
 - Tabelle `wk_news (id, title, body, min_version, created_at, active)`, öffentlich lesbar, wenn `active`.
 
 ## 7. Verwaltung
+
+**Stand:** 🔵 geplant
 
 - `admin.html` nach Kernwacht-Vorbild, Reiter: **Feedback** (Status neu/gesehen/erledigt/verworfen, Notiz,
   Bildschirmfoto ansehen, mitgeschickten Spielstand als Datei herunterladen), **Umfragen**, **Neuigkeiten**,

@@ -4,9 +4,11 @@ Frühling, Sommer, Herbst und Winter verändern das Aussehen der Insel und spät
 Nahrung). Dieses Dokument sammelt die Wünsche und die technische Grundlage.
 
 Verwandt: `assets.md` 4.1 (Farbrollen), `nahrung.md` (Vorräte für den Winter), `bewohner.md` (Wintersport,
-Strand, Kleidung je Jahreszeit).
+Strand, Kleidung je Jahreszeit). Stand der Features: siehe `README.md`.
 
 ## 1. Was sich mit der Jahreszeit ändert
+
+**Stand:** 🔵 geplant
 
 - **Laubbäume:** im Herbst erst verfärben (Eiche orange, Birke gelb, Obstbaum rot), dann nach und nach das Laub
   verlieren, im Winter kahl, im Frühling neu austreiben (helles Grün, Obstbäume blühen). Nadelbäume bleiben grün.
@@ -25,7 +27,9 @@ Strand, Kleidung je Jahreszeit).
 - **Wetter:** Häufigkeit der Wetterlagen je Jahreszeit (Schnee nur im Winter; heute hat `schnee` in WEATHER noch
   p = 0 und ist nur von Hand wählbar).
 
-## 2. Technische Grundlage (vorhanden)
+## 2. Technische Grundlage
+
+**Stand:** ✅ vorhanden
 
 - **Farbrollen** (`src/core/colors.js`): Alle im Code gebauten Pflanzen, Felsen, Felder und Gärten tragen je Fläche eine
   Rolle mit Grundfarbe aus dem Theme. `setSlot(rolle, farbe, anteil)` färbt eine Rolle zur Laufzeit fließend um.
@@ -41,6 +45,8 @@ Strand, Kleidung je Jahreszeit).
   Spieltage überblendet wird.
 
 ## 3. Noch zu bauen
+
+**Stand:** 🔵 geplant
 
 1. **Kalender:** Spieltag und Jahreszeit im Spielstand (z. B. `S.day`); Länge eines Jahres festlegen (etwa 4 × 7
    Spieltage). Anzeige in der Uhrzeit-Kachel.
