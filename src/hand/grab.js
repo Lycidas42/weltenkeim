@@ -1,7 +1,7 @@
 // Bäume greifen, ausreißen und werfen
 
 import { clamp, rnd } from '../core/util.js';
-import { behindCam, tA, tB, toScreen } from '../core/render.js';
+import { segToScreen, tA, tB } from '../core/render.js';
 import { addLogs, floatText } from '../ui/feedback.js';
 import { heightAt } from '../world/terrain.js';
 import { fox } from '../creature/kinds.js';
@@ -16,15 +16,15 @@ import { foxIdle } from '../creature/ai.js';
 // liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
 // wächst später ein neuer Baum.
 
-// Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
+// Baum unter dem Finger: Abstand zur sichtbaren Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der
+// Baumgröße, aber höchstens etwa eine Kronenbreite (sonst packt ein Baum dicht vor der Kamera fast das ganze Bild)
 function treeAt(cx, cy) {
   let best = null, bd = 1e9;
   for (const t of trees) {
     if (!t.alive || t.gone || t.g < .6) continue;
-    const y = heightAt(t.x, t.z); toScreen(t.x, y, t.z, tA); if (behindCam()) continue;
-    toScreen(t.x, y + TREE_H * ST * t.g, t.z, tB); if (behindCam()) continue;
+    const y = heightAt(t.x, t.z); if (!segToScreen(t.x, y, t.z, t.x, y + TREE_H * ST * t.g, t.z, tA, tB)) continue;
     const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
-    const d = Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u), tol = Math.max(26, Math.sqrt(L2) * .38);
+    const d = Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u), tol = clamp(Math.sqrt(L2) * .38, 26, 110);
     if (d < tol && d / tol < bd) { bd = d / tol; best = t; }
   }
   return best;

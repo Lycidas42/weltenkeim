@@ -2,7 +2,7 @@
 
 import { $, clamp } from '../core/util.js';
 import { S } from '../core/state.js';
-import { behindCam, canvas, clock, tA, tB, toScreen } from '../core/render.js';
+import { canvas, clock, segToScreen, tA, tB, toScreen } from '../core/render.js';
 import { CREATURES, fox } from '../creature/kinds.js';
 import { heldTree, input, pointerXY } from '../hand/pointer.js';
 import { ACT_COL, ACT_DESC, ACT_LABEL, foxPivot } from '../creature/creature.js';
@@ -33,12 +33,17 @@ function openRing() {
 }
 function closeRing() { ringOpen = false; $('ring').classList.remove('open'); $('ring').hidden = true; }
 addEventListener('keydown', e => { if (e.key === 'Escape' && ringOpen) closeRing(); });
-// Tier unter dem Finger: Abstand zur Strecke Füße–Kopfhöhe auf dem Bildschirm, Toleranz wächst mit der Größe
+// Tier unter dem Finger: Abstand zu zwei Strecken auf dem Bildschirm, senkrecht (Füße–Kopfhöhe) und längs durch den
+// Körper in Blickrichtung des Modells (Schwanz–Kopf, etwa doppelt so lang wie hoch). Nur die senkrechte Strecke
+// verfehlte von oben und von der Seite Kopf, Rücken und Schwanz – mit voller Hand wurde dann abgesetzt statt das
+// Kreismenü geöffnet. Toleranz wächst mit der Größe auf dem Bildschirm.
+function segDist(cx, cy) { const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1); return [Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u), Math.sqrt(L2)]; }
 function foxUnder(cx, cy) {
-  const y = foxPivot.position.y, C = CREATURES[fox.kind]; toScreen(fox.x, y + C.h * .1, fox.z, tA); if (behindCam()) return false;
-  toScreen(fox.x, y + C.h * .85, fox.z, tB); if (behindCam()) return false;
-  const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
-  return Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u) < Math.max(36, Math.sqrt(L2) * .55);
+  const y = foxPivot.position.y, C = CREATURES[fox.kind], h = C.h, a = foxPivot.rotation.y, sx = Math.sin(a) * h, sz = Math.cos(a) * h;
+  let dv = Infinity, lv = 0, dh = Infinity, lh = 0;
+  if (segToScreen(fox.x, y + h * .1, fox.z, fox.x, y + h * .95, fox.z, tA, tB)) [dv, lv] = segDist(cx, cy);
+  if (segToScreen(fox.x - sx, y + h * .4, fox.z - sz, fox.x + sx * .95, y + h * .5, fox.z + sz * .95, tA, tB)) [dh, lh] = segDist(cx, cy);
+  return dv < Math.max(36, lv * .55) || dh < Math.max(36, lv * .4, lh * .2);
 }
 // Kreismenü und Einblendung mitführen; die Einblendung zeigt Name, Tätigkeit und Neigungen,
 // wenn das Menü offen ist oder die Hand über dem Tier schwebt, sonst nur eine offene Frage nach Lob/Tadel
