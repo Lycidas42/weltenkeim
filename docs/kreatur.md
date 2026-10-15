@@ -31,6 +31,7 @@ Stand der Features: siehe `README.md`.
 | Leine | der Hand folgen, an einem Pfahl anbinden | 3.5 | 🔵 geplant |
 | Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` | 🔵 geplant |
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
+| Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -168,6 +169,93 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 - Lieblingsessen (`nahrung.md` 4) und Lieblingsspiel je Art.
 - Eigene Reaktionen auf Lob/Tadel je Art (Fuchs erledigt, übrige offen).
 
+### 3.11 Erleben in der Welt, Charakterbogen und „Warum?“
+
+**Stand:** 🔵 geplant
+
+Leitgedanke: **Beobachten und Erziehen passieren in der Welt**, nicht in einem Fenster mit eigenem Modell. Dort sieht
+man, wie die Kreatur einen Baum umwirft, wie das Dorf reagiert, was sie umgibt. Der **Charakterbogen** bleibt, aber als
+echter Bogen zum Nachschlagen: wer die Kreatur ist, was sie kann, was sie gelernt hat und **warum sie tut, was sie
+tut**. Genau das fehlte in Black & White: nachvollziehen zu können, was die Kreatur gerade gelernt hat und woher ihr
+Verhalten kommt. Je mehr Tätigkeiten, Bedürfnisse und Fähigkeiten dazukommen (3.1–3.9), desto wichtiger wird das.
+
+#### A. Nahsicht in der Welt statt Porträt
+
+- **Tipp auf den Namen** oben (`#btnFox`): Die Kamera gleitet in etwa 1 s zur Kreatur (Abstand etwa 6, schräg von
+  oben) und folgt ihr (`setFollow`). Unten erscheint eine schmale Karte mit Name, Tätigkeit, Motiv (C) und dem Knopf
+  „Bogen“. Ein zweiter Tipp auf den Namen öffnet den Charakterbogen.
+- Die Nahsicht endet beim Herauszoomen über etwa Abstand 12, beim Verschieben der Karte, mit „Nicht folgen“ im
+  Kreismenü oder mit dem × der Karte. Die Kamera bleibt in der Nahsicht frei dreh- und zoombar.
+- Das **Porträt** (`src/ui/portrait.js`, eigener WebGL-Renderer im Bogen) entfällt. Das spart auf dem Handy einen
+  zweiten WebGL-Kontext.
+- Der **Fell-Fuchs** (`Fox_HD`) wird heute nur im Porträt gezeigt. Ob er in der Nahsicht das Modell in der Welt ersetzt,
+  entscheidet eine Messung auf dem Handy (Schritt 6). Bis dahin wird er nicht mehr geladen.
+
+#### B. Erziehen per Geste an der Kreatur
+
+- **Leere Hand**, Druck beginnt auf der Kreatur (`foxUnder`):
+  - **Tipp** (kurz, kaum bewegt): Kreismenü wie heute. Neu öffnet es erst beim Loslassen, nicht schon beim Druck.
+  - **Streicheln:** langsam über die Kreatur streichen (mindestens etwa 0,4 s und 40 px, langsamer als ein Wurf, der
+    Finger bleibt auf oder dicht an der Kreatur). Löst die vorhandene Streichel-Geste der Hand aus (`playHand('pet')`).
+  - **Klaps:** schnelles Wischen, das auf der Kreatur beginnt (schneller als 700 px/s, wie beim Werfen).
+- **Volle Hand:** nur Tipp öffnet das Kreismenü, kein Streicheln und kein Klaps (Wischen wirft das Gehaltene).
+- Streicheln und Klaps bleiben im Kreismenü als Abkürzung. Am Rechner gelten dieselben Gesten mit der Maus.
+
+#### C. Gedanken und „Warum?“
+
+- **Entscheidungen mit Begründung:** `foxChoose` hält jede Wahl fest: Tätigkeit, Ziel, Uhrzeit und eine Liste von
+  Gründen `{ key, label, weight }`, heute die Anteile der Neigungen (z. B. Helfen 48 %) und ob die Wahl gegen die
+  stärkste Neigung fiel („aus einer Laune heraus“). Später kommen weitere Gründe hinzu: Hunger, Müdigkeit, Spieltrieb
+  (3.2), Ausrichtung (3.3), Eigenwille (3.4), gelernte Fähigkeit und Lob für genau dieses Ziel (3.9). Die Datenform
+  bleibt gleich, damit der Bogen jede neue Ursache ohne Umbau zeigen kann.
+- **In der Welt:** Beim Losgehen zeigt eine kleine Gedankenblase über der Kreatur die Absicht für einige Sekunden
+  (Baum mit Herz: Holz fürs Dorf, Kiste: Waren tragen, Ball: spielen, Baum mit Blitz: Unfug). In der Nahsicht bleibt
+  sie klein stehen. Genutzt wird dieselbe Technik wie bei den Symbolen über den Bewohnern.
+- **Einblendung an der Kreatur** (`#foxBadge`) und Karte der Nahsicht zeigen eine Zeile „Warum“, z. B. „Helfen ist ihre
+  stärkste Neigung (48 %)“ oder „Aus einer Laune heraus: Unfug liegt nur bei 20 %“.
+- **Lob und Tadel sichtbar machen:** Nach Lob oder Tadel steht über der Kreatur kurz, was sich geändert hat, z. B.
+  „Helfen 34 % → 48 %“. Die Tat, auf die es sich bezog, steht im Toast („Lob für: Baum fürs Lager gebracht“).
+  Kam das Lob zu spät oder ohne Tat, heißt es „weiß nicht, wofür“ wie heute.
+
+#### D. Charakterbogen
+
+Ohne Porträt, als Bogen zum Nachschlagen, von oben nach unten:
+
+1. **Kopf:** Name (änderbar), Geschlecht, Gestalt, später Lebensabschnitt (3.1) und Ausrichtung (3.3). Knopf
+   „Beobachten“ startet die Nahsicht (A).
+2. **Neigungen:** Balken für Helfen, Spielen und Unfug mit der Veränderung seit Tagesbeginn (▲ +14 / ▼ −6).
+3. **Erfahrung:** je Tätigkeit, wie oft sie es getan hat (Bäume ins Lager gebracht, Waren getragen, gespielt, Bäume
+   umgeworfen). Grundlage für Alter und Wachstum (3.1). Später kommen hier die Fähigkeiten aus `kreatur-lernen.md` 4
+   mit Fortschritt dazu (ungelernt, im Lernen, gelernt).
+4. **Gelernt:** Chronik der letzten Lernereignisse, neueste oben, z. B. „Tag 3, 14 Uhr – Lob für ‚Baum fürs Lager
+   gebracht‘: Helfen 34 % → 48 %“. Später auch „hat Säen gelernt“.
+5. **Zuletzt entschieden:** die letzten Entscheidungen mit ihren Gründen (C), z. B. „14:20 Uhr – Baum umgeworfen.
+   Warum: aus einer Laune heraus, Unfug 20 %“.
+
+- Streicheln, Klaps und Folgen verschwinden aus dem Bogen (Erziehen in der Welt, B).
+- Die Wahl der Gestalt bleibt vorerst im Bogen. 💡 Später als Ritual am Schrein: Die Kreatur geht dorthin, verwandelt
+  sich im Licht und kommt zurück.
+
+#### E. Spielstand
+
+- `S.cXp` – Erfahrung je Tätigkeit `{ tree, haul, play, mischief }` (Zahlen, Standard 0).
+- `S.cLearn` – Liste der letzten 30 Lernereignisse `{ day, hour, kind: 'pet' | 'slap', act, desc, from, to }`.
+- `S.cDay` – Neigungen zu Tagesbeginn (für ▲/▼ im Bogen), Standard `null`.
+- Entscheidungen nur zur Laufzeit (`fox.log`, die letzten 10), nicht im Spielstand.
+
+#### F. Reihenfolge der Umsetzung
+
+Je Schritt ein Commit auf `develop`, im Spiel geprüft (`__wk`, eigene Prüfung `dev/checks/kreatur.mjs`).
+
+1. **Gedächtnis:** Entscheidungen mit Gründen (`fox.log`), Lernchronik (`S.cLearn`), Erfahrung (`S.cXp`),
+   Neigungen zu Tagesbeginn (`S.cDay`); in `__wk` sichtbar.
+2. **Charakterbogen neu** (D) ohne Porträt, `portrait.js` und das Laden von `Fox_HD` aus dem Bogen entfernen.
+3. **Nahsicht** (A) mit Karte, „Warum“ in Einblendung und Karte, Gedankenblase und Anzeige der Änderung nach Lob und
+   Tadel (C).
+4. **Gesten** Streicheln und Klaps (B), Kreismenü öffnet beim Loslassen.
+5. **Doku und Hinweise:** Stand-Marken, Info-Panel (`#sheetInfo`), Hinweistexte.
+6. **Fell-Fuchs in der Nahsicht** nur nach Messung auf dem Handy (Bildrate mit und ohne), sonst 💡 zurückstellen.
+
 ## 4. Spielstand (Vorschlag, abwärtskompatibel)
 
 - `S.cAge` – Erfahrung/Alter (Zahl), daraus Lebensabschnitt und Größe.
@@ -178,10 +266,12 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 - `S.skills` – Fähigkeiten (siehe `kreatur-lernen.md`).
 - `S.cMiracles` – Erlaubnis Wunder (bool).
 - Bestehendes `S.w` bleibt als Grundneigung.
+- `S.cXp`, `S.cLearn`, `S.cDay` – Erfahrung, Lernchronik, Neigungen zu Tagesbeginn (3.11 E).
 
 ## 5. Vorgeschlagene Reihenfolge
 
-1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur.
+0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar.
+1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur. ✅
 2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst).
 3. Bedürfnisse und Launen, Fressen aus dem Lager, Schlafen.
 4. Ausrichtung Gut/Böse mit sichtbarer Veränderung.
