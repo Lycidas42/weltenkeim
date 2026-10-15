@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, rnd, smooth } from '../core/util.js';
-import { scene } from '../core/render.js';
+import { camera, scene } from '../core/render.js';
 import { sky } from '../world/sky.js';
 import { HALF, heightAt } from '../world/terrain.js';
 import { shoreLine } from '../world/water.js';
@@ -116,6 +116,8 @@ function updateBirds(dt, t) {
       M.g.visible = true; b.sleep = false;
     }
     M.g.position.set(b.x, b.y, b.z); M.g.rotation.set(0, b.h, b.state === 'fly' ? b.bank : 0, 'YXZ');
+    // Nah an der Kamera schrumpft der Vogel weg, sonst füllt ein Flügel als dunkle Fläche das Bild
+    const nearK = smooth(1.2, 3.5, M.g.position.distanceTo(camera.position)); M.g.scale.setScalar(nearK); M.g.visible = nearK > .02;
   }
 }
 
