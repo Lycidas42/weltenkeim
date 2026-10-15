@@ -28,7 +28,7 @@ import './village/build.js';
 import { bushes, cover, renderNature, rocks } from './world/nature.js';
 import { buildNav, findPath, navF, navV, nearBuilding, updateNav } from './world/nav.js';
 import { updateCover } from './world/cover.js';
-import { vAll, villagers } from './village/villagers.js';
+import { spawnVillager, vAll, villagers } from './village/villagers.js';
 import { updateLights } from './village/night.js';
 import { hand } from './hand/hand.js';
 import './creature/creature.js';
@@ -42,6 +42,7 @@ import { arrows, startFishing, updateArrows, updateFishingLines, updateSleepers,
 import { reconcileJobs } from './village/jobs.js';
 import { placeWishUI, startWish, updateWish } from './village/wishes.js';
 import { renderVillagers } from './village/render.js';
+import { emotes, updateEmotes } from './village/emotes.js';
 import { updateVillage } from './village/economy.js';
 import { foxHaul, reinforce, updateFox } from './creature/ai.js';
 import { forestAlert, updateForestAlert } from './village/forest-alert.js';
@@ -105,6 +106,7 @@ function tick(dt, t) {
   updateWater(dt, t, rain.t > 0);
   updateTerrain(dt);
   updateCamera(dt);
+  updateEmotes(dt, t); // nach der Kamera: Symbole zeigen zu ihr
 
   placeFoxUI(dt);
   placeWishUI(); placeForestUI(); placeFieldTags(); updateHandHover(dt);
@@ -123,5 +125,5 @@ window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
   // draw = null gar keins (viele kurze Schritte in Prüfungen, Software-WebGL braucht pro Bild Sekunden)
   step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw === false && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
-  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on };
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager };
 requestAnimationFrame(frame);
