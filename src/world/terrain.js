@@ -100,7 +100,7 @@ const STREAM = (() => {
   }
   // Ufer links und rechts: ihre Höhe beim Erzeugen; ändert der Spieler das Gelände dort, folgt der Bach (fitStream)
   out.forEach((p, i) => { const a = out[Math.max(0, i - 1)], b = out[Math.min(out.length - 1, i + 1)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; p.nx = -(b.z - a.z) / l; p.nz = (b.x - a.x) / l; p.bank = p.w + 1.15;
-    p.gL0 = hAt(p.x + p.nx * p.bank, p.z + p.nz * p.bank); p.gR0 = hAt(p.x - p.nx * p.bank, p.z - p.nz * p.bank); p.bed0 = p.bed; });
+    p.gL0 = hAt(p.x + p.nx * p.bank, p.z + p.nz * p.bank); p.gR0 = hAt(p.x - p.nx * p.bank, p.z - p.nz * p.bank); p.gC0 = hAt(p.x, p.z); p.bed0 = p.bed; });
   for (const p of out) p.y = p.bed + .055; // Wasserspiegel knapp über dem Bett
   return { pts: out, dist, len, cells, src: { x: S0.x, z: S0.z, y: poolBed + .1, dx: (out[3] || S0).x - S0.x, dz: (out[3] || S0).z - S0.z } };
 })();
@@ -137,7 +137,10 @@ function terrainColor(h, jit, k = -1) {
 }
 // Vom Spieler geformtes Gelände: gespeichert als Abweichung von der erzeugten Insel (Punkt, Höhe in cm), hier wieder aufgetragen
 const BASE_H = H.slice();
-if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d)) H[k] = clamp(H[k] + d, -3, 8.5); }
+// Ältere Spielstände (vor S.streamFix): Bach und Mühle sanken bei jedem Laden ein Stück ab und gruben dabei eine Rinne bis
+// unter den Meeresspiegel. Einmalig werden Absenkungen am Bach (bis knapp hinter die Ufer) verworfen.
+const fixStream = !S.streamFix; S.streamFix = 1;
+if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d) && !(fixStream && d < 0 && STREAM.dist[k] < 2.2)) H[k] = clamp(H[k] + d, -3, 8.5); }
 // Meer: nur wo Gelände unter dem Meeresspiegel mit dem offenen Meer verbunden ist (Flutfüllung vom Inselrand).
 // Eine Grube im Inland bleibt trocken, ein Graben bis zur Küste läuft voll. Im Bachbett steht Bachwasser: Das Meer
 // dringt nur dort ein, wo der Bachspiegel unter dem Meeresspiegel liegt (Mündung), nicht gegen die Fließrichtung
@@ -145,7 +148,7 @@ if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terr
 const SEA_LV = -.02, SEA = new Uint8Array(N * N);
 function updateSea() {
   const old = SEA.slice(), q = []; SEA.fill(0); const P = STREAM.pts, C4 = STREAM.cells;
-  for (let c = 0; c < C4.length; c += 4) { const a = P[C4[c + 1] - 1], b = P[C4[c + 1]]; if (a.y + (b.y - a.y) * C4[c + 2] > SEA_LV) SEA[C4[c]] = 2; } // 2: Bach, kein Meer
+  for (let c = 0; c < C4.length; c += 4) { const a = P[C4[c + 1] - 1], b = P[C4[c + 1]]; if (a.y + (b.y - a.y) * C4[c + 2] > SEA_LV + .2) SEA[C4[c]] = 2; } // 2: Bach, kein Meer (an der Mündung, knapp über dem Meer, läuft es ineinander)
   for (let k = 0; k < N * N; k++) { const i = k % N, j = (k / N) | 0; if ((i === 0 || j === 0 || i === N - 1 || j === N - 1) && H[k] < SEA_LV) { SEA[k] = 1; q.push(k); } }
   while (q.length) {
     const k = q.pop(), i = k % N, j = (k / N) | 0;
@@ -205,20 +208,23 @@ scene.add(terrain);
 
 // Wasserband des Bachs: fließt sichtbar bergab, schäumt an steilen Stellen, wird zur Mündung breiter.
 // Bei Schneeschmelze (und Regen) schwillt er an: höher, breiter, schneller, trüber, mehr Schaum (uSwell).
-const streamU = { uT: { value: 0 }, uSwell: { value: 0 } };
+// Strömung: zwei Schichten mit je eigenem, überall gleichem Tempo (Phase hier aufsummiert); an steilen Stellen wird die schnelle
+// eingeblendet. Zeit × ortsabhängiges Tempo würde das Muster mit der Zeit verscheren (rast, läuft scheinbar rückwärts).
+const streamU = { uT: { value: 0 }, uSwell: { value: 0 }, uPh: { value: new THREE.Vector2() } };
 const streamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, roughness: .15, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 streamMat.onBeforeCompile = sh => {
-  sh.uniforms.uT = streamU.uT; sh.uniforms.uSwell = streamU.uSwell;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float foam; attribute vec2 suv; varying float vFoam; varying vec2 vSU;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFoam = foam; vSU = suv;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT, uSwell; varying float vFoam; varying vec2 vSU;\n' + NOISE_GLSL)
+  sh.uniforms.uT = streamU.uT; sh.uniforms.uSwell = streamU.uSwell; sh.uniforms.uPh = streamU.uPh; sh.uniforms.uSea = { value: seaTex };
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float foam; attribute vec2 suv; varying float vFoam; varying vec2 vSU; varying vec2 vXZ;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFoam = foam; vSU = suv; vXZ = position.xz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT, uSwell; uniform vec2 uPh; varying float vFoam; varying vec2 vSU; varying vec2 vXZ; uniform sampler2D uSea;\n' + NOISE_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
       float edge = smoothstep(.0, .2, vSU.x) * smoothstep(1., .8, vSU.x), fo = vFoam + uSwell * .3;
-      vec2 q = vec2(vSU.x * 3., vSU.y * 1.6 - uT * (1.2 + fo * 3. + uSwell * 1.5));
-      float n = vns(q * 2.) * .6 + vns(q * 5.) * .4;
+      vec2 q = vec2(vSU.x * 3., vSU.y * 1.6 - uPh.x), q2 = vec2(vSU.x * 3., vSU.y * 1.6 - uPh.y);
+      float n = mix(vns(q * 2.) * .6 + vns(q * 5.) * .4, vns(q2 * 2. + 7.3) * .6 + vns(q2 * 5. + 3.1) * .4, smoothstep(.15, 1.1, fo));
       float fm = clamp(smoothstep(.55 - uSwell * .05, .85, n) * (.25 + fo * 1.4) + (1. - edge) * .35, 0., 1.);
       vec3 wc = mix(mix(vec3(.2, .55, .62), vec3(.32, .7, .74), n), mix(vec3(.36, .4, .33), vec3(.5, .5, .4), n), uSwell * .6); // Hochwasser: trüb
       diffuseColor.rgb = mix(wc, vec3(.92, .96, 1.), fm);
-      diffuseColor.a = (.55 + .35 * edge + uSwell * .15) * smoothstep(0., .08, vSU.x) * smoothstep(1., .92, vSU.x) + fm * .2;`);
+      diffuseColor.a = (.55 + .35 * edge + uSwell * .15) * smoothstep(0., .08, vSU.x) * smoothstep(1., .92, vSU.x) + fm * .2;
+      diffuseColor.a *= 1. - texture2D(uSea, (vXZ + ${HALF.toFixed(1)}) / ${SIZE.toFixed(1)} * ${((N - 1) / N).toFixed(5)} + ${(.5 / N).toFixed(5)}).r; // Mündung: geht ins Meer über`);
 };
 const streamMesh = (() => {
   const P = STREAM.pts, n = P.length, idx = [], uv = [];
@@ -240,16 +246,20 @@ function layStream(sw) { // Lage des Wasserbands aus Bett und Hochwasser
 }
 layStream(0);
 // Nach dem Formen: Bach folgt dem Gelände. Heben oder senken beide Ufer, steigt oder sinkt das Bett mit; liegt ein Ufer
-// tiefer als das Wasser, sinkt das Bett darunter. Ein einzeln gesenktes Ufer (z. B. der Mühlenplatz) zieht das Bett nicht mit; es fließt aber
+// tiefer als das Wasser oder wird mit den Ufern darunter gegraben, sinkt das Bett darunter. Ein einzeln gesenktes Ufer
+// (z. B. der Mühlenplatz) zieht das Bett nicht mit. Er fließt aber
 // immer bergab, eine aufgeschüttete Stelle gräbt der Bach wieder durch. Liefert die geänderten Geländepunkte (neu färben).
 function fitStream() {
   const P = STREAM.pts, changed = [];
   let prev = 1e9;
   for (const p of P) {
     const hl = heightAt(p.x + p.nx * p.bank, p.z + p.nz * p.bank), hr = heightAt(p.x - p.nx * p.bank, p.z - p.nz * p.bank);
-    const dl = hl - p.gL0, dr = hr - p.gR0, d = dl > 0 && dr > 0 ? Math.min(dl, dr) : dl < 0 && dr < 0 ? Math.max(dl, dr) : 0; // nur wenn beide Ufer mitgehen
+    let d = 0; const dl = hl - p.gL0, dr = hr - p.gR0;
+    if (dl > 0 && dr > 0) d = Math.min(dl, dr); // nur wenn beide Ufer mitgehen
+    else if (dl < 0 && dr < 0) d = Math.min(Math.max(dl, dr), heightAt(p.x, p.z) - p.gC0); // abgegraben: auch so tief wie der Grund in der Mitte (sonst schwebt der Bach)
     const cap = (h, g0) => h < g0 && g0 > p.bed0 + .1 ? h - .1 : 1e9; // ein gesenktes Ufer, das vorher über dem Wasser lag
-    p.bed = Math.min(p.bed0 + d, cap(hl, p.gL0), cap(hr, p.gR0), prev - .004); prev = p.bed; p.y = p.bed + .055; p.refL = hl; p.refR = hr; // Wasser bleibt unter dem tieferen Ufer
+    p.bed = Math.min(p.bed0 + d, cap(hl, p.gL0), cap(hr, p.gR0), prev - .004); // Wasser bleibt unter dem tieferen Ufer
+    prev = p.bed; p.y = p.bed + .055; p.refL = hl; p.refR = hr;
   }
   const C4 = STREAM.cells;
   for (let c = 0; c < C4.length; c += 4) {
@@ -303,7 +313,7 @@ let terrainDirty = false, terrainT = 0;
 const markTerrainDirty = () => { terrainDirty = true; }; // Normalen, Höhen- und Tiefenkarte gleich nachziehen
 function updateTerrain(dt) {
   terrainU.uWet.value = weather.wet;
-  const sw = Math.max(weather.flood, weather.wet * .3); streamU.uSwell.value = sw; if (Math.abs(sw - streamSwell) > .004) layStream(sw);
+  const sw = Math.max(weather.flood, weather.wet * .3); streamU.uSwell.value = sw; streamU.uPh.value.x += dt * (1.2 + sw * 1.5); streamU.uPh.value.y += dt * (3.6 + sw * 2.5); if (Math.abs(sw - streamSwell) > .004) layStream(sw);
   terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 
 export { BARE, C, CELL, GARDEN_R, H, HALF, HOUSE_R, J, N, NOISE_GLSL, SACRED_SEG, SEG, SHRINE_AT, SIZE, STREAM, depData, fitStream, hTex, heightAt, laneDist, markTerrainDirty, resetTerrain, sacredDist, updateSea, streamDist, streamMat, seaAt, seaTex, streamU, surfaceAt, tCol, tPos, terrainColor, terrainU, tg, updateTerrain };
