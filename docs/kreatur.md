@@ -32,6 +32,7 @@ Stand der Features: siehe `README.md`.
 | Lernen und Wunder | Zuschauen → Fortschritt → selbst tun; Lob und Tadel je Fähigkeit und Ziel | 3.6–3.9, `kreatur-lernen.md` | 🔵 geplant |
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
 | Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | 🔵 geplant |
+| Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -255,6 +256,78 @@ Je Schritt ein Commit auf `develop`, im Spiel geprüft (`__wk`, eigene Prüfung 
 4. **Gesten** Streicheln und Klaps (B), Kreismenü öffnet beim Loslassen.
 5. **Doku und Hinweise:** Stand-Marken, Info-Panel (`#sheetInfo`), Hinweistexte.
 6. **Fell-Fuchs in der Nahsicht** nur nach Messung auf dem Handy (Bildrate mit und ohne), sonst 💡 zurückstellen.
+7. **Zweibeinige Gestalt** (3.12), in eigenen Schritten (3.12 G).
+
+### 3.12 Zweibeinige Gestalt
+
+**Stand:** 🔵 geplant – welches Tier und welches Modell ist noch offen
+
+Wie in Black & White eine aufrechte Kreatur, die mit den Händen arbeitet: als weitere Gestalt neben den Vierbeinern,
+nicht als Ersatz.
+
+#### A. Warum
+
+- Was die Kreatur durch Zuschauen lernt (`kreatur-lernen.md`: säen, ernten, füttern, pflanzen, Waren tragen, Wunder
+  wirken), wirkt mit Händen glaubwürdig. Ein Vierbeiner trägt alles im Maul, heute höchstens 3 Waren.
+- Sie kann der Hand ähnlicher handeln: aufheben, tragen, werfen, Bewohner vorsichtig in den Arm nehmen (3.8), winken.
+
+#### B. Gestalt
+
+- Ein **aufrecht gehendes Tier** (z. B. Affe, Bär oder ein Fantasiewesen), kein Mensch: Die Kreatur bleibt ein
+  Tiergeist und lässt sich auf einen Blick von den Bewohnern unterscheiden.
+- Deutlich größer als die Bewohner (Spielhöhe etwa 2 bis 2,5), freundlich und rund im Stil der übrigen Modelle.
+- Wird wie heute im Bogen als Gestalt gewählt (`kinds.js`, Theme-Schlüssel `creature.<id>`), später als Ritual am
+  Schrein (3.11 D).
+
+#### C. Modell und Animationen
+
+- **Lizenz:** frei, CC0 bevorzugt, Eintrag in `assets/CREDITS.md` und im Info-Panel. Bis etwa 10.000 Dreiecke
+  (`docs/assets.md`).
+- **Skelett:** menschenähnlich (Arme, Hände mit Knochen, Kopf), damit sich Animationen aus freien Bibliotheken mit
+  demselben Skelettaufbau in Blender übertragen lassen (Retargeting).
+- **Kandidaten** (vor der Wahl Lizenz, Dreiecke und mitgelieferte Animationen prüfen): Pakete von Quaternius und KayKit
+  (von dort stammen schon Tiere und Gebäude), Kenney, Poly Pizza. Fehlende Animationen aus einer freien
+  Animationsbibliothek für menschenähnliche Skelette übertragen.
+- **Benötigte Animationen:** Stehen, Gehen, Rennen, Aufheben, Gehen mit Last (vor dem Körper bzw. auf der Schulter),
+  am Boden arbeiten (säen, ernten, pflanzen), Werfen, Wunder wirken, Sitzen bzw. Dösen, Freuen (Lob), Ducken (Tadel),
+  später Winken. Die Namen kommen in `docs/assets.md` (Abschnitt „Animationen der Kreaturen“) dazu.
+- **Detailmodell:** wie beim Fell-Fuchs in Blender verbessert (Fell, Gesicht, Mimik) und nur in der Nahsicht gezeigt,
+  falls die Messung aus 3.11 F6 das erlaubt.
+
+#### D. Was sich im Spiel ändert
+
+- **Theme** (`src/themes/cozy.js`): neue Einträge je Kreatur `body: 'biped'` (Standard `'quad'`), `hands` (Knochen der
+  linken und rechten Hand als Haltepunkte) und `carry` (wo eine Last sitzt: Baum auf der Schulter, Kiste vor dem
+  Körper). Spielcode fragt nur diese Schlüssel ab, keine Knotennamen.
+- **Tragen:** an den Händen statt im Maul (`updateMouthTree` und das Tragen von Waren); mehr Tragkraft, z. B. 6 Waren.
+- **Treffen** (`foxUnder`, `src/ui/ring.js`): bei Zweibeinern die senkrechte Strecke über die ganze Höhe mit etwas
+  breiterer Toleranz (Arme), keine Längsstrecke.
+- **Streicheln** (`gestures.js`, heute über den Rücken eines Vierbeiners): beim Zweibeiner den Kopf tätscheln, Klaps
+  auf die Schulter. Die Gesten an der Kreatur (3.11 B) bleiben gleich.
+- **Ruhen:** sitzen statt liegen (heute `rest` mit Liegepose `paw`/`hoof`).
+- **Lernen:** dieselben Fähigkeiten wie bei Vierbeinern; der Zweibeiner führt sie sichtbar mit den Händen aus, der
+  Vierbeiner mit Maul und Pfoten (einfachere Animation).
+
+#### E. Offene Fragen
+
+- Welches Tier? Vorschlag: zuerst ein Affe oder Bär, je nachdem, welches freie Modell die meisten passenden
+  Animationen mitbringt.
+- Soll der Zweibeiner Vorteile haben (Tragkraft), oder sollen alle Gestalten gleich stark sein und sich nur in
+  Persönlichkeit unterscheiden (3.10)?
+
+#### F. Spielstand
+
+- Keine neuen Felder: Die Gestalt steht wie heute in `S.creature`.
+
+#### G. Reihenfolge
+
+1. **Modelle sichten:** zwei bis drei Kandidaten mit Lizenz, Dreiecken, Animationen und Screenshot im Spiel; Wahl
+   gemeinsam mit dem Nutzer.
+2. **Einbauen** mit Stehen, Gehen, Rennen, Sitzen; Theme-Einträge `body`, `hands`, `carry`; Treffen und Streicheln
+   angepasst.
+3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
+4. **Arbeiten am Boden** zusammen mit dem Lernen durch Vormachen (`kreatur-lernen.md`).
+5. **Detailmodell** in Blender für die Nahsicht (nach der Messung aus 3.11 F6).
 
 ## 4. Spielstand (Vorschlag, abwärtskompatibel)
 
@@ -272,7 +345,8 @@ Je Schritt ein Commit auf `develop`, im Spiel geprüft (`__wk`, eigene Prüfung 
 
 0. Erleben in der Welt, Charakterbogen und „Warum?“ (3.11) – macht alle folgenden Schritte nachvollziehbar.
 1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur. ✅
-2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst).
+2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst). Davor die zweibeinige Gestalt (3.12 G 1–3), damit Arbeiten
+   mit den Händen gleich mitgebaut werden kann.
 3. Bedürfnisse und Launen, Fressen aus dem Lager, Schlafen.
 4. Ausrichtung Gut/Böse mit sichtbarer Veränderung.
 5. Leine (3.5).
