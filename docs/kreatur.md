@@ -14,6 +14,9 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 
 - **Sie lebt sichtbar:** Kopf und Blick folgen dem, was sie interessiert, sie blinzelt, Ohren und Schwanz zeigen ihre
   Stimmung, das Gesicht zeigt Gefühle (Freude, Ärger, Trauer, Müdigkeit), kurze Laute statt Text.
+- **Zuschauen macht Spaß:** wie bei den Bewohnern (schlicht, aber niedlich), nur noch mehr: kleine, gut lesbare
+  Handlungen zwischendurch – schnuppern, sich strecken, gähnen, Schmetterlingen nachspringen, mit Bewohnern spielen,
+  neugierig etwas untersuchen, sich über einen gefällten Baum freuen. Übertrieben und weich animiert statt steif.
 - **Sie bemerkt den Spieler:** schaut zur Hand, freut sich über Zuwendung, begrüßt ihn nach einer Pause, vermisst ihn
   (sichtbar, nicht als Strafe).
 - **Sie braucht ihn:** Hunger, Müdigkeit, Spieltrieb und Laune (3.2) sind an ihr ablesbar; Fürsorge zeigt Wirkung.
