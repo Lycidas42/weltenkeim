@@ -170,6 +170,23 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #foxBadge b{font-family:var(--f-display);color:var(--glaube);font-size:17px;font-weight:700;line-height:1}
 #foxBadge em{font-style:normal;color:var(--glaube);font-weight:800}
 #foxBadge em:empty,#foxBadge .mini:empty,#foxBadge span:empty{display:none}
+#foxBadge .bwhy{color:var(--ink-dim)}
+/* Gedankenblase über der Kreatur: was sie gerade vorhat (kreatur.md 3.11 C) */
+#foxThought{position:absolute;left:0;top:0;z-index:3;pointer-events:none;width:38px;height:38px;border-radius:50%;background:rgba(250,246,235,.94);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#foxThought::before,#foxThought::after{content:"";position:absolute;border-radius:50%;background:rgba(250,246,235,.94)}
+#foxThought::before{width:10px;height:10px;left:-3px;bottom:-5px}
+#foxThought::after{width:6px;height:6px;left:-10px;bottom:-12px}
+#foxThought svg{width:24px;height:24px;fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+#foxThought[hidden]{display:none}
+/* Karte der Nahsicht: Name, Tätigkeit, Grund */
+#foxCard{display:flex;align-items:center;gap:8px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 12px;width:min(440px,100%);box-sizing:border-box}
+#foxCard[hidden]{display:none}
+#foxCard .txt{flex:1;min-width:0;display:grid;gap:2px;font-size:13px;line-height:1.3}
+#foxCard b{font-family:var(--f-display);color:var(--glaube);font-size:17px;font-weight:700;line-height:1.1}
+#foxCard .cwhy{color:var(--ink-dim)}
+#foxCard .cwhy:empty{display:none}
+#foxCard button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px;flex:none}
+#foxCard button.x{width:34px;height:34px;padding:0;font-size:18px;line-height:1}
 .mini{display:grid;grid-template-columns:auto 70px;gap:2px 7px;align-items:center;font-size:11px;color:var(--ink-dim)}
 .mini i{display:block;height:5px;border-radius:5px;background:rgba(244,239,225,.15);overflow:hidden}
 .mini i u{display:block;height:100%;border-radius:5px}
@@ -293,8 +310,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <div id="handTip" aria-hidden="true" hidden></div>
   <button id="forestAlert" class="wish forest" hidden aria-label="Wald geht zur Neige: Tippen, um Regen zu wirken"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l5 7h-3l4 6h-5v5h-2v-5H6l4-6H7z"/><path d="M4 20l16-16" class="x"/></svg></span><span class="tx"><b>Wald geht zur Neige</b><small>Tippen, um dort Regen zu wirken</small></span></button>
   <button id="wish" class="wish" hidden><span class="ic" id="wishIc" aria-hidden="true"></span><span class="tx"><b id="wishT"></b><small>Tippen, um das Wunder zu wählen</small></span><i class="bar"><u id="wishBar"></u></i></button>
-  <div id="foxBadge" hidden><b id="badgeName"></b><span id="badgeNow"></span><div class="mini" id="badgeBars"></div><em id="badgeAsk"></em></div>
+  <div id="foxBadge" hidden><b id="badgeName"></b><span id="badgeNow"></span><span id="badgeWhy" class="bwhy"></span><div class="mini" id="badgeBars"></div><em id="badgeAsk"></em></div>
   <div id="ring" hidden></div>
+  <div id="foxThought" hidden aria-hidden="true"><svg viewBox="0 0 24 24"></svg></div>
 
   <header class="top">
     <div class="res">
@@ -413,6 +431,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 
   <footer class="dock">
     <div class="hint" id="hint"></div>
+    <div id="foxCard" hidden><div class="txt"><b id="cardName"></b><span id="cardNow"></span><span id="cardWhy" class="cwhy"></span></div><button id="btnCardSheet">Bogen</button><button class="x" id="btnCardEnd" aria-label="Beobachten beenden">×</button></div>
     <div class="ctx" id="ctxSculpt" hidden>
       <button data-dir="1" aria-pressed="true">Heben</button>
       <button data-dir="-1" aria-pressed="false">Senken</button>

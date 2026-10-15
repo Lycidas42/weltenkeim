@@ -138,14 +138,38 @@ $('tmSkip').addEventListener('click', () => { toggleDayNight(); closeTimeMenu();
 $('tmPause').addEventListener('click', () => { S.timePaused = !S.timePaused; toast(S.timePaused ? 'Die Zeit steht still.' : 'Die Zeit läuft weiter.', 2); save(); closeTimeMenu(); });
 addEventListener('pointerdown', e => { if (!timeMenu.hidden && !timeMenu.contains(e.target) && !$('btnTime').contains(e.target)) closeTimeMenu(); });
 addEventListener('keydown', e => { if (e.key === 'Escape') closeTimeMenu(); });
-$('btnFox').addEventListener('click', () => openSheet('sheetFox'));
+// Name oben: erster Tipp startet die Nahsicht, ein weiterer öffnet den Charakterbogen
+$('btnFox').addEventListener('click', () => { if (observe && $('sheetFox').hidden) openSheet('sheetFox'); else if (!observe) setObserve(true); else closeSheets(); });
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
-function setFollow(on) { follow = on; renderFollow(); }
-function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Beobachten beenden' : 'Beobachten'; }
+function setFollow(on) { follow = on; if (!on) observe = false; renderFollow(); }
+function renderFollow() {
+  $('btnFollow').hidden = !follow || observe; $('foxCard').hidden = !observe; $('hint').hidden = observe; // Karte statt Hinweis
+  $('btnFocus').setAttribute('aria-pressed', observe); $('btnFocus').textContent = observe ? 'Beobachten beenden' : 'Beobachten';
+}
+// Nahsicht (kreatur.md 3.11 A): Die Kamera gleitet nah an die Kreatur (Abstand NEAR.d, schräg von oben) und folgt ihr.
+// Unten zeigt eine Karte Tätigkeit und Grund. Herauszoomen über NEAR.end beendet sie, ebenso × und „Nicht folgen“.
+const NEAR = { d: 9, pol: .9, end: 16, glide: 1.2 };
+let observe = false, glide = 0, cardT = 0;
+function setObserve(on) {
+  if (on) { observe = true; glide = NEAR.glide; follow = true; closeSheets(); renderCard(); } else { observe = false; follow = false; }
+  renderFollow();
+}
+function renderCard() {
+  $('cardName').textContent = S.name; $('cardNow').textContent = `${foxDoing()[0].toUpperCase()}${foxDoing().slice(1)}.`;
+  const w = why(); $('cardWhy').textContent = w ? `Warum: ${w}` : '';
+}
 // Kamera: folgt dem Tiergeist, bleibt über der Insel
 function updateCamera(dt) {
+  if (observe) {
+    const ox = camera.position.x - controls.target.x, oy = camera.position.y - controls.target.y, oz = camera.position.z - controls.target.z;
+    if (glide > 0) { // weich auf Nahsicht-Abstand und -Neigung, die Blickrichtung (Azimut) bleibt
+      glide -= dt; const az = Math.atan2(ox, oz), k = 1 - Math.exp(-dt * 4), s = Math.sin(NEAR.pol) * NEAR.d;
+      camera.position.set(controls.target.x + ox + (Math.sin(az) * s - ox) * k, controls.target.y + oy + (Math.cos(NEAR.pol) * NEAR.d - oy) * k, controls.target.z + oz + (Math.cos(az) * s - oz) * k);
+    } else if (Math.hypot(ox, oy, oz) > NEAR.end) setObserve(false); // herausgezoomt
+    if ((cardT -= dt) <= 0) { cardT = .25; renderCard(); }
+  }
   if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
     camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
   const tr = Math.hypot(controls.target.x, controls.target.z);
@@ -153,7 +177,9 @@ function updateCamera(dt) {
   controls.target.y = 1;
   controls.update();
 }
-$('btnFocus').addEventListener('click', () => { setFollow(!follow); if (follow) closeSheets(); });
+$('btnFocus').addEventListener('click', () => setObserve(!observe));
+$('btnCardSheet').addEventListener('click', () => openSheet('sheetFox'));
+$('btnCardEnd').addEventListener('click', () => setObserve(false));
 $('btnFollow').addEventListener('click', () => setFollow(false));
 let resetArmed = false;
 $('btnReset').addEventListener('click', e => {
@@ -256,4 +282,4 @@ function renderForms() {
 }
 $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
 
-export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };
+export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

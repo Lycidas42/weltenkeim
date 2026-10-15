@@ -198,9 +198,12 @@ function reinforce(kind) {
     if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
     foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
   }
-  // die Hand führt die Geste aus; das Tier reagiert erst, wenn sie es wieder losgelassen hat
+  // die Hand führt die Geste aus; das Tier reagiert erst, wenn sie es wieder losgelassen hat.
+  // Was sich dabei geändert hat (z. B. „Helfen 34 % → 45 %“), steht danach kurz über dem Tier.
+  let learned = '';
   playHand(kind, () => {
     const top = foxPivot.position.y + CREATURES[fox.kind].h + .5;
+    if (learned) floatText(fox.x, top + .45, fox.z, learned, 's');
     if (kind === 'pet') {
       floatText(fox.x, top, fox.z, '♥', 'love');
       if (fox.state === 'rest') fox.timer += 4; else foxOnce(foxActs.praise ? 'praise' : 'idle2'); // liegend genießt es einfach weiter
@@ -214,7 +217,7 @@ function reinforce(kind) {
     S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
     const sum = S.w.help + S.w.play + S.w.mischief; for (const k in S.w) S.w[k] /= sum;
     const to = share(a), pc = p => `${Math.round(p * 100)} %`;
-    noteLearn(kind, a, fox.lastDesc, from, to);
+    noteLearn(kind, a, fox.lastDesc, from, to); learned = `${ACT_LABEL[a]} ${pc(from)} → ${pc(to)}`;
     toast(`${kind === 'pet' ? 'Lob' : 'Tadel'}, weil ${S.name} ${fox.lastDesc} hat. ${S.name} lernt: ${kind === 'pet' ? 'mehr' : 'weniger'} ${ACT_LABEL[a]} (${pc(from)} → ${pc(to)}).`);
     fox.last = null; $('btnFox').classList.remove('pulse');
   } else {
