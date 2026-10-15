@@ -57,7 +57,7 @@ export default {
     // Fuchsmensch: Körper selbst gebaut, Skelett und Bewegungen aus Quaternius Universal Animation Library 1+2 (CC0).
     'creature.foxfolk': { file: 'animals/Foxfolk.glb', head: 'Head', body: 'biped', face: 0, ws: 1, hands: ['hand_l', 'hand_r'], tail: ['tail_01', 'tail_02', 'tail_03', 'tail_04'],
       anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'PickUp_Table',
-        hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: 'Sitting_Enter', lie: 'Sitting_Idle_Loop', standUp: 'Sitting_Exit',
+        hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: { clip: 'LayToIdle', reverse: true }, lie: { clip: 'LayToIdle', hold: 0 }, standUp: 'LayToIdle',
         harvest: 'Farm_Harvest', plant: 'Farm_PlantSeed', water: 'Farm_Watering', interact: 'Interact', throw: 'OverhandThrow' } },
     // Mensch (Test): KayKit Adventurers „Mage“ ohne Stab und Buch (Kay Lousberg, CC0)
     'creature.mage': { file: 'animals/Mage.glb', head: 'head', body: 'biped', face: 0, ws: 1, hands: ['handslot.l', 'handslot.r'],

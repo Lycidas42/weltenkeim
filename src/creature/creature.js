@@ -38,7 +38,13 @@ function buildRig(id, gltf, fur = false) {
   model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   const mixer = new THREE.AnimationMixer(model), acts = {};
   // Animationen: Vierbeiner nach den Quaternius-Namen (ANIM_PAT), Zweibeiner nach der Zuordnung im Theme (anims)
-  if (C.anims) { for (const [k, n] of Object.entries(C.anims)) { const clip = gltf.animations.find(a => a.name === n); if (clip) acts[k] = mixer.clipAction(clip); } }
+  // Ein Eintrag ist ein Name oder { clip, reverse } (rückwärts, z. B. Hinlegen aus „vom Liegen aufstehen“) bzw. { clip, hold } (ein Bild halten)
+  if (C.anims) for (const [k, n] of Object.entries(C.anims)) {
+    const spec = typeof n === 'string' ? { clip: n } : n; let clip = gltf.animations.find(a => a.name === spec.clip); if (!clip) continue;
+    if (spec.reverse) clip = reverseClip(clip, k);
+    else if (spec.hold !== undefined) clip = THREE.AnimationUtils.subclip(clip, k, spec.hold, spec.hold + 1, 30);
+    acts[k] = mixer.clipAction(clip);
+  }
   else for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) acts[k] = mixer.clipAction(clip); }
   for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!acts[k] && acts[f]) { acts[k] = mixer.clipAction(acts[f].getClip().clone()); acts[k].timeScale = ts; }
   if (acts.walk) acts.walk.timeScale = C.ws;
@@ -50,6 +56,15 @@ function buildRig(id, gltf, fur = false) {
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
   return { model, mixer, acts, cur: null, id, dims };
+}
+// Clip rückwärts: Zeiten spiegeln, Schlüsselwerte in umgekehrter Reihenfolge
+function reverseClip(clip, name) {
+  const d = clip.duration, tracks = clip.tracks.map(t => {
+    const n = t.times.length, s = t.getValueSize(), times = new Float32Array(n), vals = new t.values.constructor(t.values.length);
+    for (let i = 0; i < n; i++) { times[i] = d - t.times[n - 1 - i]; vals.set(t.values.subarray((n - 1 - i) * s, (n - i) * s), i * s); }
+    return new t.constructor(t.name, times, vals);
+  });
+  return new THREE.AnimationClip(name, d, tracks);
 }
 // Knochen auf ihre Werte beim Laden zurücksetzen. Nicht skeleton.pose(): das rechnet bei aus Blender
 // exportierten Modellen die Skalierung des Armature-Knotens (×100) ein zweites Mal ein.

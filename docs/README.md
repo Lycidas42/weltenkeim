@@ -11,6 +11,7 @@ ausgeliefert. Regeln für den Code stehen in `CLAUDE.md` im Wurzelordner.
 | `gut-und-boese.md` | wie Welt, Schrein und Kreatur auf die Waage reagieren |
 | `bewohner.md` | die Bewohner: Identität, Bedürfnisse, Gefühle und Ausdruck, Pausen und Urlaub, Freizeit und Sport, Animationen, Fokus auf einen Bewohner |
 | `kreatur.md` | die Kreatur (Tiergeist): Alter, Bedürfnisse, Ausrichtung, Eigenwille, Leine, Persönlichkeit, Erleben in der Welt und „Warum?“, zweibeinige Gestalt |
+| `kreatur-modelle.md` | Arbeitsnotiz: zweibeinige Gestalten bauen (Blender-Skript), aufbereiten, einbauen, Stand und nächste Kandidaten |
 | `kreatur-lernen.md` | die Kreatur lernt durch Zusehen, was die Hand vormacht, bis hin zu Wundern |
 | `nahrung.md` | wofür die Lebensmittel da sind: Essen, Wachstum, Gaben, Kreatur füttern, Verarbeitung |
 | `jahreszeiten.md` | Frühling bis Winter: Verfärben, Laubfall, Wiesen, Felder; Kalender und Technik |
