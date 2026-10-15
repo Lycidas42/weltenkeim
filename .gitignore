@@ -3,3 +3,6 @@ dist/
 .DS_Store
 *.blend1
 dev/out/
+
+# Rohdateien fremder Asset-Pakete (Zips, entpackt) – nur lokal, nicht im Repo
+dev/assets-raw/
