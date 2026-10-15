@@ -20,7 +20,7 @@ Fuchs, Wolf, Hirsch, Stier und Alpaka (`Fox.glb`, `Wolf.glb`, `Stag.glb`, `Bull.
 Fell-Prototyp (`Fox_HD.glb`, Quelle `../source/Fox_HD.blend`):
 
 - Abgeleitet aus dem Quaternius-Fuchs (CC0): Vertices verschmolzen, einmal unterteilt, glatt schattiert, UV-Koordinaten und Fellmaske (`_FUR`) ergänzt, in Blender 5.2.
-- Im Spiel als Fell-Modell in der Nahansicht (Ruun-Panel), außerdem in der Vorschau `dev/fur.html`.
+- Derzeit im Spiel nicht geladen (zu schwer fürs Handy, `docs/kreatur.md` 3.11 F 6), nur in der Vorschau `dev/fur.html`.
 
 Katze (`Cat.glb`):
 
