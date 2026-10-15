@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { $ } from '../core/util.js';
 import { tmpV } from '../core/render.js';
 import { CREATURES, fox } from '../creature/kinds.js';
-import { gSack, load } from '../assets/models.js';
+import { loadModel, model } from '../assets/models.js';
 import { TK } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H } from '../world/trees.js';
@@ -22,7 +22,7 @@ import { buildRig, mouthF, mouthTmp, mouthV, mouthZ, portrait, rigPlay, updateFu
 async function showPortrait() {
   const P = portrait, id = fox.kind, C = CREATURES[id];
   if ((P.rig && P.rig.id === id) || P.loading === id) return;
-  if (!P.hand && !P.handLoading) P.handLoading = load('hand/GodHand.glb').then(g => { P.hand = makeHand(g); P.scene.add(P.hand.g); styleHand(P.hand); }).catch(() => {});
+  if (!P.hand && !P.handLoading) P.handLoading = loadModel('hand').then(g => { P.hand = makeHand(g); P.scene.add(P.hand.g); styleHand(P.hand); }).catch(() => {});
   if (!P.renderer) {
     P.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     P.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $('foxPortrait').appendChild(P.renderer.domElement);
@@ -30,7 +30,7 @@ async function showPortrait() {
   }
   P.loading = id;
   try {
-    const g = P.cache[id] || (P.cache[id] = await load(`animals/${C.hd || C.file}.glb`));
+    const g = P.cache[id] || (P.cache[id] = await loadModel('creature.' + id, 'hd'));
     if (P.loading !== id || fox.kind !== id) return;
     if (P.rig) P.pivot.remove(P.rig.model);
     P.rig = buildRig(id, g, !!C.hd); P.pivot.add(P.rig.model);
@@ -58,7 +58,7 @@ function renderPortrait(dt, t) {
 // Stamm im Maul auch im Porträt (wie in der Welt, das Tier blickt hier nach +z)
 function portraitMouthTree() {
   const P = portrait;
-  if (!P.mouth) { P.mouth = TK.map(g => { const o = g.scene.clone(true); o.visible = false; P.scene.add(o); return o; }); P.sack = gSack.scene.clone(true); P.sack.visible = false; P.scene.add(P.sack); }
+  if (!P.mouth) { P.mouth = TK.map(g => { const o = g.scene.clone(true); o.visible = false; P.scene.add(o); return o; }); P.sack = model('prop.sack').scene.clone(true); P.sack.visible = false; P.scene.add(P.sack); }
   P.mouth.forEach(o => o.visible = false); P.sack.visible = false;
   if (!(fox.carry || fox.carryGoods) || !P.rig) return;
   const C = CREATURES[P.rig.id], m = P.rig.model, head = m.userData.head || (m.userData.head = m.getObjectByName(C.head || 'Head'));

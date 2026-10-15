@@ -6,7 +6,7 @@ import { rnd } from '../core/util.js';
 import { S, onSave } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { HALF, heightAt, streamDist, surfaceAt } from '../world/terrain.js';
-import { gBakery, gBarrel, gCrate, gFarmHouse, gHutGreen, gHutRed, gHutYellowA, gHutYellowB, gLogs, gMill, gSack, gSawmill } from '../assets/models.js';
+import { model, modelInfo } from '../assets/models.js';
 import { LAGER, MILL_POS, SB, SHRINE_POS, onSacred, statics } from './layout.js';
 import { mill } from './houses.js';
 
@@ -29,12 +29,12 @@ const lager = (() => {
   const gable = new THREE.Shape([new THREE.Vector2(-D / 2, 0), new THREE.Vector2(D / 2, 0), new THREE.Vector2(0, Math.tan(ang) * D / 2)]);
   for (const sx of [-1, 1]) { const o = new THREE.Mesh(new THREE.ExtrudeGeometry(gable, { depth: .05, bevelEnabled: false }), wood2); o.rotation.y = Math.PI / 2; o.position.set(sx * (W / 2) - .025, top - .02, 0); g.add(o); }
   // Vorräte in der Halle
-  const prop = (gl, x, z, ry, k) => { const o = gl.scene.clone(true); o.position.set(x, B, z); o.rotation.y = ry; o.scale.setScalar(k); g.add(o); return o; };
-  prop(gCrate, -.8, -.38, .2, 1.6); prop(gCrate, -.42, -.42, -.1, 1.6); prop(gCrate, -.62, -.4, .4, 1.3).position.y = B + .32;
-  prop(gSack, .1, -.4, .5, 1.8); prop(gSack, .3, -.35, -.3, 1.8); prop(gBarrel, .65, -.38, 0, 1.6); prop(gBarrel, .88, -.2, 0, 1.6); prop(gBarrel, .85, -.48, 0, 1.6);
+  const prop = (key, x, z, ry, k) => { const o = model(key).scene.clone(true); o.position.set(x, B, z); o.rotation.y = ry; o.scale.setScalar(k * (modelInfo(key).scale || 1)); g.add(o); return o; };
+  prop('prop.crate', -.8, -.38, .2, 1.6); prop('prop.crate', -.42, -.42, -.1, 1.6); prop('prop.crate', -.62, -.4, .4, 1.3).position.y = B + .32;
+  prop('prop.sack', .1, -.4, .5, 1.8); prop('prop.sack', .3, -.35, -.3, 1.8); prop('prop.barrel', .65, -.38, 0, 1.6); prop('prop.barrel', .88, -.2, 0, 1.6); prop('prop.barrel', .85, -.48, 0, 1.6);
   // Stammstapel (rechts außen) und Bretterstapel (links außen)
   const logs = [], planks = [];
-  for (let k = 0; k < 5; k++) { const o = gLogs.scene.clone(true); o.position.set(W / 2 + .45 + (k % 2) * .05, (k >> 1) * .19, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; o.scale.setScalar(1.3); g.add(o); logs.push(o); }
+  for (let k = 0; k < 5; k++) { const o = model('prop.logs').scene.clone(true); o.position.set(W / 2 + .45 + (k % 2) * .05, (k >> 1) * .19, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; o.scale.setScalar(1.3); g.add(o); logs.push(o); }
   const pg = mergeGeometries([0, 1, 2, 3].map(k => new THREE.BoxGeometry(.62, .035, .13).translate((k % 2) * .02, .02 + k * .037, (k % 2 ? .07 : -.07))));
   for (let k = 0; k < 5; k++) { const o = new THREE.Mesh(pg, plank); o.position.set(-W / 2 - .45, (k >> 1) * .15, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; g.add(o); planks.push(o); }
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -47,17 +47,19 @@ function updateLagerStock() {
   lager.logs.forEach((o, k) => { o.visible = S.logs > k * 6; });
   lager.planks.forEach((o, k) => { o.visible = S.holz > k * 12; });
 }
-// Hütten der Spezialisten; Tür und Arbeitsplatz im Modellraum
+// Hütten der Spezialisten: Modell (Schlüssel im Theme) und Größe in der Welt
 const HUT = {
-  lumber: { gl: gHutRed, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .45 } },
-  forester: { gl: gHutGreen, k: SB, door: { x: 0, z: .32 }, work: { x: .28, z: .6 } },
-  sawyer: { gl: gSawmill, k: 1.2, door: { x: -.32, z: .62 }, work: { x: .3, z: .55 } },
-  hunter: { gl: gHutYellowA, k: SB, door: { x: 0, z: .32 }, work: { x: -.5, z: .5 } },
-  fisher: { gl: gHutYellowB, k: SB, door: { x: .14, z: .32 }, work: { x: -.45, z: .6 } },
-  farmer: { gl: gFarmHouse, k: SB, door: { x: .14, z: .32 }, work: { x: .55, z: .62 } },
-  miller: { gl: gMill, k: 1.6, door: { x: 0, z: .44 }, work: { x: .42, z: .62 } },
-  baker: { gl: gBakery, k: SB, door: { x: .14, z: .32 }, work: { x: -.52, z: .56 } },
+  lumber: { key: 'hut.lumber', k: SB },
+  forester: { key: 'hut.forester', k: SB },
+  sawyer: { key: 'hut.sawyer', k: 1.2 },
+  hunter: { key: 'hut.hunter', k: SB },
+  fisher: { key: 'hut.fisher', k: SB },
+  farmer: { key: 'hut.farmer', k: SB },
+  miller: { key: 'hut.miller', k: 1.6 },
+  baker: { key: 'hut.baker', k: SB },
 };
+// Tür und Arbeitsplatz liegen im Modell: sie kommen aus dem Theme (Andockpunkte)
+for (const r in HUT) Object.assign(HUT[r], modelInfo(HUT[r].key).anchors);
 // Fischerplätze an der Küste: Hütte etwas landeinwärts, Tür zum Meer, ein Steg führt ins tiefere Wasser
 const fisherSites = [];
 for (let i = 0; i < 40; i++) {

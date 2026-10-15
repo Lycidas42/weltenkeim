@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { clamp, smooth, rnd } from '../core/util.js';
+import { clamp, rnd, smooth } from '../core/util.js';
 import { PROC, RES, S, prayYield, resText } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { addGlaube, addHolz, addLogs, floatText } from '../ui/feedback.js';

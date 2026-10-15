@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { smooth, rnd } from '../core/util.js';
+import { rnd, smooth } from '../core/util.js';
 import { noise } from '../core/noise.js';
 import { dummy, scene } from '../core/render.js';
 import { weather } from './sky.js';

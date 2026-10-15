@@ -1,7 +1,7 @@
 // Meer: Wellen-Shader, Gischt am Ufer
 
 import * as THREE from 'three';
-import { clamp, smooth, rnd } from '../core/util.js';
+import { clamp, rnd, smooth } from '../core/util.js';
 import { noise } from '../core/noise.js';
 import { renderer, scene } from '../core/render.js';
 import { sky, weather } from './sky.js';

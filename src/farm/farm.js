@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { clamp, smooth, rnd } from '../core/util.js';
+import { clamp, rnd, smooth } from '../core/util.js';
 import { S, onSave } from '../core/state.js';
 import { noise } from '../core/noise.js';
 import { dummy, scene } from '../core/render.js';
@@ -10,7 +10,6 @@ import { floatText, toast } from '../ui/feedback.js';
 import { sky, weather } from '../world/sky.js';
 import { heightAt } from '../world/terrain.js';
 import { flattenAt } from '../world/sculpt.js';
-import { gBucket, gWheelbarrow } from '../assets/models.js';
 import { COL, COL2, paint, plantMat } from '../models/nature.js';
 import { place, statics } from '../village/layout.js';
 import { clearAround } from '../world/trees.js';
@@ -136,7 +135,7 @@ function buildFarm(e, F) {
     for (const [hx, hz] of FARM.hay) parts.push(paint(new THREE.CylinderGeometry(.2, .2, .32, 10).rotateZ(Math.PI / 2).translate(hx, at(hx, hz) + .2, hz), (px, py, pz, ny, cc) => cc.set(0xd9b65a).multiplyScalar(.9 + .1 * Math.sin(py * 60)))); }
   const mesh = new THREE.Mesh(mergeGeometries(parts), plantMat); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
   g.rotation.y = F.ry; scene.add(g); statics.push({ o: g, x: F.x, z: F.z });
-  { const p = farmPt(F, -2.95, .55); place(gWheelbarrow, p.x, p.z, F.ry + .6, 1.5); F.barrow = p; const q = farmPt(F, -.45, .5); place(gBucket, q.x, q.z, F.ry, 1.5); F.bucket = q; }
+  { const p = farmPt(F, -2.95, .55); place('prop.wheelbarrow', p.x, p.z, F.ry + .6, 1.5); F.barrow = p; const q = farmPt(F, -.45, .5); place('prop.bucket', q.x, q.z, F.ry, 1.5); F.bucket = q; }
   // Felder: Ackerboden mit Furchen, folgt dem Gelände
   FARM.fx.forEach((lx, i) => {
     const p = farmPt(F, lx, FARM.fz), sv = S.fields[fields.length], fy = heightAt(p.x, p.z);

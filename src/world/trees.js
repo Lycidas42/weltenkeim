@@ -3,14 +3,14 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { heightAt } from './terrain.js';
-import { gStump, parts, shadowify } from '../assets/models.js';
+import { model, parts, shadowify } from '../assets/models.js';
 import { COL, Swarm, TK, plantMat, treeKindAt } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 
 // Lichtung: Bäume auf dem Bauplatz verschwinden
 function clearAround(x, z, r) { for (const t of trees) if (!t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r) { if (t.reserved && t.reserved !== 'fox') t.reserved.tree = null; t.reserved = null; t.gone = true; } }
 const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
-const stumpSwarm = new Swarm(parts(gStump), 500);
+const stumpSwarm = new Swarm(parts(model('tree.stump')), 500);
 const trees = [];
 const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r);
 function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }

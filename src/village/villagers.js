@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { theme } from '../assets/theme.js';
 import { rnd } from '../core/util.js';
 import { S, cap, onSave } from '../core/state.js';
 import { scene } from '../core/render.js';
@@ -11,10 +12,7 @@ import { houses } from './houses.js';
 // Jeder Bewohner besteht aus instanzierten Einzelteilen (Beine, Rumpf, Arme, Kopf, Augen, Frisur, Bart).
 // Aussehen (Haut, Haar, Frisur, Kleidung, Größe) wird pro Platz deterministisch gewürfelt, bleibt also nach dem Neuladen gleich.
 const VCAP = 300, VS = 1.15;
-const SKINS = [0xf7d9bf, 0xefc6a0, 0xe0ac82, 0xc98f60, 0xa8724a, 0x845535, 0x5f3b22];
-const HAIRS = [0x1d1814, 0x3a2719, 0x5c3a20, 0x8b5a2b, 0xc89b55, 0xe6cb87, 0xa5422a, 0xb9b3a9];
-const ROBES = [0xc2553d, 0x3d7cc2, 0xd9a441, 0x6b9b4a, 0x8c5fb3, 0xe07a5f, 0x4aa3a0, 0xd8d0c0];
-const PANTS = [0x5b4636, 0x3e4a5c, 0x6a5a45, 0x4a3b30, 0x6b6156];
+const { skins: SKINS, hairs: HAIRS, robes: ROBES, pants: PANTS } = theme.palette.villagers;
 const HIP_Y = .1, SHO_Y = .245, HEAD_Y = .33;
 const vMesh = (geo, color, rough = .85) => {
   const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), VCAP);

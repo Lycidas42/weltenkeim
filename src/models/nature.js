@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { clamp, smooth, rnd } from '../core/util.js';
+import { clamp, rnd, smooth } from '../core/util.js';
 import { noise } from '../core/noise.js';
 import { isMobile, scene } from '../core/render.js';
 import { heightAt } from '../world/terrain.js';

@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { clamp, smooth, rnd } from '../core/util.js';
+import { clamp, rnd, smooth } from '../core/util.js';
 import { dummy, scene } from '../core/render.js';
 import { heightAt } from '../world/terrain.js';
 import { SPRAY_N, spray } from '../world/water.js';

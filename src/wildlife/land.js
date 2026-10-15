@@ -1,7 +1,7 @@
 // Wild an Land: Rehe und Hasen
 
 import * as THREE from 'three';
-import { smooth, rnd } from '../core/util.js';
+import { rnd, smooth } from '../core/util.js';
 import { scene } from '../core/render.js';
 import { HALF, heightAt } from '../world/terrain.js';
 import { fox } from '../creature/kinds.js';

@@ -3,11 +3,12 @@
 import * as THREE from 'three';
 import { S } from '../core/state.js';
 import { scene } from '../core/render.js';
-import { gHand } from '../assets/models.js';
+import { model, modelInfo } from '../assets/models.js';
 
 // Gotteshand (assets/models/hand/GodHand.glb, Quelle assets/source/GodHand.blend): Skinned-Mesh mit 18 Knochen.
 // Finger zeigen nach -Z, Handfläche nach unten, Daumen nach +X. Gebeugt wird um die lokale X-Achse der Knochen
 // (negativ = zur Handfläche), gespreizt um die lokale Z-Achse.
+const MAT = modelInfo('hand').materials || {};
 function makeHand(gltf) {
   const g = new THREE.Group(), model = gltf.scene, bones = {}, rest = {}, mats = {};
   model.rotation.x = .08; g.add(model); // Handfläche fast waagerecht
@@ -15,10 +16,11 @@ function makeHand(gltf) {
     if (o.isBone) { bones[o.name] = o; rest[o.name] = o.quaternion.clone(); }
     if (o.isMesh) {
       o.castShadow = true; o.frustumCulled = false;
-      for (const m of [].concat(o.material)) {
-        mats[m.name] = m; m.metalness = m.name === 'Trim' ? .35 : 0;
-        m.roughness = { Nails: .3, Trim: .35, Sleeve: .8, SleeveIn: 1 }[m.name] ?? .55;
-        if (m.name === 'Skin') { m.emissive = new THREE.Color(0x3a1606); m.emissiveIntensity = .25; } // warmer Schimmer, damit die Hand nicht blass wirkt
+      for (const m of [].concat(o.material)) { // Rolle des Materials (Haut, Nägel, Ärmel …) und Oberfläche laut Theme
+        const role = Object.keys(MAT).find(r => MAT[r].name === m.name), d = MAT[role] || {};
+        if (role) mats[role] = m;
+        m.metalness = d.metalness ?? 0; m.roughness = d.roughness ?? .55;
+        if (d.emissive) { m.emissive = new THREE.Color(d.emissive); m.emissiveIntensity = d.emissiveIntensity ?? 1; }
       }
     }
   });
@@ -53,7 +55,7 @@ function poseHand(h, target, dt, t, speed = 14) {
   setBone(h, 'Thumb1', (-40 * P.thumb - 3) * D); setBone(h, 'Thumb2', (-55 * P.thumb - 4) * D);
 }
 // Aussehen aus dem Spielstand: Haut, Nägel, Ärmel, Saum (Materialnamen aus GodHand.blend)
-function styleHand(h) { const st = S.handStyle, M = h.mats; if (M.Skin) M.Skin.color.set(st.skin); if (M.Nails) M.Nails.color.set(st.nails); if (M.Sleeve) M.Sleeve.color.set(st.sleeve); if (M.Trim) M.Trim.color.set(st.trim); }
-const hand = makeHand(gHand); scene.add(hand.g); styleHand(hand);
+function styleHand(h) { const st = S.handStyle, M = h.mats; for (const r of ['skin', 'nails', 'sleeve', 'trim']) if (M[r]) M[r].color.set(st[r]); }
+const hand = makeHand(model('hand')); scene.add(hand.g); styleHand(hand);
 
 export { HAND_POSES, hand, makeHand, poseHand, styleHand };

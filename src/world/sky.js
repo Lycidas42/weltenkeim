@@ -1,6 +1,7 @@
 // Tag und Nacht, Himmel, Sterne, Sonne und Mond, Wetter und Schnee
 
 import * as THREE from 'three';
+import { theme } from '../assets/theme.js';
 import { clamp, smooth } from '../core/util.js';
 import { S } from '../core/state.js';
 import { noise } from '../core/noise.js';
@@ -10,18 +11,7 @@ import { toast } from '../ui/feedback.js';
 // Spielzeit S.hour (0–24): tagsüber dauert eine Stunde 20 s, nachts nur 7 s, damit die Nacht nicht zu lang wird.
 const hourRate = h => (h >= 5.5 && h < 21.5 ? 1 / 20 : 1 / 7);
 // Stützstellen: Stunde, Himmel oben/Mitte/Horizont (= Nebel), Licht (Sonne bzw. Mond) und Stärke, Himmelslicht oben/Boden und Stärke, Nacht 0–1
-const DAY_KF = [
-  [0, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
-  [4.8, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
-  [5.7, '#1a2552', '#3b3f6e', '#8a6a7a', '#ff9f6a', .2, '#6a78a8', '#2a2430', .5, .75],
-  [6.5, '#4269a6', '#8fa9c8', '#f2b582', '#ffb27a', 1.1, '#bcd0e8', '#5a4a3a', .8, .2],
-  [7.8, '#5ea9d4', '#a9d4e4', '#dfeee2', '#fff0d4', 2.3, '#dff1ff', '#6a5a3a', 1.15, 0],
-  [17.4, '#5ea9d4', '#a9d4e4', '#e6efdc', '#ffeccc', 2.2, '#dff1ff', '#6a5a3a', 1.1, 0],
-  [18.9, '#5274ab', '#c6a39a', '#f7b07c', '#ff9a58', 1.3, '#d0c0d8', '#5a4436', .8, .2],
-  [20.1, '#1f2b5c', '#4a3f6e', '#9a5d6c', '#ff7a48', .25, '#6f76a8', '#2a2230', .6, .7],
-  [21.2, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
-  [24, '#050a1c', '#0c1631', '#1a2646', '#8fa6e6', .62, '#5a70b0', '#1b1924', .52, 1],
-].map(r => ({ h: r[0], top: new THREE.Color(r[1]), mid: new THREE.Color(r[2]), hor: new THREE.Color(r[3]), light: new THREE.Color(r[4]), li: r[5], hemiS: new THREE.Color(r[6]), hemiG: new THREE.Color(r[7]), hi: r[8], night: r[9] }));
+const DAY_KF = theme.palette.day.map(r => ({ h: r[0], top: new THREE.Color(r[1]), mid: new THREE.Color(r[2]), hor: new THREE.Color(r[3]), light: new THREE.Color(r[4]), li: r[5], hemiS: new THREE.Color(r[6]), hemiG: new THREE.Color(r[7]), hi: r[8], night: r[9] }));
 const sky = { top: new THREE.Color(), mid: new THREE.Color(), hor: new THREE.Color(), light: new THREE.Color(), hemiS: new THREE.Color(), hemiG: new THREE.Color(), li: 0, hi: 0, night: 0 };
 function sampleSky(h) {
   let k = 0; while (k < DAY_KF.length - 2 && DAY_KF[k + 1].h <= h) k++;
@@ -143,10 +133,9 @@ function snowify(m) {
   m.needsUpdate = true;
 }
 // Himmelsfarben je Wetter: strahlend blau, wenn klar; grau und trüb bei Bewölkung und Regen
-const SKY_CLEAR = { top: new THREE.Color('#2f86d4'), mid: new THREE.Color('#86c3ec'), hor: new THREE.Color('#d3eaf3') };
-const SKY_OV = { top: new THREE.Color('#87919b'), mid: new THREE.Color('#a3abb3'), hor: new THREE.Color('#bdc3c8') };
-const SKY_OVN = { top: new THREE.Color('#0c0e12'), mid: new THREE.Color('#14171c'), hor: new THREE.Color('#1d2128') };
-const SKY_N = { top: new THREE.Color('#000105'), mid: new THREE.Color('#03060f') };
+const skyColors = o => Object.fromEntries(Object.entries(o).map(([k, c]) => [k, new THREE.Color(c)]));
+const SKY_CLEAR = skyColors(theme.palette.sky.clear), SKY_OV = skyColors(theme.palette.sky.overcast);
+const SKY_OVN = skyColors(theme.palette.sky.overcastNight), SKY_N = skyColors(theme.palette.sky.night);
 const skyTmp = new THREE.Color();
 function applyWeatherSky() {
   const cv = weather.cover, day = 1 - sky.night, clear = smooth(.35, 0, cv), ov = smooth(.3, .95, cv);

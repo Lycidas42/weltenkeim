@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { S } from '../core/state.js';
 import { camera, isMobile, scene } from '../core/render.js';
 import { CREATURES, fox } from './kinds.js';
-import { gCreature, gSack, load, shadowify } from '../assets/models.js';
+import { loadModel, model, shadowify } from '../assets/models.js';
 import { TK } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H } from '../world/trees.js';
@@ -14,7 +14,7 @@ const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^W
 // fehlt eine Animation, wird eine vorhandene mit anderem Tempo genutzt
 const ANIM_FALLBACK = { idle2: ['idle', .7], eat: ['idle', .5], run: ['walk', 2.1], attack: ['walk', 2.8] };
 const foxPivot = new THREE.Group(); scene.add(foxPivot);
-const creatureCache = { [S.creature]: gCreature };
+const creatureCache = { [S.creature]: model('creature.' + S.creature) };
 let foxModel = null, foxMixer = null, foxActs = {};
 // Modell eines Tiers aufbereiten: skalieren, nach +Z ausrichten, Animationen (inkl. Posen) und ggf. Fell/Augen.
 // Liefert ein „Rig“ { model, mixer, acts, cur }; genutzt für die Welt und für das Porträt im Panel.
@@ -245,12 +245,12 @@ function foxAnim(name) {
 // einmalige Reaktion (Treffer, Freudensprung), danach übernimmt wieder der Zustand
 function foxOnce(name) { const a = foxActs[name]; if (!a) return; if (fox.cur === name) a.reset().play(); else foxAnim(name); fox.once = a.getClip().duration / a.timeScale; rigPlay(portrait.rig, name, true); }
 async function loadCreature(id) {
-  return creatureCache[id] || (creatureCache[id] = await load(`animals/${CREATURES[id].file}.glb`));
+  return creatureCache[id] || (creatureCache[id] = await loadModel('creature.' + id));
 }
 // Porträt im Charakter-Blatt: eigene kleine 3D-Ansicht mit einer zweiten Instanz des Tiers (beim Fuchs das
 // Fell-Modell), die jede Animation des Tiers in der Welt mitspielt. Eigener Renderer, die Weltkamera bleibt unberührt.
 const portrait = { hand: null, renderer: null, scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, .05, 60), pivot: new THREE.Group(), rig: null, loading: null, cache: {}, look: new THREE.Vector3(), dist: 4 };
-useCreature(S.creature, gCreature);
+useCreature(S.creature, model('creature.' + S.creature));
 const ACT_LABEL = { help: 'Helfen', play: 'Spielen', mischief: 'Unfug' };
 // Fürwörter nach dem gewählten Geschlecht der Kreatur (S.gender: 'w' oder 'm')
 const pron = () => S.gender === 'm' ? { er: 'er', ihn: 'ihn', ihm: 'ihm' } : { er: 'sie', ihn: 'sie', ihm: 'ihr' };
@@ -259,7 +259,7 @@ const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 // Der Tiergeist trägt einen Baum quer im Maul (wie einen Stock); hängt an der Kopfposition des Modells.
 const mouthTrees = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2), mouthV = new THREE.Vector3(), mouthF = new THREE.Vector3();
-const mouthSack = shadowify(gSack.scene.clone(true)); mouthSack.visible = false; scene.add(mouthSack);
+const mouthSack = shadowify(model('prop.sack').scene.clone(true)); mouthSack.visible = false; scene.add(mouthSack);
 function updateMouthTree() {
   mouthTrees.forEach(o => o.visible = false); mouthSack.visible = false;
   if (fox.carryGoods && foxModel) { // Sack mit Waren im Maul

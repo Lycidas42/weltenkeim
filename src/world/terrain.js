@@ -1,6 +1,7 @@
 // Gelände: Höhen, Bach, Farben, Gelände-Shader, Höhen- und Tiefenkarte, gespeicherte Formung
 
 import * as THREE from 'three';
+import { theme } from '../assets/theme.js';
 import { clamp, smooth } from '../core/util.js';
 import { S, onSave } from '../core/state.js';
 import { fbm, noise } from '../core/noise.js';
@@ -101,8 +102,7 @@ function heightAt(x, z) {
   return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + N] * (1 - u) + H[k + N + 1] * u) * v;
 }
 const surfaceAt = (x, z) => Math.max(heightAt(x, z), -0.12);
-const C = { deep: new THREE.Color(0xb7a06a), wet: new THREE.Color(0xc8ad74), sand: new THREE.Color(0xecd9a0), g1: new THREE.Color(0x82b047), g2: new THREE.Color(0x5a8d36),
-  dry: new THREE.Color(0xa6ad52), bare: new THREE.Color(0x8f7a54), rock: new THREE.Color(0x8e8476), snow: new THREE.Color(0xf2f1ea) };
+const C = Object.fromEntries(Object.entries(theme.palette.terrain).map(([k, c]) => [k, new THREE.Color(c)]));
 const tc = new THREE.Color(), tg = new THREE.Color();
 function terrainColor(h, jit, k = -1) {
   tg.copy(C.g1).lerp(C.g2, jit);

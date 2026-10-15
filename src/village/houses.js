@@ -7,14 +7,14 @@ import { S, onSave } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { GARDEN_R, HOUSE_R, heightAt, streamDist } from '../world/terrain.js';
 import { flattenAt } from '../world/sculpt.js';
-import { gHomeA, gHomeB, gMill, gScaff, gWell } from '../assets/models.js';
+import { findPart, modelInfo } from '../assets/models.js';
 import { COL2, paint, plantMat } from '../models/nature.js';
 import { LAGER, MILL_POS, SB, SHRINE_POS, WELL, onSacred, place, statics } from './layout.js';
 
-place(gWell, WELL.x, WELL.z, 0.4, 1.3);
+place('well', WELL.x, WELL.z, 0.4, 1.3);
 flattenAt(MILL_POS.x, MILL_POS.z, 1.8);
-const mill = place(gMill, MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_POS.z), 1.6); // Windmühle draußen am Feldrand
-let millFan = null; mill.o.traverse(o => { if (/fan/i.test(o.name)) millFan = o; });
+const mill = place('hut.miller', MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_POS.z), 1.6); // Windmühle draußen am Feldrand
+const millFan = findPart(mill.o, 'hut.miller', 'fan');
 
 const sites = [];
 // 20 Plätze im Abstand von 18° auf dem Hauskreis; Schreinweg und Lager bleiben frei. Gebaut wird von Süden (Kameraseite)
@@ -33,9 +33,9 @@ const winMask = (() => { const cv = document.createElement('canvas'); cv.width =
   const t = new THREE.CanvasTexture(cv); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false; return t; })();
 const houseMats = new Map();
 const houseMat = m => { if (!houseMats.has(m)) { const c = m.clone(); c.emissive = new THREE.Color(0xffa94d); c.emissiveMap = winMask; c.emissiveIntensity = 0; houseMats.set(m, c); } return houseMats.get(m); };
-// Tür (im Modell bei z = .32, Haus B etwas seitlich) in Weltkoordinaten, d = Abstand davor
+// Tür (Andockpunkt door des Modells im Theme) in Weltkoordinaten, d = Abstand davor
 function houseDoor(hs, d = .25, out = {}) {
-  const lx = (hs.b ? .14 : 0) * SB, lz = .32 * SB + d, ry = hs.o.rotation.y;
+  const door = modelInfo(hs.key).anchors.door, lx = door.x * SB, lz = door.z * SB + d, ry = hs.o.rotation.y;
   out.x = hs.x + lx * Math.cos(ry) + lz * Math.sin(ry); out.z = hs.z - lx * Math.sin(ry) + lz * Math.cos(ry); return out;
 }
 function freeSite() { return sites.find(s => !s.used && heightAt(s.x, s.z) > 0.25); }
@@ -57,7 +57,7 @@ const gardenGeo = (() => {
   return mergeGeometries(parts);
 })();
 function addHouse(site) {
-  site.used = true; const b = houses.length % 2, h = place(b ? gHomeB : gHomeA, site.x, site.z, site.ry, SB); h.b = b;
+  site.used = true; const b = houses.length % 2, h = place(b ? 'house.b' : 'house.a', site.x, site.z, site.ry, SB); h.b = b;
   h.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
   const back = GARDEN_R - HOUSE_R, gx = site.x - Math.sin(site.ry) * back, gz = site.z - Math.cos(site.ry) * back; // hinter dem Haus, nach außen
   if (heightAt(gx, gz) > .3 && !onSacred(gx, gz, .9) && Math.hypot(gx - SHRINE_POS.x, gz - SHRINE_POS.z) > 4) { const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
@@ -66,6 +66,6 @@ function addHouse(site) {
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
 S.houses = houses.length;
 const build = { construction: null };
-const scaff = place(gScaff, 0, 0, 0, 0.95); scaff.o.visible = false;
+const scaff = place('scaffold', 0, 0, 0, 0.95); scaff.o.visible = false;
 
 export { addHouse, build, freeSite, houseDoor, houseMat, houseMats, houses, mill, millFan, scaff, sites };

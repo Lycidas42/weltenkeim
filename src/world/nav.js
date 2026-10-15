@@ -4,6 +4,7 @@ import { clamp } from '../core/util.js';
 import { S } from '../core/state.js';
 import { HALF, SIZE, heightAt } from './terrain.js';
 import { CREATURES, fox } from '../creature/kinds.js';
+import { modelInfo } from '../assets/models.js';
 import { LAGER, MILL_POS, PLAZA, SB, SHRINE_POS, WELL } from '../village/layout.js';
 import { trees } from './trees.js';
 import { sacredProps } from '../village/shrine.js';
@@ -21,12 +22,11 @@ const navWater = new Uint8Array(NAV_SZ);
 const navCell = (x, z) => { const i = Math.floor((x + HALF) / NAV_C), j = Math.floor((z + HALF) / NAV_C); return i < 0 || j < 0 || i >= NAV_N || j >= NAV_N ? -1 : j * NAV_N + i; };
 const cellX = c => -HALF + (c % NAV_N + .5) * NAV_C, cellZ = c => -HALF + (Math.floor(c / NAV_N) + .5) * NAV_C;
 // Grundrisse im Modellraum: Mitte (cx, cz) und halbe Ausdehnung (hx, hz)
-const FOOT = { homeA: [0, -.04, .4, .43], homeB: [0, .01, .44, .55], sawmill: [0, .055, .69, .52], mill: [0, .015, .57, .4] };
 function buildingObstacles() {
   const rects = [], circles = [];
   const rect = (e, f) => { const k = e.o.scale.x, p = localPt(e, f[0], f[1]); rects.push({ x: p.x, z: p.z, ry: e.o.rotation.y, hx: f[2] * k, hz: f[3] * k }); };
-  for (const h of houses) { rect(h, h.b ? FOOT.homeB : FOOT.homeA); if (h.garden) rects.push({ x: h.garden.x, z: h.garden.z, ry: h.garden.ry, hx: .58, hz: .4 }); }
-  for (const h of huts) { rect(h, h.role === 'sawyer' ? FOOT.sawmill : h.role === 'miller' ? FOOT.mill : ['fisher', 'farmer', 'baker'].includes(h.role) ? FOOT.homeB : FOOT.homeA); if (h.oven) circles.push({ x: h.oven.x, z: h.oven.z, r: .36 }, { x: localPt(h, -.95 - .62 / SB, .05).x, z: localPt(h, -.95 - .62 / SB, .05).z, r: .28 }); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
+  for (const h of houses) { rect(h, modelInfo(h.key).foot); if (h.garden) rects.push({ x: h.garden.x, z: h.garden.z, ry: h.garden.ry, hx: .58, hz: .4 }); }
+  for (const h of huts) { rect(h, modelInfo(h.key).foot); if (h.oven) circles.push({ x: h.oven.x, z: h.oven.z, r: .36 }, { x: localPt(h, -.95 - .62 / SB, .05).x, z: localPt(h, -.95 - .62 / SB, .05).z, r: .28 }); if (h.pile) circles.push({ x: h.pile.x, z: h.pile.z, r: .38 }); }
   for (const F of farms) { // Felder und Weidezaun (die Weide selbst bleibt Gras)
     for (const f of F.fields) rects.push({ x: f.x, z: f.z, ry: f.ry, hx: FARM.fw / 2, hz: FARM.fd / 2 });
     const P = FARM.pen, fr = (lx, lz, hx, hz) => { const p = farmPt(F, lx, lz); rects.push({ x: p.x, z: p.z, ry: F.ry, hx, hz }); };
