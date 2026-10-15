@@ -16,12 +16,14 @@ import { villagers } from '../village/villagers.js';
 import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, updateMouthTree } from './creature.js';
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, hauling } from '../village/ai.js';
+import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
 
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
-function foxFinish(a) {
+// Tat vollbracht: a = Neigung (help/play/mischief), kind = Tätigkeit für Erfahrung und Gedächtnis (tree/haul/play/mischief)
+function foxFinish(a, kind) {
   fox.last = a; fox.lastT = clock.elapsedTime; foxIdle(5 + Math.random() * 4); fox.act = null;
-  fox.lastDesc = fox.desc || ACT_DESC[a]; fox.desc = null;
+  fox.lastDesc = fox.desc || ACT_DESC[a]; fox.desc = null; noteDone(kind, fox.lastDesc);
   toast(`${S.name} hat ${fox.lastDesc}. Lob oder Tadel?`, 4.5);
   $('btnFox').classList.add('pulse');
   emit('fox');
@@ -31,18 +33,28 @@ function foxChoose() {
   // ab und zu hinlegen und ausruhen
   if (foxActs.lie && Math.random() < .25) { // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
     const p = restSpot(); if (Math.hypot(p.x - fox.x, p.z - fox.z) > .15) { foxWalk(p.x, p.z, 'rest'); return; }
+    noteChoice('rest', 'rest', 'ausruhen', [{ key: 'rest', label: 'zwischendurch braucht es Ruhe', weight: .25 }]);
     fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); return;
   }
+  // Wahl nach den Neigungen; die Gründe kommen ins Gedächtnis (mind.js), damit der Spieler nachvollziehen kann, warum
   const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
   let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
-  if (a === 'help' && Math.random() < .55 && foxHaul()) { fox.act = 'help'; return; } // Waren von einer Hütte ins Lager tragen
+  const why = leanReasons(a);
+  if (a === 'help' && Math.random() < .55 && foxHaul()) { // Waren von einer Hütte ins Lager tragen
+    const H = fox.haul, hut = ROLES[H.hut.role].hut;
+    noteChoice('help', 'haul', H.supply ? `Nachschub zur ${hut} tragen` : `Waren der ${hut} ins Lager tragen`,
+      [...why, { key: 'goods', label: H.supply ? `die ${hut} braucht Nachschub` : `an der ${hut} warten Waren`, weight: 1 }]);
+    fox.act = 'help'; return;
+  }
   if (a !== 'play') {
     let best = null, bd = 1e9;
     for (const t of trees) { if (!t.alive || t.gone || t.reserved || t.g < .7) continue; const d = (t.x - fox.x) ** 2 + (t.z - fox.z) ** 2; if (d < bd) { bd = d; best = t; } }
-    if (!best) a = 'play'; else { fox.tree = best; best.reserved = 'fox'; const ang = Math.atan2(fox.x - best.x, fox.z - best.z); foxWalk(best.x + Math.sin(ang) * .9, best.z + Math.cos(ang) * .9, 'tree'); }
+    if (!best) { a = 'play'; why.push({ key: 'noTree', label: 'kein großer Baum frei, also lieber spielen', weight: 1 }); }
+    else { fox.tree = best; best.reserved = 'fox'; const ang = Math.atan2(fox.x - best.x, fox.z - best.z); foxWalk(best.x + Math.sin(ang) * .9, best.z + Math.cos(ang) * .9, 'tree'); }
   }
   fox.act = a;
-  if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); }
+  if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); noteChoice('play', 'play', 'mit dem Dorf spielen', why); }
+  else noteChoice(a, a === 'help' ? 'tree' : 'mischief', a === 'help' ? 'Holz fürs Dorf holen' : 'einen Baum umwerfen', why);
 }
 // Tragen: Hütte mit wartenden Waren suchen, bis zu 3 Stück auf einmal (die meisten zuerst), ins Lager bringen
 const FOX_CARRY = 3;
@@ -83,6 +95,7 @@ function playSpot() {
   return CENTER;
 }
 function updateFox(dt, t) {
+  updateMind();
   const C = CREATURES[fox.kind], spd = C.walk;
   // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
@@ -100,7 +113,7 @@ function updateFox(dt, t) {
       else if (fox.next === 'store') {
         // Baum ablegen: er liegt kurz vor dem Lager und wird zu Stämmen
         const C = CREATURES[fox.kind]; fallTree({ type: fox.carryType || 0, g: .55 * C.h / 1.45, x: fox.x + Math.sin(fox.h) * C.h * .25, z: fox.z + Math.cos(fox.h) * C.h * .25 }, fox.x + Math.cos(fox.h), fox.z - Math.sin(fox.h), 1.3, true);
-        addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help');
+        addLogs(4, fox.x, 1.2, fox.z); fox.carry = false; foxFinish('help', 'tree');
       }
       else if (fox.next === 'haulPick') { // Waren aufnehmen (so viele noch da sind)
         const H = fox.haul, g = {}; let n = 0;
@@ -115,13 +128,13 @@ function updateFox(dt, t) {
         const H = fox.haul, g = fox.carryGoods || {}, k = Object.keys(g)[0], n = k ? g[k] : 0;
         if (H && huts.includes(H.hut) && n) { if (H.hut.role === 'sawyer') H.hut.logs += n; else H.hut.inp += n; } else if (k) S[k] += n; // Werkstatt weg: zurück ins Lager
         floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h, fox.z, `${resText(k, n)} abgeladen`, 'h');
-        fox.carryGoods = null; fox.haul = null; fox.desc = `${resText(k, n)} zur ${H ? ROLES[H.hut.role].hut : 'Werkstatt'} getragen`; foxFinish('help');
+        fox.carryGoods = null; fox.haul = null; fox.desc = `${resText(k, n)} zur ${H ? ROLES[H.hut.role].hut : 'Werkstatt'} getragen`; foxFinish('help', 'haul');
       }
       else if (fox.next === 'haulStore') { // im Lager abladen
         const g = fox.carryGoods || {}, out = [];
         for (const k in g) { if (k === 'logs') S.logs += g[k]; else S[k] += g[k]; out.push(resText(k, g[k])); }
         floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h, fox.z, `+${out.join(', ')}`, 'h');
-        fox.carryGoods = null; fox.haul = null; fox.desc = `${out.join(', ')} ins Lager getragen`; foxFinish('help');
+        fox.carryGoods = null; fox.haul = null; fox.desc = `${out.join(', ')} ins Lager getragen`; foxFinish('help', 'haul');
       }
       else if (fox.next === 'rest') { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); }
@@ -137,7 +150,7 @@ function updateFox(dt, t) {
           fallTree(tr, fox.x, fox.z, 4.5);
           floatText(tr.x, surfaceAt(tr.x, tr.z) + 1.4, tr.z, 'Krach!', 'w');
           for (const v of villagers) { const dx = v.x - fox.x, dz = v.z - fox.z, d = Math.hypot(dx, dz); if (d < 4.5 && ['idle', 'walk', 'pray', 'chop', 'lunch', 'plant', 'beg'].includes(v.state)) { if (v.tree) { v.tree.reserved = null; v.tree = null; } v.state = 'flee'; v.timer = 2; v.tx = v.x + dx / (d || 1) * 3; v.tz = v.z + dz / (d || 1) * 3; } }
-          foxFinish('mischief');
+          foxFinish('mischief', 'mischief');
         }
       } else foxIdle(1);
     } break;
@@ -147,7 +160,7 @@ function updateFox(dt, t) {
       fox.playA += dt * 1.9; const pc = fox.pc || CENTER, px = pc.x + Math.cos(fox.playA) * 1.6, pz = pc.z + Math.sin(fox.playA) * 1.6;
       moveFree(fox, px, pz, C.run * 1.6 * dt, navF);
       if (Math.floor(fox.playT) !== Math.floor(fox.playT - dt)) addGlaube(1.5, fox.x, 1.4, fox.z);
-      if (fox.playT > 5) foxFinish('play');
+      if (fox.playT > 5) foxFinish('play', 'play');
     } break;
   }
   if (fox.hop > 0) fox.hop = Math.max(0, fox.hop - dt);
@@ -197,11 +210,17 @@ function reinforce(kind) {
     }
   });
   if (a && t - fox.lastT < 25) {
+    const from = share(a);
     S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
     const sum = S.w.help + S.w.play + S.w.mischief; for (const k in S.w) S.w[k] /= sum;
-    toast(kind === 'pet' ? `${S.name} lernt: mehr ${ACT_LABEL[a]}.` : `${S.name} lernt: weniger ${ACT_LABEL[a]}.`);
+    const to = share(a), pc = p => `${Math.round(p * 100)} %`;
+    noteLearn(kind, a, fox.lastDesc, from, to);
+    toast(`${kind === 'pet' ? 'Lob' : 'Tadel'}, weil ${S.name} ${fox.lastDesc} hat. ${S.name} lernt: ${kind === 'pet' ? 'mehr' : 'weniger'} ${ACT_LABEL[a]} (${pc(from)} → ${pc(to)}).`);
     fox.last = null; $('btnFox').classList.remove('pulse');
-  } else toast(kind === 'pet' ? `${S.name} schmiegt sich an deine Hand.` : `${S.name} duckt sich und weiß nicht, wofür.`);
+  } else {
+    noteLearn(kind, null, null, null, null);
+    toast(kind === 'pet' ? `${S.name} schmiegt sich an deine Hand.` : `${S.name} duckt sich und weiß nicht, wofür.`);
+  }
   emit('fox'); save();
 }
 

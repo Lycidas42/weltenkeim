@@ -46,6 +46,7 @@ import { renderVillagers } from './village/render.js';
 import { emotes, updateEmotes } from './village/emotes.js';
 import { updateVillage } from './village/economy.js';
 import { foxHaul, reinforce, updateFox } from './creature/ai.js';
+import { mind } from './creature/mind.js';
 import { forestAlert, updateForestAlert } from './village/forest-alert.js';
 import { castHaste, castRain, rain, tryMiracle, updateMiracleFx } from './hand/miracles.js';
 import { throwTree, treeAt, updateTrees, uprootTree } from './hand/grab.js';
@@ -126,7 +127,7 @@ window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
   // draw = null gar keins (viele kurze Schritte in Prüfungen, Software-WebGL braucht pro Bild Sekunden)
   step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw === false && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
-  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager, pointers, treeAt, foxUnder,
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager, pointers, treeAt, foxUnder, mind,
   // Nahrung: Versorgung je Bewohner (satt/hungrig), Dorf (abwechslungsreich), Vorrat und Wachstumszustand
   food: { state: food, start: { fresh: !loaded, bread: S.bread, fish: S.fish, veg: S.veg, meat: S.meat, milk: S.milk, eggs: S.eggs }, MEAL, FOOD_COL, portions, days, pickMeal, takePortions, eatLunch, growthState, workMul, prayMul, villagers: () => villagers.map(v => ({ food: v.food || null, meal: v.meal || null, ateDay: v.ateDay ?? null, work: workMul(v), pray: prayMul(v) })) } };
 requestAnimationFrame(frame);
