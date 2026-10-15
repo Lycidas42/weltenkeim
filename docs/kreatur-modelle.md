@@ -8,16 +8,16 @@ Branch `claude/zweibeiner-test` (alles zu neuen Gestalten bleibt dort, bis entsc
 | Gestalt | Datei | Herkunft | Stand |
 |---|---|---|---|
 | Fuchsmensch (`foxfolk`) | `assets/models/animals/Foxfolk.glb` | Körper selbst gebaut (`assets/source/build_tiermensch.py`), Skelett und Animationen Quaternius Universal Animation Library 1+2 (CC0) | ✅ im Test, 7.000 Dreiecke, 1,4 MB, 18 Animationen |
-| Mensch (Test) (`mage`) | `assets/models/animals/Mage.glb` | KayKit Adventurers „Mage“ (CC0), ohne Stab und Buch | ✅ im Test, 19 von 76 Animationen, 1 MB |
+| Bärenmensch (`bearfolk`) | `assets/models/animals/Bearfolk.glb` | wie Fuchsmensch, Art `bear` (runde Ohren, kurze Schnauze, Stummelschwanz, kräftiger) | ✅ im Test |
+| Magier, Barbar, Schurkin, Ritter (`mage`, `barbarian`, `rogue`, `knight`) | `assets/models/animals/<Name>.glb` | KayKit Adventurers (CC0), Waffen entfernt (`assets/source/prep_kaykit.py`) | ✅ im Test, je 19 von 76 Animationen, je 1 MB |
 
 Verworfen: Quaternius „Ultimate Monsters“ (zu grob), Fell-Fuchs in der Nahsicht (200.000 Dreiecke, `kreatur.md` 3.11 F 6),
 die freien „Universal Base Characters“ (nur muskulöse Superhelden).
 
 ## 2. Nächste Runde (vereinbart)
 
-1. Die drei übrigen KayKit-Figuren als Gestalten: Barbar (Bärenkopf-Mütze), Schurkin, Ritter. Gleiches Skelett und
-   dieselben 76 Animationen wie der Magier, Waffen entfernen (Schritte wie in 4.2).
-2. Ein zweiter eigener Tiermensch über `build_tiermensch.py` (neuer Eintrag in `ART`, z. B. Bär oder Hase).
+1. ✅ Die drei übrigen KayKit-Figuren (Barbar, Schurkin, Ritter).
+2. ✅ Zweiter eigener Tiermensch: Bär (`ART['bear']`; Parameter `belly`, `limbs`, `legs`, `head`, runde Ohren, Stummelschwanz).
 3. 100Avatars (Polygonal Mind): Eichhörnchen, Teddy, Katze, Hase. Lizenz an der Quelle prüfen (die Registry
    `github.com/ToxSam/open-source-avatars` nennt CC0, nicht bestätigt). Format VRM mit menschenähnlichem Skelett;
    Animationen der Universal Animation Library müssten übertragen werden.

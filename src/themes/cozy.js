@@ -11,10 +11,21 @@
 //   sacks    Mehlsäcke neben der Mühle: [x, z, Drehung] im Modellraum
 //   Kreaturen: hd = Fell-Modell (geplant für die Nahsicht), head = Kopfknochen, eyes = Augen am Kopfknochen ergänzen,
 //   rest = Liegepose (nur Quaternius-Skelett „AnimalArmature“), react = eigene Lob-/Tadel-Animationen (Fuchs),
-//   ws = Tempo der Laufanimation
+//   ws = Tempo der Laufanimation; Zweibeiner: body 'biped', face (Blickrichtung), hands (Handknochen fürs Tragen),
+//   tail (Knochen, die im Code schwingen), anims (Spielzustand → Animationsname, siehe docs/kreatur-modelle.md 4.3)
 //   Hand: materials = Rolle → Materialname im Modell und Oberfläche (Farben setzt der Spieler, S.handStyle)
 // palette: Farben für im Code gebaute Dinge (Gelände, Himmel, Bewohner)
 const HOME_A = [0, -.04, .4, .43], HOME_B = [0, .01, .44, .55];
+// Tiermenschen aus assets/source/build_tiermensch.py: Skelett der Universal Animation Library (Quaternius, CC0)
+const TIERMENSCH = { head: 'Head', body: 'biped', face: 0, ws: 1, hands: ['hand_l', 'hand_r'],
+  anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'PickUp_Table',
+    hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: { clip: 'LayToIdle', reverse: true }, lie: { clip: 'LayToIdle', hold: 0 }, standUp: 'LayToIdle',
+    harvest: 'Farm_Harvest', plant: 'Farm_PlantSeed', water: 'Farm_Watering', interact: 'Interact', throw: 'OverhandThrow' } };
+// KayKit Adventurers (Kay Lousberg, CC0): alle Figuren teilen Skelett und Animationen (assets/source/prep_kaykit.py)
+const KAYKIT = { head: 'head', body: 'biped', face: 0, ws: 1, hands: ['handslot.l', 'handslot.r'],
+  anims: { idle: 'Idle', idle2: 'Unarmed_Idle', walk: 'Walking_A', run: 'Running_A', attack: '1H_Melee_Attack_Chop', eat: 'PickUp',
+    hit: 'Hit_A', cast: 'Spellcast_Shoot', praise: 'Cheer', scold: 'Hit_B', lieDown: 'Lie_Down', lie: 'Lie_Idle', standUp: 'Lie_StandUp',
+    interact: 'Interact', throw: 'Throw' } };
 export default {
   id: 'cozy',
   label: 'Gemütlich',
@@ -55,15 +66,14 @@ export default {
     'creature.cat': { file: 'animals/Cat.glb', head: 'Bone003', ws: 1.2, eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },
     // Zweibeiner (kreatur.md 3.12): body 'biped', Blickrichtung +Z (face 0), Animationen nach Namen (anims), Hände zum Tragen.
     // Fuchsmensch: Körper selbst gebaut, Skelett und Bewegungen aus Quaternius Universal Animation Library 1+2 (CC0).
-    'creature.foxfolk': { file: 'animals/Foxfolk.glb', head: 'Head', body: 'biped', face: 0, ws: 1, hands: ['hand_l', 'hand_r'], tail: ['tail_01', 'tail_02', 'tail_03', 'tail_04'],
-      anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'PickUp_Table',
-        hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: { clip: 'LayToIdle', reverse: true }, lie: { clip: 'LayToIdle', hold: 0 }, standUp: 'LayToIdle',
-        harvest: 'Farm_Harvest', plant: 'Farm_PlantSeed', water: 'Farm_Watering', interact: 'Interact', throw: 'OverhandThrow' } },
-    // Mensch (Test): KayKit Adventurers „Mage“ ohne Stab und Buch (Kay Lousberg, CC0)
-    'creature.mage': { file: 'animals/Mage.glb', head: 'head', body: 'biped', face: 0, ws: 1, hands: ['handslot.l', 'handslot.r'],
-      anims: { idle: 'Idle', idle2: 'Unarmed_Idle', walk: 'Walking_A', run: 'Running_A', attack: '1H_Melee_Attack_Chop', eat: 'PickUp',
-        hit: 'Hit_A', cast: 'Spellcast_Shoot', praise: 'Cheer', scold: 'Hit_B', lieDown: 'Lie_Down', lie: 'Lie_Idle', standUp: 'Lie_StandUp',
-        interact: 'Interact', throw: 'Throw' } },
+    'creature.foxfolk': { ...TIERMENSCH, file: 'animals/Foxfolk.glb', tail: ['tail_01', 'tail_02', 'tail_03', 'tail_04'] },
+    // Bärenmensch: wie der Fuchsmensch aus build_tiermensch.py (Art 'bear'), kurzer Stummelschwanz
+    'creature.bearfolk': { ...TIERMENSCH, file: 'animals/Bearfolk.glb', tail: ['tail_01'] },
+    // Menschen: KayKit Adventurers ohne Waffen (Kay Lousberg, CC0)
+    'creature.mage': { file: 'animals/Mage.glb', ...KAYKIT },
+    'creature.barbarian': { file: 'animals/Barbarian.glb', ...KAYKIT },
+    'creature.rogue': { file: 'animals/Rogue.glb', ...KAYKIT },
+    'creature.knight': { file: 'animals/Knight.glb', ...KAYKIT },
   },
   palette: {
     // Tagesverlauf. Stützstellen: Stunde, Himmel oben/Mitte/Horizont (= Nebel), Licht (Sonne bzw. Mond) und Stärke,

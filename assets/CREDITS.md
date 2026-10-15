@@ -31,19 +31,19 @@ Katze (`Cat.glb`):
 
 ## Zweibeiner zum Ausprobieren (`models/animals/`, Test-Branch)
 
-Fuchsmensch (`Foxfolk.glb`):
+Fuchsmensch und Bärenmensch (`Foxfolk.glb`, `Bearfolk.glb`, Bauskript `../source/build_tiermensch.py`):
 
 - Körper für Weltenkeim selbst gebaut in Blender 5.2 (runde Grundformen, Voxel-Remesh, Vertexfarben, eigene Schwanzknochen).
 - Skelett und Animationen: Universal Animation Library 1 und 2 (Standard) von Quaternius, https://quaternius.com
 - Lizenz: Creative Commons Zero (CC0 1.0)
 - Quelle: https://quaternius.itch.io/universal-animation-library und https://quaternius.itch.io/universal-animation-library-2
 
-Mensch (`Mage.glb`):
+Menschen (`Mage.glb`, `Barbarian.glb`, `Rogue.glb`, `Knight.glb`, Aufbereitung `../source/prep_kaykit.py`):
 
-- KayKit Character Pack: Adventurers 1.0 („Mage“) von Kay Lousberg, https://www.kaylousberg.com
+- KayKit Character Pack: Adventurers 1.0 (Magier, Barbar, Schurkin, Ritter) von Kay Lousberg, https://www.kaylousberg.com
 - Lizenz: Creative Commons Zero (CC0 1.0)
 - Quelle: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0
-- Bearbeitung: Stab, Zauberstab und Bücher entfernt, 19 der 76 Animationen behalten.
+- Bearbeitung: Waffen, Schilde, Bücher und Krug entfernt, 19 der 76 Animationen behalten.
 
 ## Gotteshand (`models/hand/GodHand.glb`, Quelle `source/GodHand.blend`)
 
