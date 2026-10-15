@@ -16,6 +16,7 @@ import { fields, stock } from '../farm/farm.js';
 import { spawnVillager, villagers } from '../village/villagers.js';
 import { ACT_COL, ACT_LABEL, loadCreature, pron, useCreature } from '../creature/creature.js';
 import { XP, mind, share, why } from '../creature/mind.js';
+import { foxToShrine } from '../creature/ai.js';
 import { fish, wild } from '../wildlife/land.js';
 import { effJobs, reconcileJobs, roleCount } from '../village/jobs.js';
 import { GROW_DAYS, days, food, portions } from '../village/food.js';
@@ -203,7 +204,7 @@ const SHRINE = [
   { id: 'hand', title: () => `Hand stärken (Stufe ${S.hand + 1})`, desc: () => 'Formen wirkt 35 % weiter und kräftiger.', cost: handCost, buy: () => { S.hand++; } }
 ];
 function renderShrine() {
-  $('sheetShrine').dataset.grow = food.growth;
+  $('sheetShrine').dataset.grow = food.growth; renderForms();
   $('shrineItems').innerHTML = SHRINE.map(it => { const c = it.cost(), ok = S.glaube >= c && (!it.ok || it.ok());
     return `<div class="item"><div><h3>${it.title()}</h3><p>${it.desc()}</p></div><button class="buy" data-buy="${it.id}" ${ok ? '' : 'disabled'}>${fmt(c)} ✦</button></div>`; }).join('');
   $('shrineItems').querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => { const it = SHRINE.find(x => x.id === b.dataset.buy), c = it.cost();
@@ -234,7 +235,7 @@ function renderFox() {
     : `<li class="empty">Seit dem Laden noch keine Entscheidung.</li>`);
   const w = why(); $('foxWhy').hidden = !w; if (w) $('foxWhy').textContent = `Warum: ${w}`;
   $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
-  renderForms();
+  $('foxForm').textContent = `Gestalt: ${CREATURES[fox.kind].label} – wechseln am Schrein`;
 }
 // Buttons nur einmal anlegen und danach aktualisieren: renderFox läuft alle 0,25 s,
 // ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
@@ -245,6 +246,7 @@ $('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button da
 function foxDoing() {
   switch (fox.state) {
     case 'walk':
+      if (fox.next === 'shrine' && fox.morph) return `läuft zum Schrein, um die Gestalt ${CREATURES[fox.morph].label} anzunehmen`;
       if (fox.next === 'store') return 'trägt einen Baum im Maul zum Lager';
       if (fox.next === 'haulPick' && fox.haul) return `läuft zur ${ROLES[fox.haul.hut.role].hut}, um Waren ins Lager zu tragen`;
       if (fox.next === 'haulLager' && fox.haul) return `läuft zum Lager, um Nachschub für die ${ROLES[fox.haul.hut.role].hut} zu holen`;
@@ -255,7 +257,7 @@ function foxDoing() {
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
     case 'play': return 'tollt über den Dorfplatz';
     case 'rest': return 'hat sich hingelegt und döst';
-    case 'cast': return 'wirkt mit dir ein Wunder';
+    case 'cast': return mind.log[0] && mind.log[0].kind === 'shrine' ? 'nimmt im Licht des Schreins die neue Gestalt an' : 'wirkt mit dir ein Wunder';
     case 'pickup': return 'hebt den gefällten Baum auf';
     case 'haulUp': return 'nimmt die Waren ins Maul';
     default: return fox.idleA === 'eat' ? 'schnuppert am Boden' : 'schaut sich um';
@@ -275,11 +277,17 @@ $('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim
 $('foxName').addEventListener('keydown', e => { if (e.key === 'Enter') $('foxName').blur(); });
 function renderForms() {
   for (const b of $('foxForms').children) {
-    const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : formLabel(id);
-    b.setAttribute('aria-pressed', id === fox.kind); b.disabled = !!creatureLoading;
+    const id = b.dataset.form, label = creatureLoading === id ? 'Lädt …' : fox.morph === id ? 'Kommt …' : formLabel(id);
+    b.setAttribute('aria-pressed', id === fox.kind); b.disabled = !!creatureLoading || !!fox.morph;
     if (b.textContent !== label) b.textContent = label;
   }
 }
-$('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
+// Gestalt am Schrein wählen: Das Modell lädt schon, während der Tiergeist zum Schrein läuft; dort verwandelt er sich
+$('foxForms').addEventListener('click', e => {
+  const b = e.target.closest('[data-form]'), id = b && b.dataset.form; if (!id || id === fox.kind || fox.morph || creatureLoading) return;
+  loadCreature(id).catch(() => {}); foxToShrine(id); closeSheets();
+  toast(`${S.name} kommt zum Schrein, um die Gestalt ${CREATURES[id].label} anzunehmen.`, 3);
+});
+on('foxTransform', id => setCreature(id));
 
 export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

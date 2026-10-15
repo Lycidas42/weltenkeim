@@ -234,8 +234,8 @@ Ohne Porträt, als Bogen zum Nachschlagen, von oben nach unten:
    Warum: aus einer Laune heraus, Unfug 20 %“.
 
 - Streicheln, Klaps und Folgen verschwinden aus dem Bogen (Erziehen in der Welt, B).
-- Die Wahl der Gestalt bleibt vorerst im Bogen. 💡 Später als Ritual am Schrein: Die Kreatur geht dorthin, verwandelt
-  sich im Licht und kommt zurück.
+- Die Wahl der Gestalt steht nicht im Bogen, sondern im Schrein-Panel: Die Kreatur läuft zum Schrein und nimmt dort im
+  Licht die neue Gestalt an (`foxToShrine`). Der Bogen nennt nur die aktuelle Gestalt.
 
 #### E. Spielstand
 

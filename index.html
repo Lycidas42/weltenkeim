@@ -386,11 +386,15 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <header><h2>Schrein</h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <p class="sub">Glaube fließt aus Gebeten am Schrein. Investiere ihn in dein Dorf und deine Macht.</p>
     <div class="items" id="shrineItems"></div>
+    <p class="formsLbl">Gestalt des Tiergeists</p>
+    <div class="forms" id="foxForms" role="group" aria-label="Gestalt des Tiergeists"></div>
+    <p class="formsHint">Der Tiergeist kommt zum Schrein und nimmt dort die neue Gestalt an. ★ Bisher hat nur der Fuchs eigene Reaktionen auf Lob und Tadel.</p>
   </section>
 
   <section class="sheet" id="sheetFox" hidden aria-label="Fenja">
     <header><h2><input class="title-in" id="foxName" maxlength="16" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Name des Tiergeists"></h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <div class="gender" id="foxGender" role="radiogroup" aria-label="Geschlecht"><button role="radio" data-g="w" aria-checked="true">♀ weiblich</button><button role="radio" data-g="m" aria-checked="false">♂ männlich</button></div>
+    <p class="why" id="foxForm"></p>
     <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
     <p class="why" id="foxWhy" hidden></p>
     <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button></div>
@@ -402,9 +406,6 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <ol class="chron" id="foxLearn"></ol>
     <p class="formsLbl">Zuletzt entschieden</p>
     <ol class="chron" id="foxLog"></ol>
-    <p class="formsLbl">Gestalt</p>
-    <div class="forms" id="foxForms" role="group" aria-label="Gestalt"></div>
-    <p class="formsHint">★ Bisher hat nur der Fuchs eigene Reaktionen auf Lob und Tadel. Streicheln und Klaps wirken bei allen Gestalten.</p>
   </section>
 
   <section class="sheet" id="sheetInfo" hidden aria-label="Info">

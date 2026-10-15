@@ -54,6 +54,7 @@ const THOUGHT = {
   play: [ACT_COL.play, '<circle cx="12" cy="12" r="8"/><path d="M4.6 9.6c4.9 2 9.9 2 14.8 0M4.6 14.4c4.9-2 9.9-2 14.8 0"/>'],
   mischief: [ACT_COL.mischief, `<g transform="rotate(28 12 21)">${TREE_ICON}</g>`],
   rest: ['#7d9cb3', '<path d="M5 8h6l-6 7h6M14 5h5l-5 5h5"/>'],
+  shrine: ['#e0a92e', '<path d="M12 3l2.2 5.6 5.8.9-4.5 3.8 1.4 5.9L12 16l-4.9 3.2 1.4-5.9L4 9.5l5.8-.9z"/>'],
 };
 const THOUGHT_T = 4; let thoughtKey = '';
 // Kreismenü und Einblendung mitführen; die Einblendung zeigt Name, Tätigkeit und Neigungen,

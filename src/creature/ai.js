@@ -7,7 +7,7 @@ import { clock, scene } from '../core/render.js';
 import { addGlaube, addLogs, floatText, toast } from '../ui/feedback.js';
 import { surfaceAt } from '../world/terrain.js';
 import { CREATURES, fox } from './kinds.js';
-import { CENTER, LAGER } from '../village/layout.js';
+import { CENTER, LAGER, SHRINE_POS, shrinePt } from '../village/layout.js';
 import { FALL_T, chopTree, fallTree, trees } from '../world/trees.js';
 import { huts, lager, lagerDrop, localPt } from '../village/huts.js';
 import { hutWork } from '../village/build.js';
@@ -136,6 +136,10 @@ function updateFox(dt, t) {
         floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h, fox.z, `+${out.join(', ')}`, 'h');
         fox.carryGoods = null; fox.haul = null; fox.desc = `${out.join(', ')} ins Lager getragen`; foxFinish('help', 'haul');
       }
+      else if (fox.next === 'shrine') { // am Schrein angekommen: im Licht die neue Gestalt annehmen
+        fox.h = Math.atan2(SHRINE_POS.x - fox.x, SHRINE_POS.z - fox.z); glowT = GLOW_T; fox.state = 'cast'; fox.timer = GLOW_T; if (foxActs.cast) foxOnce('cast'); else fox.hop = .5;
+        const id = fox.morph; fox.morph = null; noteDone('shrine', `am Schrein die Gestalt ${CREATURES[id].label} angenommen`); emit('foxTransform', id);
+      }
       else if (fox.next === 'rest') { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); }
       else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); }
     } break;
@@ -185,7 +189,7 @@ const foxGlow = new THREE.PointLight(0xffd27a, 0, 9, 1.6); foxGlow.position.y = 
 const foxRing = new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false }));
 scene.add(foxRing);
 function foxCast(x, z) {
-  if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && ['store', 'haulStore', 'haulDeliver'].includes(fox.next))) return;
+  if (!['idle', 'rest', 'walk'].includes(fox.state) || (fox.state === 'walk' && ['store', 'haulStore', 'haulDeliver', 'shrine'].includes(fox.next))) return;
   if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
   fox.h = Math.atan2(x - fox.x, z - fox.z); glowT = GLOW_T;
   if (foxActs.cast) { fox.state = 'cast'; fox.timer = .1; foxOnce('cast'); } // Dauer regelt foxOnce else { fox.hop = .5; foxIdle(1.5); }
@@ -194,7 +198,7 @@ function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
   if (handAnim.kind) return; // eine Geste nach der anderen
   // ein laufendes oder stehendes Tier hält für die Geste inne (außer es trägt gerade Holz)
-  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) {
+  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store' && fox.next !== 'shrine')) {
     if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
     foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
   }
@@ -227,4 +231,15 @@ function reinforce(kind) {
   emit('fox'); save();
 }
 
-export { foxCast, foxHaul, foxIdle, reinforce, updateFox };
+// Neue Gestalt, am Schrein gewählt (kreatur.md 3.11 D): Was sie gerade tut, bricht sie ab, läuft zum Schrein und
+// verwandelt sich dort im Licht (die Oberfläche lädt das Modell, Ereignis 'foxTransform')
+function foxToShrine(id) {
+  if (fox.tree) { fox.tree.reserved = null; fox.tree = null; }
+  if (fox.carry) { fox.carry = false; addLogs(4, fox.x, 1.2, fox.z); } // getragener Baum: das Holz landet trotzdem im Lager
+  if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k];
+  fox.haul = null; fox.carryGoods = null; fox.act = null; fox.once = 0; fox.morph = id;
+  const p = shrinePt(0, 3.4); foxWalk(p.x, p.z, 'shrine');
+  noteChoice('shrine', 'shrine', `am Schrein die Gestalt ${CREATURES[id].label} annehmen`, [{ key: 'player', label: 'du hast es am Schrein so gewählt', weight: 1 }]);
+}
+
+export { foxCast, foxHaul, foxToShrine, foxIdle, reinforce, updateFox };
