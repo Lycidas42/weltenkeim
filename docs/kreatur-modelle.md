@@ -96,7 +96,23 @@ Spuren behalten, ausgewählt exportieren (`export_animation_mode='NLA_TRACKS'`).
 5. Prüfen: `__wk.setCreature('<id>')`, Zustände durchlaufen lassen (`__wk.step`), Tragen, Liegen, Lob/Tadel;
    `node dev/check.mjs kreatur zielen`.
 
-## 5. Offene Punkte (Stand Ende 16.10.)
+## 5. Nächster Schwerpunkt: Lebendigkeit, Mimik, Fell (Wunsch 16.10.)
+
+Ziel: Der Spieler soll sich mit dem Tier verbinden und identifizieren; heute wirkt der Fuchsmensch noch flach und steif.
+
+1. **Kopf und Blick** (im Code, über den Animationen): Kopf und Nacken drehen sich zu Hand, Kamera, Bewohnern oder dem
+   Arbeitsziel, die Augen (Pupillen) folgen, regelmäßiges Blinzeln.
+2. **Ohren** mit eigenen Knochen: aufstellen, anlegen, zucken (neugierig, ängstlich, beleidigt).
+3. **Maul**: Kieferknochen (öffnen/schließen: Gähnen, Bellen, Fressen, zu Geräuschen); Formziele (Shape Keys) für Lächeln,
+   Schmollen, Zähnezeigen; Platz für ein angedeutetes Gebiss.
+4. **Augenlider und Brauen** als eigene Formen statt flach gedrückter Augen: Freude, Ärger, Trauer, Müdigkeit.
+5. **Gefühle verknüpfen** mit Lob, Tadel, Hunger, Müdigkeit, Laune (und dem „Warum“ aus `mind.js`).
+6. **Geräusche**: kurze Fuchslaute (Fiepen, Keckern, Bellen), freie Lizenz (CC0), synchron zum Maul.
+7. **Fell in der Nahsicht**: Schalen-Fell wie beim alten Fell-Fuchs (`addFur`, Maske `_FUR`), aber nur 4–6 Schalen
+   (etwa 30.000–40.000 Dreiecke) und nur zugeschaltet, wenn die Kamera nah ist; Fellmaske: buschig an Schwanz,
+   Wangen, Brust, kurz an Schnauze und Pfoten. Auf dem Handy messen.
+
+## 6. Offene Punkte (Stand Ende 16.10.)
 
 Vereinbart: **vorerst nur am Fuchsmenschen arbeiten**, bis er richtig gut ist; erst dann auf andere Arten (Bär, Löwe …)
 übertragen.
