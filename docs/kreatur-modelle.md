@@ -32,6 +32,15 @@ Bei gleichem Skelett ist eine neue Animation nur ein weiterer Eintrag beim Expor
 Gestalten als Statisten dazu (`src/creature/parade.js`, `S.testParade`). Sie wandern, stehen, machen Gesten, arbeiten
 aber nicht. 11 Statisten: rund 4 s Laden, etwa 2 ms Rechenzeit pro Bild am Rechner.
 
+**Fuchsmensch, Stand 16.10.:** Gesicht nach Vorlagen (dreieckig mit hellem Wangenfell, breiter Schnauzenansatz, längere
+Schnauze mit Unterkiefer, bernsteinfarbene Augen mit Pupille flach im Kopf, größere Ohren, helle Kehle); Beine getrennt
+(Bauch endet höher, schmales Becken); eigene Bewegungen per Pose im Bauskript (`posen()`): `Curl_Down`/`Curl_Idle`
+(eingerollt auf der Seite schlafen, Augen zu), `Lift_Ground` (bücken, Baum mit beiden Händen greifen, aufrichten),
+`Hold_Idle`. Im Spiel wechselt der gefällte Baum beim Greifen in die Hände (`LIFT_GRAB` in `creature/ai.js`).
+
+**Ideen für weitere Arten:** Löwenmensch (große, dunklere goldbraune Mähne als Ring um Kopf und Hals, kurze breite
+Schnauze mit breiter Nase, kleine runde Ohren, Quaste am Schwanzende). Erst nachdem der Fuchsmensch richtig gut ist.
+
 ## 3. Rohdaten und Werkzeuge
 
 - **Rohdaten** liegen nur lokal in `dev/assets-raw/` (in `.gitignore`): die Zips der Universal Animation Library 1+2

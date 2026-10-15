@@ -23,7 +23,8 @@ const FALL_T = .7;
 function fallTree(tr, fromX, fromZ, life, lying = false) {
   if (fallen.length >= 12) { const f = fallen.shift(); scene.remove(f.o); }
   const o = shadowify(TK[tr.type || 0].scene.clone(true)); scene.add(o);
-  fallen.push({ o, t: lying ? FALL_T : 0, dir: Math.atan2(tr.x - fromX, tr.z - fromZ), x: tr.x, z: tr.z, s: ST * (tr.g ?? 1), life });
+  const f = { o, t: lying ? FALL_T : 0, dir: Math.atan2(tr.x - fromX, tr.z - fromZ), x: tr.x, z: tr.z, s: ST * (tr.g ?? 1), life };
+  fallen.push(f); return f; // life = 0 setzen entfernt ihn sofort (z. B. wenn ihn jemand aufhebt)
 }
 const fallQ = new THREE.Quaternion(), fallE = new THREE.Euler();
 function updateFallen(dt) {

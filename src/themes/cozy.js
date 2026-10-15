@@ -18,8 +18,8 @@
 const HOME_A = [0, -.04, .4, .43], HOME_B = [0, .01, .44, .55];
 // Tiermenschen aus assets/source/build_tiermensch.py: Skelett der Universal Animation Library (Quaternius, CC0)
 const TIERMENSCH = { head: 'Head', body: 'biped', face: 0, ws: 1, hands: ['hand_l', 'hand_r'],
-  anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'PickUp_Table',
-    hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: { clip: 'LayToIdle', reverse: true }, lie: { clip: 'LayToIdle', hold: 0 }, standUp: 'LayToIdle',
+  anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'Lift_Ground', hold: 'Hold_Idle',
+    hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: 'Curl_Down', lie: 'Curl_Idle', standUp: { clip: 'Curl_Down', reverse: true },
     harvest: 'Farm_Harvest', plant: 'Farm_PlantSeed', water: 'Farm_Watering', interact: 'Interact', throw: 'OverhandThrow' } };
 // KayKit Adventurers (Kay Lousberg, CC0): alle Figuren teilen Skelett und Animationen (assets/source/prep_kaykit.py)
 const KAYKIT = { head: 'head', body: 'biped', face: 0, ws: 1, hands: ['handslot.l', 'handslot.r'],

@@ -102,6 +102,12 @@ function swayTail(t, moving) {
   const f = moving ? 7 : 2.2, a = moving ? .22 : .12;
   T.forEach((b, i) => { const r = b.userData.rest; if (!r) return; b.quaternion.copy(r.q).multiply(swayQ.setFromAxisAngle(swayAx, Math.sin(t * f - i * .7) * a)); });
 }
+// Augen schließen (Dösen): Augenteile (Knoten „Eye…“, Zweibeiner) senkrecht flach drücken – dunkler Lidstrich
+function eyesClosed(closed) {
+  const m = foxModel && foxModel.userData; if (!m) return;
+  if (!m.eyeParts) { m.eyeParts = []; foxModel.traverse(o => { if (o.isMesh && /^Eye/.test(o.name)) m.eyeParts.push({ o, y: o.scale.y }); }); }
+  for (const e of m.eyeParts) e.o.scale.y = closed ? e.y * .12 : e.y;
+}
 function useCreature(id, gltf) {
   if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
   const rig = buildRig(id, gltf);
@@ -323,4 +329,4 @@ function updateMouthTree() {
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, swayTail, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };
+export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, eyesClosed, swayTail, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };

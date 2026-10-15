@@ -13,11 +13,12 @@ import { huts, lager, lagerDrop, localPt } from '../village/huts.js';
 import { hutWork } from '../village/build.js';
 import { blockedAt, buildNav, followPath, moveFree, navF, navReady, navV, setGoal } from '../world/nav.js';
 import { villagers } from '../village/villagers.js';
-import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, swayTail, updateMouthTree } from './creature.js';
+import { ACT_DESC, ACT_LABEL, eyesClosed, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, swayTail, updateMouthTree } from './creature.js';
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, hauling } from '../village/ai.js';
 import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
 
+const LIFT_GRAB = .75; // Sekunden ab Beginn des Aufhebens, bis die Hände den Baum fassen (Bild 18 von Lift_Ground)
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
 // Tat vollbracht: a = Neigung (help/play/mischief), kind = Tätigkeit für Erfahrung und Gedächtnis (tree/haul/play/mischief)
@@ -107,7 +108,18 @@ function updateFox(dt, t) {
     case 'rest': anim('lie'); fox.timer -= dt; if (fox.timer <= 0) { foxOnce('standUp'); foxIdle(.4); } break;
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'haulUp': anim(fox.timer > .4 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { if (fox.haul && fox.haul.supply) { const p = hutWork(fox.haul.hut); foxWalk(p.x, p.z, 'haulDeliver'); } else { const p = localPt(lager, .2, 1.9); foxWalk(p.x, p.z, 'haulStore'); } } break;
-    case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); } break;
+    case 'pickup': {
+      // Zweibeiner bücken sich zum gefällten Baum, packen ihn mit beiden Händen und richten sich mit ihm auf:
+      // der liegende Baum verschwindet in dem Moment, in dem die Hände ihn fassen (LIFT_GRAB), und hängt dann in den Händen
+      const lift = C.body === 'biped' && foxActs.eat ? foxActs.eat.getClip().duration : 0;
+      if (lift) {
+        if (!fox.lifting && fox.timer > lift) anim('idle'); // schaut zu, wie der Baum fällt
+        if (!fox.lifting && fox.timer <= lift) { fox.lifting = true; foxAnim('idle'); foxActs.eat.reset(); foxAnim('eat'); }
+        if (fox.lifting && !fox.carry && fox.timer <= lift - LIFT_GRAB) { fox.carry = true; if (fox.fallen) fox.fallen.life = 0; }
+      } else anim(fox.timer < .85 ? 'eat' : 'idle');
+      fox.timer -= dt;
+      if (fox.timer <= 0) { fox.carry = true; fox.lifting = false; fox.fallen = null; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); }
+    } break;
     case 'walk': anim((fox.carry || fox.carryGoods) && foxActs.carry ? 'carry' : 'walk'); if (followPath(fox, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') {
@@ -149,7 +161,8 @@ function updateFox(dt, t) {
         chopTree(tr);
         if (fox.act === 'help') {
           // Baum kippt um, dann senkt der Tiergeist den Kopf und hebt ihn auf
-          fallTree(tr, fox.x, fox.z, FALL_T + .85); fox.carryType = tr.type; fox.state = 'pickup'; fox.timer = FALL_T + .85;
+          const lift = C.body === 'biped' && foxActs.eat ? foxActs.eat.getClip().duration : .85;
+          fox.fallen = fallTree(tr, fox.x, fox.z, FALL_T + lift + .5); fox.carryType = tr.type; fox.state = 'pickup'; fox.timer = FALL_T + lift; fox.lifting = false;
         } else {
           fallTree(tr, fox.x, fox.z, 4.5);
           floatText(tr.x, surfaceAt(tr.x, tr.z) + 1.4, tr.z, 'Krach!', 'w');
@@ -180,7 +193,7 @@ function updateFox(dt, t) {
   const dvh = Math.atan2(Math.sin(fox.h - fox.vh), Math.cos(fox.h - fox.vh));
   fox.vh += Math.sign(dvh) * Math.min(Math.abs(dvh) * (1 - Math.exp(-dt * 7)), dt * 4.5);
   foxPivot.rotation.y = fox.vh;
-  foxMixer.update(dt); swayTail(t, fox.state === 'walk' || fox.state === 'play');
+  foxMixer.update(dt); swayTail(t, fox.state === 'walk' || fox.state === 'play'); eyesClosed(fox.state === 'rest' && fox.cur === 'lie');
   updateMouthTree();
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)

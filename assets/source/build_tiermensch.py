@@ -23,7 +23,7 @@ MANNEQUIN = os.path.join(RAW, 'Universal_Animation_Library_2_Standard_', 'Univer
 # Arten: Farben (sRGB-Hex) und Formen. light = Bauch/Schnauze/Schwanzspitze, dark = Pfoten/Ohrspitzen/Nase.
 ART = {
     'fox': {'file': 'Foxfolk.glb', 'fur': 'c96a33', 'light': 'f6ecdc', 'dark': '3d2c25',
-            'snout': (0.085, 0.23), 'ears': {'r': 0.075, 'h': 0.20, 'spread': 0.06}, 'tail': 'bushy'},
+            'snout': (0.078, 0.30), 'ears': {'r': 0.088, 'h': 0.23, 'spread': 0.07}, 'tail': 'bushy', 'ruff': True, 'iris': 'c98a2a'},
     'bear': {'file': 'Bearfolk.glb', 'fur': '6a4530', 'light': 'c9a27a', 'dark': '2e2019', 'belly': 1.25, 'limbs': 1.4, 'legs': 1.12, 'head': 1.18,
              'snout': (0.10, 0.12), 'ears': {'round': 0.065}, 'tail': 'stub'},
     # weitere Arten: Hase (lange Ohren), Waschbär (Maske) …
@@ -34,7 +34,8 @@ TAILS = {'bushy': [(0, 0.17, 0.98, .07), (0, 0.27, 0.90, .10), (0, 0.38, 0.86, .
 # Animationen im GLB (Namen wie in der Bibliothek); Zuordnung zu den Spielzuständen steht im Theme (anims)
 ANIMS = ['Idle_Loop', 'Idle_FoldArms_Loop', 'Walk_Loop', 'Jog_Fwd_Loop', 'Walk_Carry_Loop', 'TreeChopping_Loop', 'PickUp_Table',
          'Hit_Chest', 'Spell_Simple_Shoot', 'Yes', 'Idle_No_Loop', 'LayToIdle',
-         'Farm_Harvest', 'Farm_PlantSeed', 'Farm_Watering', 'Interact', 'OverhandThrow']
+         'Farm_Harvest', 'Farm_PlantSeed', 'Farm_Watering', 'Interact', 'OverhandThrow',
+         'Curl_Down', 'Curl_Idle', 'Lift_Ground', 'Hold_Idle']  # die letzten vier baut das Skript selbst (posen())
 TRIS = 7000
 
 def srgb(h):
@@ -43,6 +44,60 @@ def srgb(h):
 
 def smooth(a, b, x):
     t = max(0.0, min(1.0, (x - a) / (b - a))); return t * t * (3 - 2 * t)
+
+# Eigene Bewegungen, als Posen auf dem UAL-Skelett gebaut (Drehungen in Grad um die Achsen des Skeletts, aufrecht,
+# Blick −Y; Kinder werden vor den Eltern gedreht, die Eltern nehmen sie mit): Einrollen zum Schlafen wie ein Fuchs,
+# Aufheben vom Boden mit beiden Händen und Halten der Last vor dem Bauch.
+CURL = {'spine_01': [('x', 18)], 'spine_02': [('x', 18)], 'spine_03': [('x', 14)], 'neck_01': [('x', 10)], 'Head': [('x', 12)],
+        'thigh_l': [('x', -105)], 'thigh_r': [('x', -105)], 'calf_l': [('x', 135)], 'calf_r': [('x', 135)],
+        'upperarm_l': [('x', -30)], 'upperarm_r': [('x', -30)], 'lowerarm_l': [('x', -50)], 'lowerarm_r': [('x', -50)],
+        'tail_01': [('x', 30), ('z', 30)], 'tail_02': [('z', 55)], 'tail_03': [('z', 60)], 'tail_04': [('z', 55)]}
+BEND = {'spine_01': [('x', 34)], 'spine_02': [('x', 28)], 'spine_03': [('x', 14)], 'neck_01': [('x', -10)], 'Head': [('x', -14)],
+        'thigh_l': [('x', -72)], 'thigh_r': [('x', -72)], 'calf_l': [('x', 112)], 'calf_r': [('x', 112)], 'foot_l': [('x', -40)], 'foot_r': [('x', -40)],
+        'upperarm_l': [('x', -78), ('y', -14)], 'upperarm_r': [('x', -78), ('y', 14)], 'lowerarm_l': [('x', -8)], 'lowerarm_r': [('x', -8)]}
+HOLD = {'upperarm_l': [('x', -28), ('y', -8)], 'upperarm_r': [('x', -28), ('y', 8)], 'lowerarm_l': [('x', -48)], 'lowerarm_r': [('x', -48)]}
+
+def posen(arm, body):
+    import math
+    from mathutils import Matrix
+    ad = arm.animation_data; AX = {'x': Vector((1, 0, 0)), 'y': Vector((0, 1, 0)), 'z': Vector((0, 0, 1))}
+    def depth(b):
+        d = 0
+        while b.parent: b = b.parent; d += 1
+        return d
+    def base():  # Grundhaltung: erstes Bild von Idle_Loop; Knochen ohne Spur in Idle_Loop (Schwanz) auf Ruhe
+        for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = (1, 0, 0, 0); pb.location = (0, 0, 0)
+        a = bpy.data.actions['Idle_Loop']; ad.action = a; ad.action_slot = a.slots[0]; bpy.context.scene.frame_set(0); bpy.context.view_layer.update()
+        vals = {pb.name: (pb.rotation_quaternion.copy(), pb.location.copy()) for pb in arm.pose.bones}; ad.action = None
+        for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion, pb.location = vals.get(pb.name, ((1, 0, 0, 0), (0, 0, 0)))
+        bpy.context.view_layer.update()
+    def apply(rot, move=None):
+        for n in sorted(rot, key=lambda n: -depth(arm.pose.bones[n])):
+            pb = arm.pose.bones[n]; bpy.context.view_layer.update(); R = Matrix.Identity(4)
+            for ax, deg in rot[n]: R = Matrix.Rotation(math.radians(deg), 4, AX[ax]) @ R
+            h = pb.head.copy(); pb.matrix = Matrix.Translation(h) @ R @ Matrix.Translation(-h) @ pb.matrix
+        bpy.context.view_layer.update()
+        for n, v in (move or {}).items(): pb = arm.pose.bones[n]; pb.matrix = Matrix.Translation(Vector(v)) @ pb.matrix; bpy.context.view_layer.update()
+    def on_ground():  # tiefsten Punkt des Körpers auf den Boden
+        ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
+        z = min((body.matrix_world @ v.co).z for v in me.vertices); ev.to_mesh_clear(); apply({}, {'pelvis': (0, 0, -z + 0.01)})
+    def curl(breath=0):
+        base(); c = dict(CURL); c['spine_02'] = [('x', 18 + breath)]; apply(c); apply({'pelvis': [('y', 90)]}); on_ground()
+    bend = lambda: (base(), apply(BEND, {'pelvis': (0, 0.1, -0.42)}))
+    hold = lambda: (base(), apply(HOLD))
+    def make(name, steps):
+        a = bpy.data.actions.get(name)
+        if a: bpy.data.actions.remove(a)
+        a = bpy.data.actions.new(name); a.use_fake_user = True
+        for f, fn in steps:
+            ad.action = None; fn(); ad.action = a
+            for pb in arm.pose.bones: pb.keyframe_insert('rotation_quaternion', frame=f); pb.keyframe_insert('location', frame=f)
+        ad.action = None
+    make('Curl_Down', [(0, base), (24, curl)])
+    make('Curl_Idle', [(0, curl), (45, lambda: curl(3)), (90, curl)])
+    make('Lift_Ground', [(0, base), (14, bend), (22, bend), (40, hold)])
+    make('Hold_Idle', [(0, hold), (30, hold)])
+    base()
 
 def build(kind='fox', out=None):
     A = ART[kind]
@@ -72,17 +127,23 @@ def build(kind='fox', out=None):
     def capsule(a, b, r):
         a, b = Vector(a), Vector(b); d = b - a; n = max(3, int(d.length / (r * .6)))
         for i in range(n + 1): ellip(a + d * (i / n), (r, r, r), 16)
-    def cone(base, tip, r):
+    def cone(base, tip, r, tip_r=.15):  # tip_r: Radius an der Spitze als Anteil (Ohren spitz, Schnauze stumpf)
         base, tip = Vector(base), Vector(tip); d = tip - base
         me = bpy.data.meshes.new('c'); o = bpy.data.objects.new('c', me); sc.collection.objects.link(o)
-        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r * .15, depth=d.length); bm.to_mesh(me); bm.free()
+        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r * tip_r, depth=d.length); bm.to_mesh(me); bm.free()
         o.location = base + d / 2; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized()); parts.append(o)
     k = A.get('belly', 1.0)
-    ellip((0, 0.01, 1.18), (0.21 * k, 0.18 * k, 0.30)); ellip((0, -0.01, 1.40), (0.20 * k, 0.16 * k, 0.14)); ellip((0, 0, 1.55), (0.09, 0.09, 0.08))  # Bauch, Brust, Hals
+    # Bauch endet über den Oberschenkeln, darunter ein schmales Becken: sonst wachsen Bauch und Beine zu einem Rock zusammen
+    ellip((0, 0.01, 1.22), (0.21 * k, 0.18 * k, 0.26)); ellip((0, -0.01, 1.40), (0.20 * k, 0.16 * k, 0.14)); ellip((0, 0, 1.55), (0.09, 0.09, 0.08))  # Bauch, Brust, Hals
+    ellip((0, 0.02, 0.99), (0.16 * k, 0.14 * k, 0.09))                                                                           # Becken
     hk, lk, gk = A.get('head', 1.0), A.get('limbs', 1.0), A.get('legs', 1.0)
     hp = lambda x, y, z: (x * hk, y * hk, 1.76 + (z - 1.76) * hk)   # Punkt am Kopf, mit der Kopfgröße skaliert
     ellip((0, 0.0, 1.76), (0.19 * hk, 0.17 * hk, 0.17 * hk)); ellip((0, -0.06, 1.70), (0.17 * hk, 0.12 * hk, 0.10 * hk))           # Kopf, Wangen
-    sr, sl = A['snout']; cone(hp(0, -0.10, 1.71), hp(0, -0.10 - sl, 1.69), sr * hk)                                            # Schnauze
+    sr, sl = A['snout']; cone(hp(0, -0.10, 1.715), hp(0, -0.10 - sl, 1.69), sr * hk, .42)                                      # Schnauze (Oberkiefer), stumpfes Ende
+    cone(hp(0, -0.05, 1.70), hp(0, -0.10 - sl * .55, 1.69), sr * 1.5 * hk, .55)                                                # breiter Ansatz: Gesicht läuft dreieckig in die Schnauze
+    if A.get('ruff'):                                                                                                           # Wangenfell, seitlich abstehend
+        for s in (1, -1): ellip(hp(s * 0.125, -0.05, 1.665), (0.095 * hk, 0.08 * hk, 0.075 * hk), 20)
+    cone(hp(0, -0.10, 1.655), hp(0, -0.10 - sl * .8, 1.648), sr * .62 * hk, .5)                                                # Unterkiefer: Maullinie dazwischen
     E = A['ears']
     for s in (1, -1):                                                                                                           # Ohren
         if E.get('round'): ellip(hp(s * 0.13, 0.02, 1.90), (E['round'] * hk, E['round'] * .6 * hk, E['round'] * hk), 20)
@@ -92,7 +153,8 @@ def build(kind='fox', out=None):
         capsule(B['clavicle_' + s][1], ua[1], 0.065 * lk); capsule(la[0], la[1], 0.055 * lk)
         ellip(hd[0] + (hd[1] - hd[0]).normalized() * 0.06, (0.075 * lk, 0.06 * lk, 0.05 * lk))                                   # Pfote
         th, ca, ft = B['thigh_' + s], B['calf_' + s], B['foot_' + s]
-        capsule(th[0] + Vector((0, 0, -0.04)), th[1], 0.095 * gk); capsule(ca[0], ca[1] + Vector((0, 0, 0.03)), 0.072 * gk)
+        ofs = Vector((0.02 if s == 'l' else -0.02, 0, 0))   # Beine leicht nach außen, damit innen eine Lücke bleibt
+        capsule(th[0] + ofs + Vector((0, 0, -0.02)), th[1] + ofs * .5, 0.082 * gk); capsule(ca[0] + ofs * .5, ca[1] + Vector((0, 0, 0.03)), 0.068 * gk)
         ellip(ft[0] + Vector((0, -0.07, -0.05)), (0.075 * gk, 0.13 * gk, 0.055 * gk))                                                           # Fuß
     for x, y, z, r in TAILS[A['tail']]: ellip((x, y, z), (r * .9, r, r), 20)
 
@@ -125,10 +187,11 @@ def build(kind='fox', out=None):
     for v in me.vertices:
         x, y, z = v.co; ax = abs(x)
         belly = smooth(1.15, .8, (x / .135) ** 2 + ((z - 1.22) / .27) ** 2) * smooth(-0.03, -0.11, y)
-        muzzle = smooth(-0.13, -0.2, y) * smooth(1.765, 1.7, z) * smooth(1.58, 1.63, z)
-        cheek = smooth(1.0, .6, ((ax - .1) / .07) ** 2 + ((y + .12) / .07) ** 2 + ((z - 1.69) / .06) ** 2)
+        muzzle = smooth(-0.12, -0.17, y) * smooth(1.70, 1.675, z) * smooth(1.58, 1.62, z)          # Unterseite der Schnauze, oben bleibt Fell
+        cheek = smooth(1.0, .55, ((ax - .13) / .1) ** 2 + ((y + .07) / .1) ** 2 + ((z - 1.655) / .07) ** 2)  # Wangenfell
+        throat = smooth(1.0, .6, (x / .11) ** 2 + ((z - 1.56) / .12) ** 2) * smooth(-0.0, -0.07, y)     # Kehle bis zum Unterkiefer
         tip = smooth(.6, .68, y) * smooth(.92, 1.0, z) if A['tail'] == 'bushy' else 0
-        light = max(belly, muzzle, cheek, tip)
+        light = max(belly, muzzle, cheek, throat, tip)
         dark = max(smooth(.53, .58, ax) * smooth(1.25, 1.35, z), smooth(.2, .12, z), smooth(1.975, 2.03, z))
         c = [FUR[i] * (1 - light) + LIGHT[i] * light for i in range(3)]
         c = [c[i] * (1 - dark) + DARK[i] * dark for i in range(3)]
@@ -147,8 +210,11 @@ def build(kind='fox', out=None):
         o.scale = r; o.location = c; me2.materials.append(m2); bpy.context.view_layer.update()
         w = o.matrix_world.copy(); o.parent = arm; o.parent_type = 'BONE'; o.parent_bone = 'Head'; o.matrix_world = w
         return o
-    extra = [bead('EyeL', hp(0.075, -0.155, 1.80), (0.03, 0.02, 0.038), '1d1714', .25), bead('EyeR', hp(-0.075, -0.155, 1.80), (0.03, 0.02, 0.038), '1d1714', .25),
-             bead('Nose', hp(0, -0.10 - sl - 0.005, 1.70), (0.035 * hk, 0.03 * hk, 0.028 * hk), A['dark'], .5)]
+    # Augen flach in die Kopfform gesetzt (nicht vorstehend), leicht mandelförmig; zum Schlafen skaliert das Spiel sie flach (Lider)
+    iris = A.get('iris', '1d1714')
+    extra = [bead('EyeL', hp(0.072, -0.148, 1.79), (0.026, 0.012, 0.032), iris, .3), bead('EyeR', hp(-0.072, -0.148, 1.79), (0.026, 0.012, 0.032), iris, .3),
+             bead('EyePupilL', hp(0.071, -0.156, 1.79), (0.011, 0.006, 0.02), '120c08', .2), bead('EyePupilR', hp(-0.071, -0.156, 1.79), (0.011, 0.006, 0.02), '120c08', .2),
+             bead('Nose', hp(0, -0.10 - sl + 0.012, 1.695), (0.03 * hk, 0.026 * hk, 0.024 * hk), A['dark'], .5)]  # sitzt auf der Schnauzenspitze
 
     # 6. Animationen aus UAL1 und UAL2 als NLA-Spuren
     have = {a.name for a in bpy.data.actions}
@@ -156,6 +222,7 @@ def build(kind='fox', out=None):
         before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=f)
         for o in [o for o in bpy.data.objects if o not in before]: bpy.data.objects.remove(o, do_unlink=True)
     ad = arm.animation_data or arm.animation_data_create(); ad.action = None
+    posen(arm, body)
     for t in list(ad.nla_tracks): ad.nla_tracks.remove(t)
     for nme in ANIMS:
         a = bpy.data.actions.get(nme)
