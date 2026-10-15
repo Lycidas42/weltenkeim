@@ -47,6 +47,7 @@ import { updateVillage } from './village/economy.js';
 import { foxHaul, reinforce, updateFox } from './creature/ai.js';
 import { mind } from './creature/mind.js';
 import { parade, updateParade } from './creature/parade.js';
+import './ui/animtest.js';
 import { forestAlert, updateForestAlert } from './village/forest-alert.js';
 import { castHaste, castRain, rain, tryMiracle, updateMiracleFx } from './hand/miracles.js';
 import { throwTree, treeAt, updateTrees, uprootTree } from './hand/grab.js';

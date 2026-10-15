@@ -301,4 +301,4 @@ $('foxForms').addEventListener('click', e => {
 });
 on('foxTransform', id => setCreature(id));
 
-export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };
+export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, setObserve, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

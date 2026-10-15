@@ -179,6 +179,14 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #foxThought svg{width:24px;height:24px;fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
 #foxThought[hidden]{display:none}
 /* Karte der Nahsicht: Name, Tätigkeit, Grund */
+/* Test-Leiste: Animationen der Kreatur einzeln abspielen */
+#animTest{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:14px;padding:8px;width:min(560px,100%);box-sizing:border-box;display:grid;gap:6px}
+#animTest[hidden]{display:none}
+#animTest .head{display:flex;align-items:center;gap:6px;font-size:13px}
+#animTest .head b{flex:1;font-family:var(--f-display);color:var(--glaube);font-size:16px}
+#animTest .list{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+#animTest button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-weight:700;font-size:13px;white-space:nowrap;flex:none}
+#animTest button[aria-pressed="true"]{background:var(--glaube);color:#2a1d05;border-color:var(--glaube)}
 #foxCard{display:flex;align-items:center;gap:8px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 12px;width:min(440px,100%);box-sizing:border-box}
 #foxCard[hidden]{display:none}
 #foxCard .txt{flex:1;min-width:0;display:grid;gap:2px;font-size:13px;line-height:1.3}
@@ -400,7 +408,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <p class="why" id="foxForm"></p>
     <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
     <p class="why" id="foxWhy" hidden></p>
-    <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button></div>
+    <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button><button class="act" id="btnAnimTest">Animationen testen</button></div>
     <p class="formsLbl">Neigungen <span class="sub">seit Tagesbeginn</span></p>
     <div class="bars" id="foxBars"></div>
     <p class="formsLbl">Erfahrung</p>
@@ -436,6 +444,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 
   <footer class="dock">
     <div class="hint" id="hint"></div>
+    <div id="animTest" hidden><div class="head"><span>Animation:</span> <b id="animTestNow"></b><button id="animTestEnd">Weiter</button></div><div class="list" id="animTestList"></div></div>
     <div id="foxCard" hidden><div class="txt"><b id="cardName"></b><span id="cardNow"></span><span id="cardWhy" class="cwhy"></span></div><button id="btnCardSheet">Bogen</button><button class="x" id="btnCardEnd" aria-label="Beobachten beenden">×</button></div>
     <div class="ctx" id="ctxSculpt" hidden>
       <button data-dir="1" aria-pressed="true">Heben</button>

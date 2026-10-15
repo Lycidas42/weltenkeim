@@ -22,6 +22,7 @@ const APP = [
   './src/creature/kinds.js',
   './src/creature/mind.js',
   './src/creature/parade.js',
+  './src/ui/animtest.js',
   './src/farm/farm.js',
   './src/hand/grab.js',
   './src/hand/hand.js',
