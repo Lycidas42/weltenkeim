@@ -35,6 +35,9 @@ sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
 scene.add(sun); // tagsüber Sonne, nachts Mondlicht
 const tmpV = new THREE.Vector3();
 const tA = new THREE.Vector2(), tB = new THREE.Vector2();
+// Lag der zuletzt mit toScreen bzw. project umgerechnete Punkt hinter der Kamera? Dann ist seine Bildschirmlage
+// gespiegelt und taugt nicht für Treffer (sonst „trifft“ z. B. ein Baum hinter der Kamera das halbe Bild).
+const behindCam = () => tmpV.z > 1;
 function toScreen(x, y, z, out) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return out.set((tmpV.x + 1) / 2 * r.width + r.left, (1 - tmpV.y) / 2 * r.height + r.top); }
 
 const clock = new THREE.Clock();
@@ -42,4 +45,4 @@ const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
-export { camera, canvas, clock, controls, dummy, hemi, isMobile, renderer, scene, sun, tA, tB, tmpV, toScreen, zero };
+export { behindCam, camera, canvas, clock, controls, dummy, hemi, isMobile, renderer, scene, sun, tA, tB, tmpV, toScreen, zero };

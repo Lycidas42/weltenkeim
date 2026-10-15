@@ -1,7 +1,7 @@
 // Start: Hauptschleife und Debug-Zugang
 
 import { $ } from './core/util.js';
-import { PROC, S, save } from './core/state.js';
+import { PROC, S, on, save } from './core/state.js';
 import './core/noise.js';
 import { camera, clock, controls, renderer, scene, sun, toScreen } from './core/render.js';
 import { updateFloats, updateIncome } from './ui/feedback.js';
@@ -15,7 +15,7 @@ import { fox } from './creature/kinds.js';
 import './assets/models.js';
 import './models/nature.js';
 import './world/spring.js';
-import { heldTree, input } from './hand/pointer.js';
+import { heldTree, input, pointers } from './hand/pointer.js';
 import { clouds, updateClouds, updatePuddles, updateSnowfall, updateWeatherRain } from './world/weather-fx.js';
 import { updateStatics } from './village/layout.js';
 import { trees } from './world/trees.js';
@@ -50,7 +50,7 @@ import { castHaste, castRain, rain, tryMiracle, updateMiracleFx } from './hand/m
 import { throwTree, updateTrees, uprootTree } from './hand/grab.js';
 import { closeSheets, openSheet, renderName, setCreature, updateCamera } from './ui/sheets.js';
 import { placeFoxUI } from './ui/ring.js';
-import { carryGrabbed, handHelp, harvestByHand, helpAt, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
+import { carryGrabbed, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
 import { placeFieldTags, placeForestUI, placeHutTags, updateHud } from './ui/hud.js';
 import { SLOTS, setSlot, slotState } from './core/colors.js';
 
@@ -114,7 +114,7 @@ function tick(dt, t) {
   updateFloats(dt);
   updateHud(dt, t);
 
-  if (!drawFrames) return;
+  if (!drawFrames) { camera.updateMatrixWorld(); return; } // sonst erst beim Zeichnen: Zeiger und Bildschirmpunkte nutzen die Kamera
   renderer.render(scene, camera);
   if (!$('sheetFox').hidden) renderPortrait(dt, t);
 }
@@ -122,7 +122,8 @@ $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
 window.__wk = {
-  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte
-  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || i === n - 1; clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
-  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, emotes, renderer, scene, spawnVillager };
+  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
+  // draw = null gar keins (viele kurze Schritte in Prüfungen, Software-WebGL braucht pro Bild Sekunden)
+  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw === false && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager, pointers };
 requestAnimationFrame(frame);
