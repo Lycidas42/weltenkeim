@@ -128,6 +128,9 @@ Geplanter Weg (A, Teile-Modell):
   Ausgangspunkt für Blender.
 - **Farben:** Haut, Haar und Kleidung bleiben je Bewohner einstellbar (Instanzfarben). Die Teile sollten deshalb hell
   bzw. neutral eingefärbt sein.
+- **Geplante Teile:** `bewohner.md` sieht weitere Teile vor (Mund und Augenbrauen für die Mimik, Mütze und Schal,
+  Sportgeräte wie Ski und Surfbrett) und mehr Gelenke (Kopf neigen, Ellbogen, Abschnitt 7.3). Die Teileliste für
+  Designer wächst entsprechend.
 
 Später möglich (Weg B, Skelett-Modell): ein Bewohner mit Skelett und festen Knochennamen. Der Code dreht die Knochen
 mit denselben Haltungswerten, eigene Animationen wären zusätzlich möglich. Freier im Stil, aber mehr Aufwand für

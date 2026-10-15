@@ -4,7 +4,8 @@ Die Kreatur ist neben der Hand die zweite „Hand“ des Spielers in der Welt: e
 Launen hat und durch die Erziehung gut oder böse wird. Vorbild ist das Spielprinzip von *Black & White*
 (Lionhead, 2001), angepasst an ein entspanntes, handyfreundliches Aufbauspiel.
 
-Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` (Essen).
+Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` (Essen, Lieblingsessen je Art),
+`gott-und-hand.md` (Hand, Wunder, Waage), `gut-und-boese.md`, `bewohner.md` (wie das Dorf auf die Kreatur reagiert).
 
 ---
 
@@ -13,8 +14,9 @@ Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` 
 - **Gestalten:** Fuchs (Fell-Modell, eigene Reaktionen), Wolf, Hirsch, Stier, Alpaka, Katze. Name und Geschlecht wählbar
   (Start: Fenja, weiblich). `S.creature`, `S.name`, `S.gender`.
 - **Neigungen:** `S.w` mit `help` (Helfen), `play` (Spielen), `mischief` (Unfug); bestimmen, was sie aus eigenem Antrieb tut.
-- **Tätigkeiten:** Baum fällen und ins Lager bringen (Helfen), mit dem Dorf spielen, Baum umwerfen (Unfug), dösen,
-  eine Geste beim Wunder des Spielers (`foxCast`).
+- **Tätigkeiten:** Baum fällen und ins Lager bringen (Helfen), Waren tragen (bis zu 3 Stück im Maul: von Hütten ins
+  Lager, aus dem Lager zu Säge, Mühle, Bäckerei), mit dem Dorf spielen, Baum umwerfen (Unfug; Bewohner in der Nähe
+  fliehen), dösen, eine Geste beim Wunder des Spielers (`foxCast`).
 - **Erziehung:** Kreismenü an der Kreatur: Streicheln (Lob) und Klaps (Tadel) verstärken bzw. schwächen die zuletzt
   gezeigte Tätigkeit (`reinforce`). Fuchs reagiert sichtbar (Schwanz wedeln bzw. einklemmen).
 - **Kamera:** „Folgen“ hält die Kreatur im Bild.
@@ -57,7 +59,7 @@ Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` 
 | Bewohner fressen | – | **nicht übernehmen** (Ton des Spiels); böse Variante: erschreckt Bewohner, stiehlt Essen, zertrampelt Felder |
 | Kämpfe gegen andere Kreaturen | – | eher nicht; allenfalls später freundliche „Wettkämpfe“ |
 | Notdurft | – | weglassen (oder als Dünger auf Feldern, falls gewünscht humorvoll) |
-| Welt ändert sich mit Gut/Böse | – | optional: Schrein und Hand ändern ihr Aussehen leicht mit der Ausrichtung |
+| Welt ändert sich mit Gut/Böse | – | geplant: Welt, Schrein und Hand verändern sich mit der Waage des Gottes (`gut-und-boese.md`, `gott-und-hand.md` 9) |
 
 ---
 
@@ -92,9 +94,8 @@ Verwandte Dokumente: `kreatur-lernen.md` (Lernen durch Vormachen), `nahrung.md` 
   - gut: helleres, weicheres Fell, sanfter Lichtschein, Blüten/Glühwürmchen um sie, freundliche Augen;
   - böse: dunkleres, struppiges Fell, glühende Augen, Schatten-Schleier, Pfotenabdrücke welken das Gras.
   - Technisch: Material-Tönung, Emissive, Partikel; beim Fell-Modell Farbverlauf und Struppigkeit.
-- **Veränderung des Verhaltens:** gute Kreatur hilft unaufgefordert, Bewohner winken ihr zu und beten mehr;
-  böse Kreatur wird gefürchtet – Bewohner weichen aus, arbeiten aus Angst schneller, aber beten weniger aus Liebe
-  (Glaube aus Furcht statt aus Freude: beides möglich, unterschiedliche Spielweise).
+- **Veränderung des Verhaltens:** gute Kreatur hilft unaufgefordert, Bewohner winken ihr zu und spielen mit ihr;
+  böse Kreatur wird gefürchtet, Bewohner weichen ihr aus (Gefühle und Glaube der Bewohner: `bewohner.md` 9).
 - Beide Wege sind spielbar, nicht „falsch“ – wie in Black & White.
 
 ### 4.4 Verweigern (Eigenwille)
@@ -129,13 +130,9 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 ### 4.7 Große Transporte mit der Hand (und Lernen dadurch)
 
-- Die Hand soll auch **große Mengen** von A nach B bringen können: z. B. am Lager einen ganzen Stapel Stämme packen
-  (gedrückt halten, je länger, desto mehr), in der Hand halten (sichtbar als Bündel/Kiste) und an einer Säge, einem
-  Bauplatz oder einer anderen Hütte loslassen.
-- Unterscheidung zur heutigen Tipp-Hilfe: Tippen = kleine Arbeit an Ort und Stelle; Packen und Tragen = Transport.
+- Wie die Hand Stapel packt, trägt und absetzt, steht in `gott-und-hand.md` 5.2.
 - **Die Kreatur schaut zu** und lernt so, selbst größere Mengen gezielt zu verteilen (z. B. Stämme zur Säge,
   Bretter zur Baustelle, Korn zur Mühle), statt nur 3 Stück.
-- Gehört zur Hand, nicht zu den Wundern (körperliche Arbeit, siehe `gott-und-hand.md` Abschnitt 5).
 
 ### 4.8 Bewohner vorsichtig tragen
 
@@ -156,7 +153,7 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 - Startwerte je Art, z. B.: Fuchs (verspielt, schlau, lernt schnell), Wolf (treu, kräftig, neigt zu Jagd),
   Hirsch (sanft, groß, langsam), Stier (stark, stur – verweigert öfter), Alpaka (freundlich, eigensinnig),
   Katze (eigenwillig, neugierig, liebt Fisch).
-- Lieblingsessen und Lieblingsspiel je Art.
+- Lieblingsessen (`nahrung.md` 4) und Lieblingsspiel je Art.
 - Eigene Reaktionen auf Lob/Tadel je Art (Fuchs erledigt, übrige offen).
 
 ---

@@ -5,13 +5,13 @@ Wie in *Black & White* soll er auch böse sein können. Die **Waage** (`S.align`
 Veränderung der Hand stehen in `gott-und-hand.md` (Abschnitte 7 und 9). Hier geht es darum, wie Welt, Bewohner,
 Schrein und Kreatur auf die Ausrichtung reagieren.
 
-Verwandt: `gott-und-hand.md` (Waage, Taten, Hand, Wunder), `kreatur.md` (Ausrichtung der Kreatur).
+Verwandt: `gott-und-hand.md` (Waage, Taten, Hand, Wunder), `bewohner.md` (Gefühle und Verhalten der Bewohner je
+Ausrichtung, Abschnitt 9), `kreatur.md` (Ausrichtung der Kreatur).
 
 ## 1. Was sich mit der Waage verändert
 
-- **Bewohner:** gut → beten aus Liebe, winken, singen, arbeiten zufrieden; böse → ducken sich, wenn die Hand naht,
-  beten aus Furcht (Glaube kommt trotzdem, evtl. schneller, aber unregelmäßiger), arbeiten schneller unter Angst,
-  fliehen vor der Hand.
+- **Bewohner:** gut → Liebe und Dank, böse → Furcht; Beten, Arbeit, Pausen und Freizeit ändern sich entsprechend.
+  Einzelheiten in `bewohner.md` Abschnitt 9.
 - **Welt:** gut → kräftige Farben, Blumen, Sonnenschein häufiger; böse → fahlere Farben, kahle Bäume am Schrein,
   häufiger Gewitter, dunkle Wolken über dem Schrein.
 - **Schrein:** gut → hell, Blüten, goldenes Leuchten; böse → dunkler Stein, rote Glut, Dornen.
@@ -24,5 +24,5 @@ Verwandt: `gott-und-hand.md` (Waage, Taten, Hand, Wunder), `kreatur.md` (Ausrich
 
 Waage, Taten und Hand: siehe `gott-und-hand.md` Abschnitt 11. Danach:
 
-1. Bewohner reagieren (Furcht vs. Freude), Glaube aus Liebe/Furcht.
+1. Bewohner reagieren (Furcht vs. Liebe), Glaube aus Liebe/Furcht (`bewohner.md` 9).
 2. Welt und Schrein verändern sich.

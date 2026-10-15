@@ -1,13 +1,11 @@
 # Der Gott und seine Hand
 
 Zentrales Konzept für den Spieler als Gott: was er kann, wie er sich in der Welt zeigt und wie Gut und Böse
-ihn verändern. Bisher war das über `gut-und-boese.md`, das frühere `hand-und-wunder.md` und `kreatur.md`
-verteilt; hier ist es zusammengeführt.
+ihn verändern.
 
-Verwandt: `gut-und-boese.md` (Folgen der Waage für Welt, Bewohner, Schrein), `kreatur.md` und
-`kreatur-lernen.md` (die Kreatur lernt von der Hand), `spielstaende.md` (Hand und Waage gehören zur Welt).
-
-Stand: **vorhanden** = im Spiel, **teilweise** = angelegt, aber unvollständig, **geplant** = nur Konzept.
+Verwandt: `gut-und-boese.md` (Folgen der Waage für Welt und Schrein), `bewohner.md` (wie die Bewohner auf Hand und
+Waage reagieren), `kreatur.md` und `kreatur-lernen.md` (die Kreatur lernt von der Hand), `spielstaende.md` (Hand und
+Waage gehören zur Welt). Stand-Begriffe: siehe `README.md`.
 
 ## 1. Der Gott
 
@@ -182,6 +180,7 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 | gut | böse |
 |---|---|
 | Bewohnern bei der Arbeit helfen (ernten, tragen, säen …) | Bewohner hart werfen, ins Wasser werfen |
+| erschöpften Bewohnern einen freien Tag schenken (`bewohner.md` 5.3) | Bewohner ohne Pause schuften lassen (Eile auf Eile) |
 | Bewohner sanft an einen sinnvollen Ort setzen, retten | Bewohner irgendwo aussetzen, wiederholt herumschleudern |
 | Regen auf Felder und Wald, Eile für Arbeiter | böse Wunder: Wirbelsturm im Dorf, Blitz, Dürre, Plage |
 | Bitten der Bewohner erfüllen | Bitten verstreichen lassen (leicht), das Gegenteil tun (stark) |
@@ -194,7 +193,7 @@ Stufe die Hand insgesamt stärker; der Text im Schrein-Panel nennt die Verbesser
 
 - **Heute (vorhanden, ohne Oberfläche):** Modell `GodHand.blend` mit den Materialien `Skin`, `Nails`, `Sleeve`,
   `Trim`; `styleHand` färbt sie aus `S.handStyle` (`skin`, `nails`, `sleeve`, `trim`). Ein Panel zum Ändern gibt es
-  noch nicht – die älteren Docs sprachen von einem „Hand-Panel“, das ist nicht umgesetzt.
+  noch nicht.
 - **Editor (geplant):** eigenes Panel „Hand gestalten“, erreichbar im Schrein-Panel (und per langem Druck auf den
   Werkzeugknopf „Hand“). Oben eine große Vorschau der Hand, die sich langsam dreht und die Haltungen durchspielt;
   darunter Kategorien als Reiter:
@@ -233,7 +232,8 @@ Die Veränderung ist langsam und weich (einige Minuten), damit sie wie Entwicklu
 - Rückweg möglich: Wer wieder gut handelt, dessen Hand wird langsam wieder hell.
 - Im Editor zeigt die Vorschau, wie die Hand **jetzt** aussieht (mit Waage); ein Schalter „ohne Waage“ zeigt das
   reine Styling.
-- Die Bewohner reagieren auf die Hand: freundlich winken bei heller, ducken und fliehen bei finsterer Hand.
+- Die Bewohner reagieren auf die Hand: freundlich winken bei heller, ducken und fliehen bei finsterer Hand
+  (`bewohner.md` 9).
 
 ## 10. Spielstand
 

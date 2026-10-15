@@ -3,6 +3,9 @@
 Frühling, Sommer, Herbst und Winter verändern das Aussehen der Insel und später auch das Spiel (Ernte, Wachstum,
 Nahrung). Dieses Dokument sammelt die Wünsche und die technische Grundlage.
 
+Verwandt: `assets.md` 4.1 (Farbrollen), `nahrung.md` (Vorräte für den Winter), `bewohner.md` (Wintersport,
+Strand, Kleidung je Jahreszeit).
+
 ## 1. Was sich mit der Jahreszeit ändert
 
 - **Laubbäume:** im Herbst erst verfärben (Eiche orange, Birke gelb, Obstbaum rot), dann nach und nach das Laub
@@ -17,6 +20,8 @@ Nahrung). Dieses Dokument sammelt die Wünsche und die technische Grundlage.
 - **Felder und Gärten:** Pflanzen verfärben sich zum Herbst. Im Winter liegen die Felder brach (Spiellogik: keine
   Aussaat), im Frühling wird neu gesät.
 - **Büsche:** Blüten im Frühling, Beeren im Spätsommer, braunes Laub im Herbst.
+- **Bewohner:** Freizeit je Jahreszeit (Skifahren und Schneemann im Winter, Strand und Surfen im Sommer, Laubhaufen
+  im Herbst), im Winter Mütze und Schal, bei Kälte kürzere Abende draußen (`bewohner.md` 6).
 - **Wetter:** Häufigkeit der Wetterlagen je Jahreszeit (Schnee nur im Winter; heute hat `schnee` in WEATHER noch
   p = 0 und ist nur von Hand wählbar).
 
