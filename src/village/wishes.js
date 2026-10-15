@@ -71,4 +71,4 @@ function placeWishUI() {
   B.style.transform = `translate(${clamp(tA.x - r.left - bw / 2, 8, r.width - bw - 8)}px, ${clamp(tA.y - r.top - bh, 120, r.height - bh - 120)}px)`;
 }
 
-export { placeWishUI, startWish, updateWish, wishDone };
+export { ICON_HASTE, ICON_RAIN, placeWishUI, startWish, updateWish, wishDone };

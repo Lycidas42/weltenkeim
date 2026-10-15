@@ -165,4 +165,4 @@ function spawnVillager(x, z) {
 const homeSpot = () => { const h = houses[Math.floor(Math.random() * houses.length)] || { x: 0, z: 0 }; return { x: h.x + rnd(1), z: h.z + rnd(1) }; };
 for (let i = 0; i < Math.min(S.pop, cap()); i++) { const p = homeSpot(); spawnVillager(p.x, p.z); }
 
-export { CHOP_HIT, CHOP_T, DIG_T, HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VCAP, VS, chopPose, digPose, homeSpot, spawnVillager, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers };
+export { CHOP_HIT, CHOP_T, DIG_T, HEAD_Y, HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VCAP, VS, chopPose, digPose, homeSpot, spawnVillager, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers };
