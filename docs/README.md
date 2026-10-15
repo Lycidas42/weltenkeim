@@ -43,9 +43,11 @@ Jedes Feature in den Konzepten trägt seinen Stand, damit die Docs zugleich Plan
 - Tabellen mit mehreren Features haben eine Spalte „Stand“ mit denselben Marken.
 - Einzelne Punkte in Listen bekommen die Marke vorn (`- 💡 Lern-Leine: …`), wenn sie vom Abschnitt abweichen.
 - Abschnitte „Ist-Stand“ beschreiben, was heute im Spiel ist, und brauchen keine Marke.
+- Gibt es für ein Feature ein Issue, steht der Link hinter der Marke:
+  `**Stand:** 🔵 geplant · [#12](https://github.com/Lycidas42/weltenkeim/issues/12)`.
 
-**Pflege:** Wird ein Feature gebaut, die Marke im Konzept auf ✅ bzw. 🟡 setzen und es unten aus „Als Nächstes“
-streichen. Wird eine Idee entschieden, wird sie 🔵 oder ⛔.
+**Pflege:** Wird ein Feature gebaut, die Marke im Konzept auf ✅ bzw. 🟡 setzen (das gehört in denselben Pull Request
+wie das Feature). Wird eine Idee entschieden, wird sie 🔵 oder ⛔.
 
 **Überblick in der Konsole:**
 
@@ -55,19 +57,47 @@ grep -rn "🟡" docs/    # Angefangenes
 grep -rn "💡" docs/    # offene Ideen, die eine Entscheidung brauchen
 ```
 
-## Als Nächstes
+## Umsetzung über GitHub-Issues
 
-Die nächsten Schritte über alle Dokumente hinweg, in dieser Reihenfolge. Die Reihenfolge ist ein Vorschlag aus den
-Reihenfolgen der einzelnen Dokumente und den Abhängigkeiten unten; der Spieler legt sie fest.
+Die Docs beschreiben **was** und **warum**. Umgesetzt wird über GitHub-Issues: Ein Issue ist ein abgegrenzter Auftrag,
+den eine Claude-Code-Sitzung in der Cloud selbstständig bis zum Pull Request bringen kann.
+
+| Ort | Inhalt |
+|---|---|
+| `docs/` | Konzept, Stand-Marke, Link zum Issue |
+| Issue (Vorlage „Feature umsetzen“) | Umfang, Nicht im Umfang, Entscheidungen, Akzeptanzkriterien |
+| Fahrplan-Issue | Reihenfolge: die Feature-Issues als Unter-Issues, oben das nächste |
+| Pull Request nach `develop` | die Umsetzung, schließt das Issue mit `Closes #n` |
+
+**Ablauf:**
+
+1. **Issue anlegen** mit der Vorlage „Feature umsetzen“ (`.github/ISSUE_TEMPLATE/feature.yml`), Link im Konzept eintragen.
+2. **Klären:** Offene Fragen im Issue beantworten. Erst wenn nichts mehr offen ist, Label `bereit` setzen.
+3. **Umsetzen lassen:** eine Cloud-Sitzung mit „Setze Issue #n um“ starten. Sie arbeitet auf einem eigenen Branch
+   `claude/issue-<n>-<kurzname>`, prüft die Akzeptanzkriterien und öffnet einen Pull Request nach `develop`.
+4. **Rückfragen:** Stößt die Sitzung auf eine Gestaltungsfrage, schreibt sie einen Kommentar ins Issue, setzt das
+   Label `frage` und wartet, statt zu raten.
+5. **Abnahme:** Pull Request ansehen (Screenshots im PR), am Handy ausprobieren, mergen. Das Issue schließt sich
+   dabei, weil `develop` der Standard-Branch ist. Veröffentlicht wird weiterhin nur auf Freigabe nach `main`.
+
+**Labels:** `feature` (setzt die Vorlage), `bereit` (kann an Claude), `frage` (wartet auf eine Antwort).
+
+### Vorschlag für den Fahrplan
+
+Wird beim Anlegen ins Fahrplan-Issue übernommen und dann hier gelöscht. Vorher braucht es einen automatischen
+Prüflauf (Spiel im Chromium ohne Bildschirm laden, `__wk.step(n)` rechnen, Fehler in der Konsole und
+Akzeptanzkriterien prüfen, Screenshots), damit eine Sitzung selbst feststellen kann, ob sie fertig ist.
 
 | # | Schritt | Konzept | Stand |
 |---|---|---|---|
-| 1 | Halten als Zustand: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten | `gott-und-hand.md` 3.2 | 🔵 geplant |
-| 2 | Waage mit Anzeige; vorhandene Taten zählen | `gott-und-hand.md` 7 | 🔵 geplant |
-| 3 | Bewohner essen mittags aus dem Lager, Gaben am Schrein | `nahrung.md` 1 und 3 | 💡 Idee (empfohlen) |
-| 4 | Bewohner mit Namen, Auswahl und Karte, Symbole über dem Kopf | `bewohner.md` 3.1, 8, 4.2 | 🔵 geplant |
-| 5 | Kalender und Überblenden der Jahreszeiten | `jahreszeiten.md` 3, Punkt 1–2 | 🔵 geplant |
-| 6 | Lokale Welten: Weltenliste, Verzweigen, Export und Import | `spielstaende.md` 9, Etappe 1 | 🔵 geplant |
+| 0 | Prüflauf für autarke Sitzungen (`dev/`) | – | 🔵 geplant |
+| 1 | Pilot: Symbole über dem Kopf für die vorhandenen Ereignisse (Jubel, Flucht, Wurf, Schlaf, Bitte) | `bewohner.md` 4.2 | 🔵 geplant |
+| 2 | Halten als Zustand: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten | `gott-und-hand.md` 3.2 | 🔵 geplant |
+| 3 | Waage mit Anzeige; vorhandene Taten zählen | `gott-und-hand.md` 7 | 🔵 geplant |
+| 4 | Bewohner essen mittags aus dem Lager, Gaben am Schrein | `nahrung.md` 1 und 3 | 💡 Idee (empfohlen) |
+| 5 | Bewohner mit Namen, Auswahl und Karte | `bewohner.md` 3.1, 8 | 🔵 geplant |
+| 6 | Kalender und Überblenden der Jahreszeiten | `jahreszeiten.md` 3, Punkt 1–2 | 🔵 geplant |
+| 7 | Lokale Welten: Weltenliste, Verzweigen, Export und Import | `spielstaende.md` 9, Etappe 1 | 🔵 geplant |
 
 ## Abhängigkeiten zwischen den Vorhaben
 

@@ -19,7 +19,14 @@
   - Er bricht auch ab, wenn ein Modul unter `src/` nicht in der `APP`-Liste steht. Neue Module also immer dort eintragen.
 - Branches: Entwickelt wird auf `develop` (Commits und Pushes dorthin sind nicht öffentlich). Nach `main` wird nur auf ausdrückliche Freigabe des Nutzers gemergt und gepusht – das ist die Veröffentlichung. Bei größeren Umbauten zwischendurch funktionierende Zwischenstände auf `develop` committen.
 - Bei jeder Veröffentlichung (Merge `develop` → `main`) `VERSION` in `sw.js` **und** `<meta name="wk-version">` in `index.html` gleich erhöhen (Schema 0.x.y), nicht bei jedem einzelnen Commit. Der Update-Hinweis vergleicht beide; der Workflow bricht ab, wenn sie abweichen. Neue Dateien, die offline verfügbar sein sollen, in die `APP`-Liste in `sw.js` eintragen.
-- Konzepte stehen in `docs/` (Überblick und Planung in `docs/README.md`). Jedes Feature trägt dort eine Stand-Marke (✅ vorhanden, 🟡 teilweise, 🔵 geplant, 💡 Idee, ⏸️ zurückgestellt, ⛔ verworfen). Nach dem Umsetzen eines Features die Marke im Konzept anpassen und den Schritt aus „Als Nächstes“ in `docs/README.md` streichen.
+- Konzepte stehen in `docs/` (Überblick in `docs/README.md`). Jedes Feature trägt dort eine Stand-Marke (✅ vorhanden, 🟡 teilweise, 🔵 geplant, 💡 Idee, ⏸️ zurückgestellt, ⛔ verworfen), bei Bedarf mit Link zum Issue.
+- Umsetzung über GitHub-Issues (Vorlage „Feature umsetzen“, Ablauf in `docs/README.md`). Wird ein Issue umgesetzt:
+  - Nur Issues mit Label `bereit` selbstständig umsetzen. Das Issue und den verlinkten Konzeptabschnitt zuerst ganz lesen.
+  - Branch `claude/issue-<n>-<kurzname>` von `develop`; Pull Request nach `develop` mit `Closes #<n>`, nie nach `main`.
+  - Nur den Umfang des Issues umsetzen. Was darüber hinaus auffällt, als Kommentar ins Issue schreiben, nicht mitbauen.
+  - Bei einer Gestaltungsfrage, die das Issue nicht beantwortet: Frage als Kommentar ins Issue, Label `frage` setzen, nicht raten.
+  - Vor dem Pull Request jedes Akzeptanzkriterium im Spiel prüfen (Chromium ohne Bildschirm, `__wk`), Screenshots in den PR, abgehakte Kriterien im PR auflisten.
+  - Im selben Pull Request die Stand-Marke im Konzept anpassen.
 - Spieltexte und UI auf Deutsch. Zahlen mit Komma als Dezimaltrennzeichen (`fmt`, `fmt1` in `src/core/util.js`).
 - Spielstand: `localStorage['weltenkeim-save']`, Objekt `S` (`src/core/state.js`) mit Versionsfeld `v` und Zeitstempel `ts`.
   - Neue Felder abwärtskompatibel ergänzen: Standardwert in `S`, geladene Werte werden darübergelegt.

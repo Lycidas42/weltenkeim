@@ -1,0 +1,58 @@
+name: Feature umsetzen
+description: Ein abgegrenztes Feature aus einem Konzept in docs/ als Auftrag, den Claude Code selbstständig umsetzen kann
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Das Konzept (Was und Warum) steht in `docs/`. Dieses Issue legt fest, **was genau** jetzt gebaut wird und **wann es fertig ist**.
+        Erst wenn alle Entscheidungen getroffen sind, das Label `bereit` setzen – dann kann eine Claude-Code-Sitzung es selbstständig umsetzen.
+  - type: input
+    id: konzept
+    attributes:
+      label: Konzept
+      description: Datei und Abschnitt in docs/
+      placeholder: "docs/bewohner.md 4.2"
+    validations:
+      required: true
+  - type: textarea
+    id: ziel
+    attributes:
+      label: Ziel
+      description: Ein, zwei Sätze aus Sicht des Spielers
+    validations:
+      required: true
+  - type: textarea
+    id: umfang
+    attributes:
+      label: Umfang
+      description: Was gehört dazu? Als Liste.
+    validations:
+      required: true
+  - type: textarea
+    id: nicht
+    attributes:
+      label: Nicht im Umfang
+      description: Was ausdrücklich nicht dazugehört (kommt später oder in ein anderes Issue)
+  - type: textarea
+    id: entscheidungen
+    attributes:
+      label: Entscheidungen
+      description: Antworten auf die offenen Fragen (💡) aus dem Konzept, die dieses Feature berühren. Ist hier noch etwas offen, ist das Issue nicht bereit.
+  - type: textarea
+    id: kriterien
+    attributes:
+      label: Akzeptanzkriterien
+      description: Prüfbar formulieren, möglichst über den Prüflauf oder `__wk` in der Konsole
+      value: |
+        - [ ] Spiel lädt ohne Fehler in der Konsole, auch mit einem alten Spielstand
+        - [ ] …
+        - [ ] Läuft flüssig auf dem Handy (keine neuen Draw-Calls je Bewohner o. Ä.)
+        - [ ] Stand-Marke im Konzept angepasst
+    validations:
+      required: true
+  - type: textarea
+    id: hinweise
+    attributes:
+      label: Hinweise zur Umsetzung
+      description: Betroffene Dateien, Spielstand-Felder, Theme-Einträge, Abhängigkeiten zu anderen Issues
