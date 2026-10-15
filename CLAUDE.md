@@ -1,12 +1,33 @@
 # Weltenkeim – Hinweise für Claude
 
-- Statische PWA ohne Build-Schritt: `index.html` (Markup, Styles), `game.js` (ES-Modul, gesamter Spielcode), `sw.js`, `manifest.webmanifest`. Three.js r170 liegt lokal unter `vendor/three-0.170.0/` und wird per Import-Map als `three` bzw. `three/addons/` geladen. Keine CDN-Abhängigkeiten außer Google Fonts.
-- Hosting: GitHub Pages über den Workflow `.github/workflows/pages.yml`, ausgelöst durch jeden Push auf `main` (sofort öffentlich). Ausgeliefert werden nur die dort aufgelisteten Laufzeit-Dateien (`index.html`, `game.js`, `sw.js`, `manifest.webmanifest`, `icons/`, `vendor/`, `assets/models/`, `assets/CREDITS.md`); `assets/source/`, `dev/`, `docs/` bleiben nur im Repo. Neue Laufzeit-Dateien außerhalb dieser Ordner auch im Workflow ergänzen. Der Workflow bricht ab, wenn eine Datei aus der `APP`-Liste in `sw.js` im Paket fehlt.
-- Branches: Entwickelt wird auf `develop` (Commits und Pushes dorthin sind nicht öffentlich). Nach `main` wird nur auf ausdrückliche Freigabe des Nutzers gemergt und gepusht – das ist die Veröffentlichung.
+- Statische PWA ohne Build-Schritt: `index.html` (Markup, Styles), Spielcode als ES-Module unter `src/`, `sw.js`, `manifest.webmanifest`. Three.js r170 liegt lokal unter `vendor/three-0.170.0/` und wird per Import-Map als `three` bzw. `three/addons/` geladen. Keine CDN-Abhängigkeiten außer Google Fonts.
+- Aufbau von `src/` (Einstieg `src/boot.js` → `src/main.js`, Hauptschleife `tick`):
+  - `core/` Grundlagen: `util` (Hilfen, `fmt`/`fmt1` mit Komma), `state` (Spielstand `S`, `save`/`onSave`, Ereignisse `on`/`emit`, Wirtschaftstabellen), `render` (Renderer, Szene, Kamera, Licht), `noise`.
+  - `world/` Insel: Himmel und Wetter, Gelände, Wasser, Pfade, Formen, Bäume, Natur, Wegfindung, Wetter-Effekte.
+  - `village/` Dorf: Lage, Schrein, Häuser, Hütten, Werkstätten, Bewohner (Aussehen, Verhalten `ai`, Zeichnen `render`), Berufe, Wirtschaft, Bitten.
+  - `farm/`, `wildlife/`, `creature/` (Gestalten, Modell, Verhalten, Gesten), `hand/` (Zeiger und Zustand `input`, Hand, Greifen, Wunder, Eingabe), `ui/` (Rückmeldungen, Panels, Kreismenü, Porträt, Anzeige), `assets/` (Modelle laden), `models/` (im Code gebaute Modelle).
+- Regeln für Module:
+  - Importe nur aus Modulen, die in der Ladereihenfolge früher kommen (siehe Reihenfolge der Imports in `main.js`). Keine Zyklen: Sonst laufen Module, bevor das, was sie beim Laden brauchen, existiert.
+  - Braucht ein frühes Modul etwas Späteres, gibt es drei Wege:
+    - Code dorthin verschieben, wo er fachlich hingehört.
+    - Rückmeldung an die Oberfläche per `emit('name')` (die UI hört mit `on`).
+    - Beitrag zum Spielstand per `onSave(fn)`.
+  - Importierte Variablen sind schreibgeschützt. Geteilten veränderlichen Zustand als Objekt-Eigenschaft führen (z. B. `input.tool`, `build.construction`) oder über eine Funktion setzen (`setFollow`, `markTerrainDirty`).
+  - Jedes Bereichs-Update ist eine eigene Funktion (`updateX(dt, t)`), die `tick` in `main.js` aufruft.
+- Hosting: GitHub Pages über den Workflow `.github/workflows/pages.yml`, ausgelöst durch jeden Push auf `main` (sofort öffentlich). Ausgeliefert werden nur die dort aufgelisteten Laufzeit-Dateien (`index.html`, `sw.js`, `manifest.webmanifest`, `src/`, `icons/`, `vendor/`, `assets/models/`, `assets/CREDITS.md`); `assets/source/`, `dev/`, `docs/` bleiben nur im Repo. Neue Laufzeit-Dateien außerhalb dieser Ordner auch im Workflow ergänzen.
+  - Der Workflow bricht ab, wenn eine Datei aus der `APP`-Liste in `sw.js` im Paket fehlt.
+  - Er bricht auch ab, wenn ein Modul unter `src/` nicht in der `APP`-Liste steht. Neue Module also immer dort eintragen.
+- Branches: Entwickelt wird auf `develop` (Commits und Pushes dorthin sind nicht öffentlich). Nach `main` wird nur auf ausdrückliche Freigabe des Nutzers gemergt und gepusht – das ist die Veröffentlichung. Bei größeren Umbauten zwischendurch funktionierende Zwischenstände auf `develop` committen.
 - Bei jeder Veröffentlichung (Merge `develop` → `main`) `VERSION` in `sw.js` **und** `<meta name="wk-version">` in `index.html` gleich erhöhen (Schema 0.x.y), nicht bei jedem einzelnen Commit. Der Update-Hinweis vergleicht beide; der Workflow bricht ab, wenn sie abweichen. Neue Dateien, die offline verfügbar sein sollen, in die `APP`-Liste in `sw.js` eintragen.
-- Spieltexte und UI auf Deutsch. Zahlen mit Komma als Dezimaltrennzeichen (`fmt`, `fmt1` in `game.js`).
-- Spielstand: `localStorage['weltenkeim-save']`, Objekt `S` mit Versionsfeld `v` und Zeitstempel `ts`. Neue Felder abwärtskompatibel ergänzen (Standardwert in `S`, geladene Werte werden darübergelegt). Vorher prüfen, dass der Feldname in `S` noch frei ist (z. B. ist `S.hand` die Ausbaustufe der Hand, ihr Aussehen steht in `S.handStyle`). Das Format soll später per Supabase synchronisierbar bleiben.
+- Spieltexte und UI auf Deutsch. Zahlen mit Komma als Dezimaltrennzeichen (`fmt`, `fmt1` in `src/core/util.js`).
+- Spielstand: `localStorage['weltenkeim-save']`, Objekt `S` (`src/core/state.js`) mit Versionsfeld `v` und Zeitstempel `ts`.
+  - Neue Felder abwärtskompatibel ergänzen: Standardwert in `S`, geladene Werte werden darübergelegt.
+  - Vorher prüfen, dass der Feldname in `S` noch frei ist (z. B. ist `S.hand` die Ausbaustufe der Hand, ihr Aussehen steht in `S.handStyle`).
+  - Bereiche schreiben ihren Teil beim Speichern über `onSave`.
+  - Das Format soll später per Supabase synchronisierbar bleiben.
 - Neue Assets nur mit freier Lizenz (CC0 bevorzugt) und immer in `assets/CREDITS.md` sowie im Info-Panel (`#sheetInfo` in `index.html`) nennen.
 - Zielgerät ist das Handy: Touch-Bedienung, Safe-Area-Abstände, Performance im Blick behalten (Instancing für viele gleiche Objekte, Schattenauflösung mobil 1024).
-- Debug-Zugang: `window.__wk` am Ende von `start()` in `game.js` gibt Spielstand, Bewohner, Kamera, Wegfindung usw. für Tests in der Konsole frei. Bleibt bewusst dauerhaft drin; bei Bedarf um weitere Objekte ergänzen. Hinweis: `controls.target.y` wird jeden Frame auf 1 gesetzt.
-- Lokal testen: im Repo-Ordner `npx serve` oder `python -m http.server` starten. Der Service Worker cached auch lokal; beim Testen in den DevTools „Update on reload“ aktivieren oder Cache leeren.
+- Debug-Zugang: `window.__wk` am Ende von `src/main.js` gibt Spielstand, Bewohner, Kamera, Wegfindung usw. für Tests in der Konsole frei. Bleibt bewusst dauerhaft drin; bei Bedarf um weitere Objekte ergänzen.
+  - `__wk.step(n)` rechnet n Bilder ohne Browser-Takt durch. So lässt sich auch testen, wenn der Tab verborgen ist und keine Bilder kommen.
+  - Hinweis: `controls.target.y` wird jeden Frame auf 1 gesetzt.
+- Lokal testen: Server aus `.claude/launch.json` (`weltenkeim` auf 8765, `weltenkeim-lan` auf 8000 fürs Handy im WLAN) oder `npx serve` / `python -m http.server`. Der Service Worker cached auch lokal; beim Testen in den DevTools „Update on reload“ aktivieren oder Cache leeren.
