@@ -29,6 +29,16 @@ if (loaded && typeof loaded === 'object') {
   if (S.gender !== 'm') S.gender = 'w';
   if (typeof S.hour !== 'number' || !isFinite(S.hour)) S.hour = 8;
 }
+// Speichern: jeder Bereich trägt seinen Teil über einen Hook bei (onSave), dann wird S als Ganzes geschrieben
+const saveHooks = [];
+const onSave = fn => saveHooks.push(fn);
+let skipSave = false;
+const stopSaving = () => { skipSave = true; }; // vor einem Neuladen, das den Spielstand verwirft
+function save() { if (skipSave) return; for (const fn of saveHooks) fn(); S.ts = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+// Ereignisse für Rückmeldungen an die Oberfläche (die Spiellogik kennt die Panels nicht)
+const handlers = {};
+const on = (name, fn) => (handlers[name] || (handlers[name] = [])).push(fn);
+const emit = (name, ...args) => (handlers[name] || []).forEach(fn => fn(...args));
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
 const passive = () => 0.06 * S.temple;
 const MAX_POP = 40; // vorerst höchstens so viele Bewohner (Übersicht und Leistung auf dem Handy)
@@ -230,7 +240,6 @@ function updateWeather(dt, t) {
   // Nässe: in etwa einer halben Minute Regen voll, bei Sonne in gut einer Minute trocken
   if (weather.rain > .3) weather.wet = Math.min(1, weather.wet + dt * weather.rain / 30);
   else weather.wet = Math.max(0, weather.wet - dt * ((1 - weather.cover) * (1 - sky.night) / 70 + 1 / 500));
-  terrainU.uWet.value = weather.wet;
 }
 // Schnee auf allem, was nach oben zeigt: wird in die Standard-Materialien eingeschleust (snowify), stärker auf flachen
 // Flächen, fleckig an den Rändern, nur oberhalb des Meeres.
@@ -428,6 +437,9 @@ function terrainColor(h, jit, k = -1) {
 // Vom Spieler geformtes Gelände: gespeichert als Abweichung von der erzeugten Insel (Punkt, Höhe in cm), hier wieder aufgetragen
 const BASE_H = H.slice();
 if (S.terrainN === N && Array.isArray(S.terrain)) for (let i = 0; i + 1 < S.terrain.length; i += 2) { const k = S.terrain[i] | 0, d = +S.terrain[i + 1] / 100; if (k >= 0 && k < N * N && isFinite(d)) H[k] = clamp(H[k] + d, -3, 8.5); }
+let terrainReset = false; // nach dem Zurücksetzen nichts mehr übernehmen, die Seite lädt neu
+function resetTerrain() { terrainReset = true; S.terrain = []; S.terrainN = N; }
+onSave(saveTerrain);
 function saveTerrain() { if (terrainReset) return; const out = []; for (let k = 0; k < N * N; k++) { const d = Math.round((H[k] - BASE_H[k]) * 100); if (Math.abs(d) >= 2) out.push(k, d); } S.terrain = out; S.terrainN = N; }
 const tGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG).rotateX(-Math.PI / 2);
 const tPos = tGeo.attributes.position;
@@ -521,7 +533,7 @@ function updateDepth() {
 }
 updateDepth(); terrainU.uDep.value = depTex; terrainU.uSkyH.value = sky.hor;
 let terrainDirty = false, terrainT = 0;
-function updateTerrain(dt) { terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
+function updateTerrain(dt) { terrainU.uWet.value = weather.wet; terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 // Wasser: Wellen und Brandung im Vertex-Shader, Kräuselung durch Wind (Böen ziehen als Flecken übers Wasser),
 // Farbe nach Tiefe (türkis im Flachen, tiefblau draußen), Schaum am Strand und bei starkem Wind Schaumkronen,
 // Spiegelung des Himmels am flachen Blickwinkel, Sonnenglitzern über die Lichtberechnung.
@@ -622,6 +634,10 @@ function updateSpray(dt, t) {
   sprayU.uVH.value = renderer.domElement.height; sprayU.uL.value = .3 + .7 * (1 - sky.night);
   sprayPts.visible = spray.length > 0;
 }
+// Wellen und Wind: wechselt langsam zwischen ruhig und böig, bei Regen (auch dem Wunder) frischt er auf
+function updateWater(dt, t, storm) {
+  streamU.uT.value = t; waterU.uT.value = t; waterU.uDir.value = weather.dir; updateSpray(dt, t); waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (storm ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
+}
 water.position.y = -.03; water.receiveShadow = true; water.frustumCulled = false;
 scene.add(water);
 
@@ -654,6 +670,7 @@ function updateWear(dt) {
   for (const k of wearDirty) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
   wearDirty.clear(); tCol.needsUpdate = true;
 }
+onSave(savePaths);
 function savePaths() { const out = []; for (let k = 0; k < WEAR.length; k++) if (WEAR[k] > 3) out.push(k, Math.round(WEAR[k])); S.paths = out; S.pathsN = N; }
 for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
 tCol.needsUpdate = true;
@@ -809,10 +826,20 @@ class Swarm {
   set(i, mat) { for (const m of this.meshes) m.setMatrixAt(i, mat); }
   commit(n) { for (const m of this.meshes) { m.count = n; m.instanceMatrix.needsUpdate = true; } }
 }
+// Lichtung: Bäume auf dem Bauplatz verschwinden
+function clearAround(x, z, r) { for (const t of trees) if (!t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r) { if (t.reserved && t.reserved !== 'fox') t.reserved.tree = null; t.reserved = null; t.gone = true; } }
+const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
+const stumpSwarm = new Swarm(parts(gStump), 500);
+const trees = [];
+const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r);
+function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
+function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
+const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 
 /* ------------------------------------------------------------------ village */
 const SB = 1.5, ST = 1.25;
 const statics = [];
+function updateStatics() { for (const s of statics) s.o.position.set(s.x, heightAt(s.x, s.z), s.z); }
 function place(gltf, x, z, ry = 0, s = SB) { const o = shadowify(gltf.scene.clone(true)); o.scale.setScalar(s); o.rotation.y = ry; scene.add(o); const e = { o, x, z }; statics.push(e); return e; }
 // Dorfplatz in der Inselmitte (Dorflinde, Brunnen), Lager am Platz; der Schrein liegt auf dem Hügel (SHRINE_AT)
 const SHRINE_POS = SHRINE_AT, PLAZA = { x: 0, z: 0, r: 2.95 }, LAGER = { x: 4.7, z: 1.4 }, WELL = { x: -2.05, z: 1.55 }, MILL_POS = { x: -10, z: 1.2 };
@@ -1042,6 +1069,7 @@ for (let k = 0; k < 20; k++) {
 const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 sites.sort((p, q) => angDist(p.a, Math.PI / 2) - angDist(q.a, Math.PI / 2));
 const houses = [];
+onSave(() => { S.houses = houses.length; });
 // Nachts leuchten die Fenster: die Scheiben liegen im Texturatlas (8×4 Felder) in Spalte 6, Zeile 1
 const winMask = (() => { const cv = document.createElement('canvas'); cv.width = 8; cv.height = 4; const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 8, 4); g.fillStyle = '#fff'; g.fillRect(6, 1, 1, 1);
   const t = new THREE.CanvasTexture(cv); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false; return t; })();
@@ -1086,7 +1114,7 @@ function addHouse(site) {
 }
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
 S.houses = houses.length;
-let construction = null;
+const build = { construction: null };
 const scaff = place(gScaff, 0, 0, 0, 0.95); scaff.o.visible = false;
 
 /* ------------------------------------------------------------------ Lager und Werkstätten */
@@ -1157,7 +1185,7 @@ function groundAt(x, z) {
   return y;
 }
 const huts = [];
-let worldReady = false; // erst wenn die Bäume stehen, können Hütten eine Lichtung schlagen
+onSave(() => { S.hutGoods = huts.map(h => h.goods); S.hutInp = huts.map(h => h.inp | 0); });
 // Werkstätten haben eigene Bauplätze am Waldrand, so nehmen sie den Wohnhäusern keinen Platz weg
 const hutSites = [];
 for (let i = 0; i < 18; i++) {
@@ -1243,6 +1271,7 @@ const cropGeo = (() => {
 const CROP_LAYOUT = CROPS.map(C => { const out = []; for (let i = 0; i < C.rows; i++) for (let j = 0; j < C.per; j++) out.push({ x: (i - (C.rows - 1) / 2) * (C.sp || (FARM.fw / 3) * (C.rows === 2 ? 1.2 : 1)) + rnd(.03), z: ((j + .5) / C.per - .5) * (FARM.fd - .25) + rnd(.04), r: Math.random() * 6.28, s: .85 + Math.random() * .3 }); return out; });
 const cropMeshes = cropGeo.map((g, c) => ['leaf', 'fruit'].map(k => { const m = new THREE.InstancedMesh(g[k], plantMat, 12 * CROPS[c].rows * CROPS[c].per); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; }));
 const fields = [], stock = [], farms = [];
+onSave(() => { S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); });
 const stockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9, flatShading: true });
 // Rinder, Schweine, Hühner: Körper aus einem Stück, Beine und Kopf beweglich
 function makeStock(kind) {
@@ -1481,6 +1510,7 @@ const puffPts = new THREE.Points(puffGeo, new THREE.ShaderMaterial({ uniforms: p
   fragmentShader: `varying float vA; uniform float uL; void main() { vec2 c = gl_PointCoord - .5; float d = dot(c, c); if (d > .25 || vA <= 0.) discard; gl_FragColor = vec4(vec3(.78, .77, .75) * uL, vA * (1. - d * 4.) * .55); }` }));
 puffPts.frustumCulled = false; puffPts.userData.noSnow = true; scene.add(puffPts);
 function updateWorkshops(dt, t) {
+  for (const h of huts) if (h.saw) { h.sawing = Math.max(0, h.sawing - dt); if (h.sawing > 0) h.saw.rotation.x += dt * 14; }
   for (const hs of huts) {
     hs.busy = Math.max(0, (hs.busy || 0) - dt);
     if (hs.role === 'miller' && hs.fan) hs.fan.rotation.z += dt * (hs.busy > 0 ? 3.6 : .7) * (.6 + .6 * waterU.uWind.value); // mahlt: Flügel drehen schnell
@@ -1495,8 +1525,6 @@ function updateWorkshops(dt, t) {
   for (let i = 0; i < PUFF_N; i++) { const q = puffs[i]; if (!q) { puffA[i * 2] = 0; continue; } puffPos.set([q.x, q.y, q.z], i * 3); const u = q.t / q.life; puffA[i * 2] = Math.min(1, u * 6) * (1 - u); puffA[i * 2 + 1] = .12 + u * .35; }
   puffGeo.attributes.position.needsUpdate = true; puffGeo.attributes.a.needsUpdate = true; puffU.uVH.value = renderer.domElement.height; puffU.uL.value = .35 + .65 * (1 - sky.night); puffPts.visible = puffs.length > 0;
 }
-// Lichtung: Bäume auf dem Bauplatz verschwinden
-function clearAround(x, z, r) { if (!worldReady) return; for (const t of trees) if (!t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r) { if (t.reserved && t.reserved !== 'fox') t.reserved.tree = null; t.reserved = null; t.gone = true; } }
 function addHut(role, site) {
   site.used = true; if (!site.existing) { clearAround(site.x, site.z, 1.5); flattenAt(site.x, site.z, 1.9); }
   const H = HUT[role], e = site.existing || place(H.gl, site.x, site.z, site.ry, H.k);
@@ -1531,19 +1559,11 @@ huts.forEach((h, i) => { h.inp = Math.max(0, S.hutInp[i] | 0); }); // Vorrat in 
 huts.forEach((h, i) => { const g = S.hutGoods[i]; if (g && typeof g === 'object') for (const k in g) if (RES[k] && isFinite(g[k]) && g[k] > 0) h.goods[k] = Math.floor(g[k]); });
 
 /* ------------------------------------------------------------------ trees & rocks */
-const treeMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, 480); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; });
-const stumpSwarm = new Swarm(parts(gStump), 500);
-const trees = [];
-const treeNear = (x, z, r) => trees.some(t => !t.gone && (t.x - x) ** 2 + (t.z - z) ** 2 < r * r);
-function addTree(x, z, g = 1) { if (trees.length >= 480) return null; const t = { x, z, type: treeKindAt(x, z), tint: .88 + Math.random() * .22, g, alive: true, gone: false, stumpT: 0, reserved: null, rot: Math.random() * 6.28, ph: Math.random() * 6.28 }; trees.push(t); return t; }
 for (let tries = 0; tries < 4000 && trees.length < 165; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
   if (h < .45 || h > 3.0 || Math.hypot(x, z) < 8.5 || streamDist(x, z) < 1.1 || onSacred(x, z, .9) || laneDist(x, z) < 1 || sites.some(st => Math.hypot(st.x - x, st.z - z) < 2.6) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.6 || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 || onFarm(x, z, .8) || treeNear(x, z, 1.0) || hutSites.some(st => st.used && Math.hypot(st.x - x, st.z - z) < 1.5)) continue;
   addTree(x, z, .75 + Math.random() * .25);
 }
-worldReady = true;
-function chopTree(t) { t.alive = false; t.stumpT = 90; if (t.reserved) t.reserved = null; } // Stumpf verrottet, danach ist der Platz frei für einen Setzling
-const freeSlot = t => !t.gone && !t.alive && !t.reserved;
 // Bauplätze, Dorfplatz und Werkstätten bleiben frei von Felsen und Büschen
 const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onFarm(x, z, .5 + r) || streamDist(x, z) < 1 + r || laneDist(x, z) < 1 + r || onSacred(x, z, .8 + r) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 3.4 + r || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 2.2 + r || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 2.2 + r) || sites.some(st => Math.hypot(st.x - x, st.z - z) < 1.4 + r) || Math.hypot(x - LAGER.x, z - LAGER.z) < 2.8 + r;
 const rocks = [];
@@ -1680,7 +1700,37 @@ function refreshCover(budget) {
     if (coverI >= K.items.length) { coverI = 0; coverK = (coverK + 1) % cover.length; }
   }
 }
-let coverFirst = true; // beim ersten Frame alles setzen
+let coverFirst = true;
+function updateCover(t) { refreshCover(coverFirst ? 1e6 : 450); coverFirst = false; grassU.uT.value = t; } // beim ersten Frame alles setzen
+
+// Bäume (wachsen, wackeln beim Ausreißen, Stümpfe verrotten), Felsen und Büsche folgen dem geformten Gelände
+function renderNature(dt, t) {
+  const tc2 = TK.map(() => 0); let sc = 0;
+  for (const tr of trees) {
+    if (tr.gone) continue;
+    const y = heightAt(tr.x, tr.z);
+    if (y < .05) { tr.gone = true; if (tr.reserved && tr.reserved !== 'fox') tr.reserved.tree = null; tr.reserved = null; continue; }
+    if (tr.alive) {
+      if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008 * (1 + 2 * weather.rain)); // Regen lässt Bäume schneller wachsen
+      const s = ST * tr.g, pull = input.treeGrab && input.treeGrab.tr === tr ? input.treeGrab.prog : 0;
+      if (tr.shake > 0) tr.shake = Math.max(0, tr.shake - dt * 3.5);
+      const shk = tr.shake ? Math.sin(t * 45) * tr.shake * .045 : 0;
+      dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12 + shk, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
+      const tm = treeMeshes[tr.type], ti = tc2[tr.type]++; tm.setMatrixAt(ti, dummy.matrix); tm.setColorAt(ti, COL.setScalar(tr.tint || 1));
+    } else if (tr.stumpT > 0) {
+      tr.stumpT -= dt;
+      dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
+    } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
+    else if (!tr.reserved && Math.random() < dt / 900 * (1 + 3 * weather.rain)) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus, bei Regen öfter
+  }
+  treeMeshes.forEach((m, k) => { m.count = tc2[k]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }); stumpSwarm.commit(sc);
+  const rc = ROCK_GEOS.map(() => 0);
+  for (const r of rocks) { const y = heightAt(r.x, r.z); dummy.position.set(r.x, y - r.s * .28, r.z); dummy.rotation.set(r.tx, r.r, r.tz); dummy.scale.setScalar(r.s); dummy.updateMatrix(); rockMeshes[r.v].setMatrixAt(rc[r.v]++, dummy.matrix); }
+  rockMeshes.forEach((m, k) => { m.count = rc[k]; m.instanceMatrix.needsUpdate = true; });
+  const bc = BUSH_GEOS.map(() => 0);
+  for (const b of bushes) { const y = heightAt(b.x, b.z); dummy.position.set(b.x, y, b.z); dummy.rotation.set(Math.sin(t * 1.1 + b.r * 3) * .03, b.r, 0); dummy.scale.setScalar(b.s); dummy.updateMatrix(); bushMeshes[b.v].setMatrixAt(bc[b.v]++, dummy.matrix); }
+  bushMeshes.forEach((m, k) => { m.count = bc[k]; m.instanceMatrix.needsUpdate = true; });
+}
 
 /* ------------------------------------------------------------------ Wegfindung */
 // Raster über die ganze Insel (NAV_C Einheiten je Feld). Belegt sind Gebäude (gedrehte Rechtecke aus den Modellmaßen),
@@ -1707,7 +1757,7 @@ function buildingObstacles() {
   }
   rects.push({ x: lager.x, z: lager.z, ry: lager.o.rotation.y, hx: 2.0, hz: .86 });
   circles.push({ x: SHRINE_POS.x, z: SHRINE_POS.z, r: 1.62 }, { x: WELL.x, z: WELL.z, r: .45 }, { x: MILL_POS.x, z: MILL_POS.z, r: .8 }, ...sacredProps.obstacles);
-  if (construction) circles.push({ x: construction.site.x, z: construction.site.z, r: .9 });
+  if (build.construction) circles.push({ x: build.construction.site.x, z: build.construction.site.z, r: .9 });
   return { rects, circles };
 }
 // Liegt der Punkt (mit Abstand m) in oder an einem Gebäude, Garten, Feld, Zaun?
@@ -1742,6 +1792,11 @@ function stampNav(nav, obs) {
   }
 }
 let navReady = false, navT = 0, navBudget = 0;
+// Wegnetz jede Sekunde neu (Gebäude, Bäume, geformtes Gelände); Rechenbudget der Wegsuche je Bild
+function updateNav(dt) {
+  navT -= dt; if (navT <= 0 || !navReady) { navT = 1; buildNav(); }
+  navBudget = 30000;
+}
 function buildNav() {
   for (let c = 0; c < NAV_SZ; c++) navWater[c] = heightAt(cellX(c), cellZ(c)) < -.05 ? 1 : 0;
   const obs = navObstacles();
@@ -1938,7 +1993,8 @@ function updatePuddles(dt, t) { terrainU.uWet.value = weather.wet; terrainU.uRai
 /* ------------------------------------------------------------------ Wildtiere */
 // Rehe und Hasen leben außerhalb des Dorfes, Fische im flachen Wasser rund um die Insel. Später sollen Jäger und Angler
 // sie nutzen: `wild` (Rehe, Hasen) und `fish` stehen dafür bereit.
-const wild = [], fish = [];
+const wild = [];
+const fish = [];
 const animalMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: .9, flatShading: true });
 function makeDeer() {
   const g = new THREE.Group(), fur = animalMat(0x9a6a40), light = animalMat(0xd9c3a2), dark = animalMat(0x3a2a20), white = animalMat(0xf2ede4);
@@ -2168,7 +2224,7 @@ function updateBirds(dt, t) {
       // aufscheuchen: Bewohner, Kreatur, Hand
       let scare = false; const near = (x, z, r) => { if ((b.x - x) ** 2 + (b.z - z) ** 2 < r * r) scare = true; };
       for (const v of villagers) if (v.state !== 'sleep') near(v.x, v.z, b.kind === 'spatz' ? .7 : 1.1);
-      near(fox.x, fox.z, 2.2); if (hand.g.visible && (pressing || hand.vel.length() > 5)) near(hand.g.position.x, hand.g.position.z, 2);
+      near(fox.x, fox.z, 2.2); if (hand.g.visible && (hand.pressing || hand.vel.length() > 5)) near(hand.g.position.x, hand.g.position.z, 2);
       if (night && b.kind !== 'moewe' && !scare) { b.sleep = true; M.g.visible = false; continue; }
       if (b.sleep) { b.sleep = false; M.g.visible = true; b.timer = Math.random() * 3; }
       b.timer -= dt;
@@ -2225,7 +2281,7 @@ function updateWild(dt, t) {
       // eher gelassen, damit man sie beobachten kann: nur wer sehr nahe kommt, scheucht sie auf
       for (const v of villagers) if (v.state !== 'sleep') near(v.x, v.z, deer ? 1.6 : 1.1);
       near(fox.x, fox.z, deer ? 2.8 : 2.2);
-      if (hand.g.visible && (pressing || hand.vel.length() > 6)) near(hand.g.position.x, hand.g.position.z, 1.6); // die Hand nur beim Zugreifen oder schnellen Bewegen
+      if (hand.g.visible && (hand.pressing || hand.vel.length() > 6)) near(hand.g.position.x, hand.g.position.z, 1.6); // die Hand nur beim Zugreifen oder schnellen Bewegen
       if (n && a.state !== 'flee') {
         const l = Math.hypot(tx, tz) || 1, run = deer ? 3.5 : 2.5, px = a.x + tx / l * run + rnd(1), pz = a.z + tz / l * run + rnd(1);
         a.state = 'flee'; setGoal(a, px, pz, navV); a.sp = deer ? 2.6 : 3; a.timer = 2;
@@ -2441,6 +2497,7 @@ function dressVillager(i) {
   return look;
 }
 const villagers = [];
+onSave(() => { S.pop = villagers.length; });
 function spawnVillager(x, z) {
   if (villagers.length >= VCAP) return null;
   const v = { x, z, y: surfaceAt(x, z), h: Math.random() * 6.28, state: 'idle', timer: .3 + Math.random() * 2, tx: x, tz: z, next: null, carry: 0, tree: null, vx: 0, vy: 0, vz: 0, haste: 0, ph: Math.random() * 6.28 };
@@ -2831,11 +2888,6 @@ const handAnim = { kind: null, t: 0, hit: null, hearts: 0 };
 const HAND_DUR = { pet: 2.1, slap: .95 }, HAND_HIT = { pet: 2.05, slap: .62 }; // HIT: Reaktion, sobald die Hand weg ist
 const BACK_Z = [-.3, -.15, 0, .15, .3]; // Messstellen entlang des Rückens (Anteile der Tierhöhe, + = Kopf)
 function playHand(kind, onHit) {
-  // ein laufendes oder stehendes Tier hält für die Geste inne (außer es trägt gerade Holz)
-  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) {
-    if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
-    foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
-  }
   const P = portrait;
   Object.assign(handAnim, { kind, t: 0, hit: onHit, hearts: 0, back: backProfile(), pback: P.rig ? backProfile(P.rig.model, P.pivot) : null });
 }
@@ -2903,7 +2955,25 @@ function floatText(x, y, z, text, cls = 'w') {
 }
 let toastTimer = 0;
 function toast(msg, dur = 3.2) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); toastTimer = dur; }
-let incomeAcc = 0, rate = 0;
+let incomeAcc = 0, rate = 0, secT = 0;
+// Glaube fließt auch ohne Gebete (Tempelstufe); die Rate in der Anzeige ist ein gleitender Mittelwert
+function updateIncome(dt) {
+  S.glaube += passive() * dt; incomeAcc += passive() * dt;
+  secT += dt; if (secT >= 1) { rate = rate * .85 + incomeAcc / secT * .15; incomeAcc = 0; secT = 0; }
+}
+// Schwebende Texte steigen auf und verblassen, der Hinweis unten blendet nach seiner Zeit aus
+function updateFloats(dt) {
+  const rect = canvas.getBoundingClientRect();
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const f = floats[i]; f.t += dt;
+    if (f.t > 1.5) { f.el.remove(); floats.splice(i, 1); continue; }
+    tmpV.copy(f.p).project(camera);
+    if (tmpV.z > 1) { f.el.style.opacity = 0; continue; }
+    const sx = (tmpV.x + 1) / 2 * rect.width, sy = (1 - tmpV.y) / 2 * rect.height - f.t * 34;
+    f.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -50%)`; f.el.style.opacity = String(Math.min(1, (1.5 - f.t) * 2.5));
+  }
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
+}
 function addGlaube(n, x, y, z) { S.glaube += n; incomeAcc += n; if (x !== undefined) floatText(x, y + .7, z, '+' + fmt1(n) + ' ✦', 'g'); }
 function addHolz(n, x, y, z) { S.holz += n; if (x !== undefined) floatText(x, y + .7, z, '+' + n + ' Bretter', 'h'); }
 function addLogs(n, x, y, z) { S.logs += n; if (x !== undefined) floatText(x, y + .7, z, `+${n} ${n === 1 ? 'Stamm' : 'Stämme'}`, 'h'); }
@@ -2948,6 +3018,19 @@ function reconcileJobs() {
   }
 }
 function roleCount(r) { return villagers.filter(v => v.role === r).length; }
+// Wachstum des Dorfes: neue Seelen, Berufe abgleichen, Bauaufträge vergeben und fertigstellen
+let birthT = 0, jobT = 0;
+function updateVillage(dt) {
+  birthT += dt; if (birthT > 9) { birthT = 0; if (villagers.length < cap()) { const p = homeSpot(), v = spawnVillager(p.x, p.z); if (v) floatText(v.x, 1.6, v.z, 'Neue Seele', 's'); } }
+  jobT -= dt; if (jobT <= 0) { jobT = 1; reconcileJobs(); }
+  if (!build.construction) { const b = nextBuild(); if (b && S.holz >= b.cost) { S.holz -= b.cost; build.construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
+  if (build.construction) { build.construction.t += dt; if (build.construction.t > 9) {
+    const c = build.construction; c.site.used = false; scaff.o.visible = false; build.construction = null;
+    if (c.role) { const e = addHut(c.role, c.site); S.huts[c.role]++; reconcileJobs(); floatText(e.x, 2.2, e.z, c.label, 's'); toast(`Eine neue ${c.label} steht. Platz für ${ROLES[c.role].per} weitere ${ROLES[c.role].label}.`); }
+    else { const hs = addHouse(c.site); S.houses = houses.length; floatText(hs.x, 2.2, hs.z, 'Neues Haus', 's'); toast(`Ein neues Haus steht. Platz für ${cap()} Seelen.`); }
+    save();
+  } }
+}
 
 /* ------------------------------------------------------------------ villager AI */
 function walk(v, x, z, next) { v.state = 'walk'; v.next = next; v.stalk = next === 'aim'; setGoal(v, x, z, navV); }
@@ -3333,6 +3416,127 @@ function updateVillager(v, dt, t) {
   v.y = groundAt(v.x, v.z); // auf dem Steg der Fischer auf Deckhöhe
 }
 
+// Nachts steigt ab und zu ein „Zzz“ über einem Haus auf, in dem jemand schläft
+let zzzT = 3;
+function updateSleepers(dt) {
+  zzzT -= dt;
+  if (zzzT <= 0) { zzzT = 2.2 + Math.random() * 1.5; const sl = villagers.filter(v => v.state === 'sleep' && v.home); if (sl.length) { const hs = sl[Math.floor(Math.random() * sl.length)].home; floatText(hs.x + rnd(.2), heightAt(hs.x, hs.z) + 1.9, hs.z + rnd(.2), 'Zzz', 'w'); } }
+}
+
+/* ------------------------------------------------------------------ Bewohner zeichnen */
+// Jeder Bewohner besteht aus Teilen (Beine, Arme, Kopf, Werkzeug …), die hier je nach Tätigkeit gestellt werden
+const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
+function renderVillagers(dt, t) {
+  for (const m of vAll) m.count = villagers.length;
+  lights.length = 0;
+  const lantern = sky.night > .3; // ab der Dämmerung trägt jeder eine Laterne
+  villagers.forEach((v, i) => {
+    const L = v.look;
+    if (v.state === 'sleep') { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte
+    let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
+    v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
+    v.st = v.state === 'lunch' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
+    if (v.state === 'walk' || v.state === 'flee') {
+      const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
+      bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
+      if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
+    } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
+    else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
+    else if (v.state === 'proc') { const s = Math.sin(t * (v.role === 'baker' ? 7 : 3) + v.ph); if (v.role === 'baker') { armA = armB = -1.15 + s * .25; tilt = .22; splay = .05; } else { armA = -1.9 + s * .12; armB = -1.7 - s * .12; splay = .2; tilt = -.04; } leg = .15; } // kneten bzw. Korn in den Trichter schütten
+    else if (v.state === 'tend') { const s = Math.sin(t * 7 + v.ph); armA = -.5; armB = -1.1 + s * .35; splay = .15; tilt = .1; } // Futter streuen
+    else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }
+    else if (v.state === 'aim') { const draw = smooth(1.3, .5, v.timer); armA = -1.57; armB = -1.45; splay = .08; armRz = .55 + draw * .35; tilt = -.05; leg = .2; } // Bogen spannen
+    else if (v.state === 'fish') { // auswerfen: Rute von hinten oben nach vorn, dann ruhig halten; beim Biss ruckt sie hoch
+      const c = v.fp === 'cast' ? smooth(.9, .1, v.timer) : 1, jerk = v.fp === 'bite' ? Math.abs(Math.sin(v.timer * 14)) * .3 : Math.sin(t * 1.3 + v.ph) * .03;
+      armB = -2.5 + c * 1.5 - jerk; armA = -.95; splay = .08; leg = .12;
+      if (v.fp === 'reel') { const u = 1 - v.timer / REEL_T; armB = -1.05 - smooth(.6, 1, u) * .55 - (v.hooked ? Math.abs(Math.sin(t * 9)) * .08 : 0); armA = -1.05 + Math.sin(t * 15) * .28; splay = .14 + Math.cos(t * 15) * .06; tilt = -.06; } // Rute heben, linke Hand kurbelt
+    }
+    else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
+    else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
+    else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
+      bite = Math.max(0, Math.sin(t * 1.4 + v.ph * 3)) ** 4 * v.st;
+      tilt = -.14 + bite * .06; armA = -.7; armB = -.7 - 1.75 * bite; splay = .12; armRz = .5 * bite;
+    }
+    else if (v.state === 'grabbed' || v.state === 'falling') {
+      const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
+      leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
+    } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
+    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
+    const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
+    if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
+    if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
+    else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
+    const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
+    const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
+    const vh = v.state === 'grabbed' || v.state === 'falling' ? (v.vh = v.h) : smoothH(v, dt);
+    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
+    const M = dummy.matrix;
+    const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
+    // Laterne in der linken Hand (nicht beim Hacken, Beten, Tragen: dann steht sie neben dem Bewohner)
+    const handLantern = lantern && !v.carry && ['walk', 'idle', 'flee', 'dizzy'].includes(v.state);
+    if (handLantern || sapling) { armA = (handLantern ? -.5 : -.35) + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .06 : 0); splay = Math.max(splay, .14); }
+    let legA = leg, legB = -leg;
+    if (v.st > 0) { // im Sitzen liegen die Beine vorne flach am Boden
+      const sl = -1.5 - tilt; legA += (sl - legA) * v.st; legB += (sl - legB) * v.st;
+      bob -= v.st * HIP_Y * VS * L.s * .92;
+      dummy.position.y = v.y + bob; dummy.updateMatrix();
+    }
+    if (v.kn > 0) { // auf den Fersen sitzen: Beine liegen hinten flach am Boden, Körper sinkt ab
+      const kl = 1.45 - tilt; legA += (kl - legA) * v.kn; legB += (kl - legB) * v.kn;
+      bob -= v.kn * HIP_Y * VS * L.s * .8;
+      dummy.position.y = v.y + bob; dummy.updateMatrix();
+    }
+    part(vParts.legL, .038, HIP_Y, legA, 0); part(vParts.legR, -.038, HIP_Y, legB, 0);
+    part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay + armRz);
+    if (bite >= 0) part(vBread, -.085, SHO_Y, armB, -splay + armRz); else vBread.setMatrixAt(i, zero);
+    if (!lantern || v.state === 'grabbed' || v.state === 'falling') { vLantern.setMatrixAt(i, zero); vLanternGlass.setMatrixAt(i, zero); }
+    else {
+      if (handLantern) { // hängt senkrecht an der Hand, pendelt beim Gehen
+        const ca = Math.cos(splay) * .13;
+        part(vLantern, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA), Math.sin(t * 5.5 + v.ph) * (v.state === 'walk' ? .25 : .05), 0, -ca * Math.sin(armA));
+      } else if (v.carry) part(vLantern, .15, .19, Math.sin(t * 5.5 + v.ph) * .2, 0, .13); // hängt am Holzbündel
+      else { // steht neben dem Bewohner am Boden
+        const c = Math.cos(vh), sn = Math.sin(vh), ox = .24, oz = .06, s2 = VS * L.s;
+        vTmp.makeRotationY(vh).setPosition(v.x + ox * c + oz * sn, groundAt(v.x + ox * c + oz * sn, v.z - ox * sn + oz * c) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
+        vLantern.setMatrixAt(i, vOut);
+      }
+      vLanternGlass.setMatrixAt(i, vOut);
+      lV.set(0, LANTERN_C, 0).applyMatrix4(vOut); lights.push({ x: lV.x, y: lV.y, z: lV.z });
+    }
+    vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
+    vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
+    vParts.beard.setMatrixAt(i, L.beard ? M : zero);
+    vWood.forEach(m => m.setMatrixAt(i, v.carry === 1 ? M : zero)); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
+    vGame.setMatrixAt(i, v.carry === 3 ? M : zero); vBasket.setMatrixAt(i, v.carry === 4 ? M : zero);
+    vVeg.setMatrixAt(i, v.carry === 5 ? M : zero); vVegTop.setMatrixAt(i, v.carry === 5 ? M : zero); vMilk.setMatrixAt(i, v.carry === 6 ? M : zero);
+    vEggBasket.setMatrixAt(i, v.carry === 7 ? M : zero); vEggs.setMatrixAt(i, v.carry === 7 ? M : zero);
+    vGrainSack.setMatrixAt(i, v.carry === 8 ? M : zero); vFlourSack.setMatrixAt(i, v.carry === 9 ? M : zero); vLoafBasket.setMatrixAt(i, v.carry === 10 ? M : zero); vLoaves.setMatrixAt(i, v.carry === 10 ? M : zero);
+    // Jäger: Bogen und Köcher auf dem Rücken, zum Schuss nimmt er den Bogen in die linke Hand und spannt die Sehne
+    const aiming = v.role === 'hunter' && v.state === 'aim', drawn = aiming && v.timer < .8;
+    vBowBack.setMatrixAt(i, v.role === 'hunter' && !aiming ? M : zero);
+    if (aiming && !drawn) part(vBowAim, .075, SHO_Y + .005, 0, -.12, .15); else vBowAim.setMatrixAt(i, zero);
+    if (drawn) part(vBowDraw, .075, SHO_Y + .005, 0, -.12, .15); else vBowDraw.setMatrixAt(i, zero);
+    vQuiver.setMatrixAt(i, v.role === 'hunter' ? M : zero);
+    if (rodOn) { part(vRod, -.085, SHO_Y, armB, -splay + armRz); const tp = lV.copy(ROD_TIP).applyMatrix4(vOut); v.tip = v.tip || {}; v.tip.x = tp.x; v.tip.y = tp.y; v.tip.z = tp.z; } else vRod.setMatrixAt(i, zero);
+    for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
+    // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
+    if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
+    for (const set of [vAxe, vShovel]) {
+      if (set !== vTool) { set.forEach(m => m.setMatrixAt(i, zero)); continue; }
+      if (v.state === 'chop' || v.state === 'plant') set.forEach(m => part(m, 0, SHO_Y, armA, 0));
+      else if (shoulder) {
+        const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
+        // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand
+        set.forEach(m => part(m, -.07, SHO_Y + .02 + Math.cos(a) * sh, a, 0, Math.sin(a) * sh));
+      } else set.forEach(m => m.setMatrixAt(i, zero));
+    }
+    // Setzling in der linken Hand (abends hält sie die Laterne)
+    if (sapling && !handLantern) { const ca = Math.cos(splay) * .13; vSapling.forEach(m => part(m, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA) - .02, 0, 0, -ca * Math.sin(armA))); }
+    else vSapling.forEach(m => m.setMatrixAt(i, zero));
+  });
+  for (const m of vAll) m.instanceMatrix.needsUpdate = true;
+}
+
 /* ------------------------------------------------------------------ fox AI */
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
@@ -3341,7 +3545,7 @@ function foxFinish(a) {
   fox.lastDesc = fox.desc || ACT_DESC[a]; fox.desc = null;
   toast(`${S.name} hat ${fox.lastDesc}. Lob oder Tadel?`, 4.5);
   $('btnFox').classList.add('pulse');
-  renderFox();
+  emit('fox');
 }
 function foxChoose() {
   if (fox.haul || fox.carryGoods) { if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k]; fox.haul = null; fox.carryGoods = null; } // abgebrochenes Tragen: Waren gehen ins Lager
@@ -3497,6 +3701,11 @@ function foxCast(x, z) {
 function reinforce(kind) {
   const t = clock.elapsedTime, a = fox.last;
   if (handAnim.kind) return; // eine Geste nach der anderen
+  // ein laufendes oder stehendes Tier hält für die Geste inne (außer es trägt gerade Holz)
+  if (fox.state === 'idle' || (fox.state === 'walk' && fox.next !== 'store')) {
+    if (fox.tree) { fox.tree.reserved = null; fox.tree = null; } fox.act = null;
+    foxIdle(HAND_DUR[kind] + .6); fox.idleA = 'idle'; foxAnim('idle');
+  }
   // die Hand führt die Geste aus; das Tier reagiert erst, wenn sie es wieder losgelassen hat
   playHand(kind, () => {
     const top = foxPivot.position.y + CREATURES[fox.kind].h + .5;
@@ -3514,7 +3723,7 @@ function reinforce(kind) {
     toast(kind === 'pet' ? `${S.name} lernt: mehr ${ACT_LABEL[a]}.` : `${S.name} lernt: weniger ${ACT_LABEL[a]}.`);
     fox.last = null; $('btnFox').classList.remove('pulse');
   } else toast(kind === 'pet' ? `${S.name} schmiegt sich an deine Hand.` : `${S.name} duckt sich und weiß nicht, wofür.`);
-  renderFox(); save();
+  emit('fox'); save();
 }
 
 /* ------------------------------------------------------------------ Bitten am Schrein */
@@ -3596,7 +3805,6 @@ const alertRing = new THREE.Mesh(new THREE.RingGeometry(4.6, 5, 64).rotateX(-Mat
 alertRing.visible = false; scene.add(alertRing);
 function updateForestAlert(dt, t) {
   const A = forestAlert;
-  alertRing.visible = !!A.hut && tool === 'miracle';
   if (alertRing.visible) { alertRing.position.set(A.at.x, Math.max(heightAt(A.at.x, A.at.z), 0) + .12, A.at.z); alertRing.material.opacity = .35 + .25 * Math.sin(t * 3); alertRing.scale.setScalar(1 + .03 * Math.sin(t * 3)); }
   if ((A.checkT -= dt) > 0) return; A.checkT = 2; A.cool -= 2;
   if (A.hut) { if (!huts.includes(A.hut) || forestAround(A.hut) >= FOREST_LOW + 2) A.hut = null; return; }
@@ -3613,7 +3821,7 @@ function forestHelped(x, z) { // nach einem Regen
 // Reifegrad über den Feldern, solange die Hand gewählt ist: Frucht und Fortschrittsring, reife Felder golden
 const fieldTagEls = [];
 function placeFieldTags() {
-  const box = $('fieldTags'), show = tool === 'hand' && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
+  const box = $('fieldTags'), show = input.tool === 'hand' && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
   fields.forEach((f, i) => {
     let el = fieldTagEls[i];
     if (!el) { el = document.createElement('div'); el.className = 'ftag'; el.innerHTML = '<i></i><span></span>'; box.appendChild(el); fieldTagEls[i] = el; el._k = ''; }
@@ -3631,6 +3839,7 @@ function placeFieldTags() {
 }
 function placeForestUI() {
   const B = $('forestAlert'), A = forestAlert;
+  alertRing.visible = !!A.hut && input.tool === 'miracle';
   B.hidden = !A.hut || $('app').classList.contains('sheet-open');
   if (B.hidden) return;
   const r = canvas.getBoundingClientRect(); toScreen(A.hut.x, heightAt(A.hut.x, A.hut.z) + 2.2, A.hut.z, tA);
@@ -3660,12 +3869,23 @@ function castHaste(x, z) {
   floatText(x, surfaceAt(x, z) + 1.6, z, n ? `${n} Bewohner beflügelt` : 'Niemand in Reichweite', 's');
   if (n) wishDone('haste');
 }
-let miracle = 'rain', sculptDir = 1;
+const input = { tool: 'hand', primary: null, pressing: false, grabbed: null, handShown: false, treeGrab: null, ptrType: 'mouse', miracle: 'rain', sculptDir: 1 };
+// Regenwolke regnet ab, Ring der Eile breitet sich aus
+function updateMiracleFx(dt, t) {
+  if (rain.t > 0) {
+    rain.t -= dt; const p = rainGeo.attributes.position;
+    for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i) - dt * 11; if (y < surfaceAt(p.getX(i), p.getZ(i))) y = 6.5; p.setY(i, y); }
+    p.needsUpdate = true; rainCloud.position.set(rain.x, 6.6 + Math.sin(t) * .1, rain.z); placeProxy(rainCloudSh, rainCloud, 1);
+    rainPts.material.opacity = Math.min(.8, rain.t);
+    if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; rainCloudSh.visible = false; }
+  }
+  if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
+}
 function tryMiracle(p) {
-  const m = MIRACLES[miracle];
+  const m = MIRACLES[input.miracle];
   if (S.glaube < m.cost) { toast(`${m.label} kostet ${m.cost} Glaube. Deine Bewohner beten noch.`); return; }
   S.glaube -= m.cost;
-  if (miracle === 'rain') castRain(p.x, p.z); else castHaste(p.x, p.z);
+  if (input.miracle === 'rain') castRain(p.x, p.z); else castHaste(p.x, p.z);
   foxCast(p.x, p.z);
 }
 
@@ -3673,19 +3893,20 @@ function tryMiracle(p) {
 // Mit der Hand einen Baum packen und halten oder nach oben ziehen: er wackelt, reißt samt Wurzeln aus,
 // liegt dann in der Hand und wird beim Loslassen geworfen. Bei der Landung wird er zu Holz; an der Stelle
 // wächst später ein neuer Baum.
-let treeGrab = null;
+
 const holdOff = new THREE.Vector3(); // Abstand Gehaltenes – Fingerpunkt am Boden beim Zupacken
 // Am Handy verdeckt der Finger, was darunter liegt: Hand und Gehaltenes schweben dort ein Stück über dem Finger.
 // Was angetippt wird (Bewohner, Baum, Tiergeist), zählt weiterhin genau unter dem Finger.
-let ptrType = 'mouse';
-const touchLift = () => ptrType === 'touch' ? 90 : 0;
-const setHoldOff = (x, z) => { if (ptrType === 'touch') holdOff.set(0, 0, 0); else holdOff.set(x - hit.x, 0, z - hit.z); }
+
+const touchLift = () => input.ptrType === 'touch' ? 90 : 0;
+const setHoldOff = (x, z) => { if (input.ptrType === 'touch') holdOff.set(0, 0, 0); else holdOff.set(x - hit.x, 0, z - hit.z); }
 const heldTree = { on: false, flying: false, type: 0, g: 1, rot: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, tilt: 0 };
 const heldObjs = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const rootBall = new THREE.Mesh(new THREE.SphereGeometry(.42, 10, 7).scale(1, .55, 1), new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true }));
 rootBall.castShadow = true; rootBall.visible = false; scene.add(rootBall);
 // Baum unter dem Finger: Abstand zur Strecke Stammfuß–Krone auf dem Bildschirm, Toleranz wächst mit der Baumgröße
-const TREE_H = 1.12, tA = new THREE.Vector2(), tB = new THREE.Vector2();
+const TREE_H = 1.12;
+const tA = new THREE.Vector2(), tB = new THREE.Vector2();
 function toScreen(x, y, z, out) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return out.set((tmpV.x + 1) / 2 * r.width + r.left, (1 - tmpV.y) / 2 * r.height + r.top); }
 function treeAt(cx, cy) {
   let best = null, bd = 1e9;
@@ -3757,12 +3978,12 @@ function updateMouthTree() {
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 function updateTrees(dt, t) {
   updateFallen(dt);
-  if (treeGrab) {
-    if (!treeGrab.tr.alive) treeGrab = null;
+  if (input.treeGrab) {
+    if (!input.treeGrab.tr.alive) input.treeGrab = null;
     else {
       // halten zieht langsam, nach oben wischen schneller
-      treeGrab.prog += dt * .4 + Math.max(0, treeGrab.lastY - pointerXY.y) / 160; treeGrab.lastY = pointerXY.y;
-      if (treeGrab.prog >= 1) { const tr = treeGrab.tr; treeGrab = null; uprootTree(tr); }
+      input.treeGrab.prog += dt * .4 + Math.max(0, input.treeGrab.lastY - pointerXY.y) / 160; input.treeGrab.lastY = pointerXY.y;
+      if (input.treeGrab.prog >= 1) { const tr = input.treeGrab.tr; input.treeGrab = null; uprootTree(tr); }
     }
   }
   const o = heldObjs[heldTree.type];
@@ -3819,6 +4040,7 @@ function foxUnder(cx, cy) {
 // wenn das Menü offen ist oder die Hand über dem Tier schwebt, sonst nur eine offene Frage nach Lob/Tadel
 let badgeT = 0;
 function placeFoxUI(dt) {
+  hoverFox = input.tool === 'hand' && input.handShown && input.primary === null && !input.grabbed && !heldTree.on && foxUnder(pointerXY.x, pointerXY.y);
   const C = CREATURES[fox.kind], r = canvas.getBoundingClientRect(), y = foxPivot.position.y;
   toScreen(fox.x, y + C.h * .5, fox.z, tA); let cx = tA.x - r.left, cy = tA.y - r.top;
   // Kreis vollständig im Bild halten (oben Statusleiste, unten Werkzeugleiste)
@@ -3842,7 +4064,7 @@ function placeFoxUI(dt) {
 
 /* ------------------------------------------------------------------ input */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-let tool = 'hand', primary = null, pressing = false, grabbed = null, handShown = false;
+
 const pointers = new Map(); const pointerXY = { x: 0, y: 0 };
 const hit = new THREE.Vector3(); let hitOk = false;
 function pick(cx, cy) {
@@ -3935,7 +4157,7 @@ function helpAt(cx, cy, picked = false) {
 // Was die Hand unter dem Mauszeiger tun kann: Haltung und Schild (nur ohne Druck, alle paar Bildschirmbilder neu bestimmt)
 let hoverHelp = null, hoverT = 0;
 function updateHandHover(dt) {
-  const tip = $('handTip'), on = tool === 'hand' && handShown && ptrType === 'mouse' && primary === null && !grabbed && !heldTree.on && !hoverFox && !ringOpen;
+  const tip = $('handTip'), on = input.tool === 'hand' && input.handShown && input.ptrType === 'mouse' && input.primary === null && !input.grabbed && !heldTree.on && !hoverFox && !ringOpen;
   if (!on) { hoverHelp = null; tip.hidden = true; return; }
   if ((hoverT -= dt) <= 0) {
     hoverT = .12;
@@ -3949,29 +4171,72 @@ function updateHandHover(dt) {
   }
   if (!tip.hidden) { const r = canvas.getBoundingClientRect(); tip.style.transform = `translate(${Math.round(pointerXY.x - r.left + 18)}px, ${Math.round(pointerXY.y - r.top + 14)}px)`; }
 }
+// Zeiger: Bodenpunkt unter dem Finger bestimmen, beim Formen das Gelände verändern
+function updatePointer(dt) {
+  if (input.primary !== null || (input.handShown && input.tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
+  if (input.pressing && input.tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, input.sculptDir, dt);
+}
+// Gehaltener Bewohner hängt unter der Hand
+function carryGrabbed() { if (input.grabbed) { input.grabbed.x = hand.g.position.x; input.grabbed.z = hand.g.position.z + .05; input.grabbed.y = hand.g.position.y - .62; } }
+// Hand: folgt dem Zeiger, hält, was sie gegriffen hat, und wechselt die Haltung je nach Werkzeug und Ziel
+function updateHand(dt, t) {
+  if (handAnim.kind) updateHandAnim(dt, t);
+  const showHand = !handAnim.kind && input.tool !== 'blick' && input.handShown && hitOk;
+  if (!handAnim.kind) hand.g.visible = showHand;
+  if (showHand) {
+    // auf dem Bildschirm etwa gleich groß, egal wie weit gezoomt ist
+    const hs = clamp(camera.position.distanceTo(hand.g.position) / 25, .42, 1.25); hand.g.scale.setScalar(hs);
+    const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : input.grabbed ? 1.0 : ((input.pressing && input.tool === 'sculpt') ? .75 : 1.5) * hs;
+    if (input.treeGrab) {
+      // am Stamm festhalten und zittern, je weiter der Baum nachgibt
+      const tr = input.treeGrab.tr, j = input.treeGrab.prog * .05;
+      hand.target.set(tr.x + rnd(j), heightAt(tr.x, tr.z) + .95 * tr.g * ST + input.treeGrab.prog * .25, tr.z + rnd(j));
+    } else if (input.grabbed || heldTree.on) {
+      // Gehaltenes (Bewohner, Baum) bleibt beim Zupacken, wo es war, und folgt dann der Fingerbewegung;
+      // die Hand hängt senkrecht darüber
+      const x = hit.x + holdOff.x, z = hit.z + holdOff.z;
+      hand.target.set(x, Math.max(heightAt(x, z), 0) + lift, z);
+    } else {
+      // leere Hand: um 'lift' über dem Boden, aber auf der Sichtlinie durch den Zeiger, damit sie genau unter ihm liegt
+      const d = ray.ray.direction, k = lift / Math.max(.2, -d.y);
+      hand.target.set(hit.x, Math.max(hit.y, 0), hit.z).addScaledVector(d, -k);
+    }
+    // war die Hand unsichtbar (z. B. zwischen zwei Tipps am Handy), erscheint sie direkt am Ziel statt heranzufliegen
+    if (!hand.shown) { hand.g.position.copy(hand.target); hand.vel.set(0, 0, 0); }
+    hand.prev.copy(hand.g.position);
+    hand.g.position.lerp(hand.target, 1 - Math.exp(-dt * 16));
+    const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
+    const dx = controls.target.x - camera.position.x, dz = controls.target.z - camera.position.z;
+    hand.g.rotation.y = Math.atan2(-dx, -dz);
+    const pose = input.grabbed || heldTree.on ? HAND_POSES.hold : input.treeGrab ? HAND_POSES.claw : hoverFox && !input.pressing ? HAND_POSES.flat : hoverHelp && !input.pressing ? HAND_POSES[hoverHelp.pose] || HAND_POSES.relax
+      : input.pressing ? (input.tool === 'sculpt' ? (input.sculptDir > 0 ? HAND_POSES.flat : HAND_POSES.fist) : HAND_POSES.grab) : HAND_POSES.relax;
+    poseHand(hand, pose, dt, t);
+  }
+  hand.shown = showHand; hand.pressing = input.pressing;
+}
 function onToolDown(cx, cy) {
-  pick(cx, cy); handShown = hitOk;
-  if (tool === 'hand') {
-    if (foxUnder(cx, cy)) { openRing(); pressing = false; return; }
+  pick(cx, cy); input.handShown = hitOk;
+  if (input.tool === 'hand') {
+    if (foxUnder(cx, cy)) { openRing(); input.pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
-    if (best) { grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; best.drop = null; } best.state = 'grabbed'; }
-    else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) treeGrab = { tr, prog: 0, lastY: cy }; }
-  } else if (tool === 'miracle' && hitOk) { tryMiracle(hit); pressing = false; return; }
-  pressing = true;
+    if (best) { input.grabbed = best; setHoldOff(best.x, best.z); if (best.tree) { best.tree.reserved = null; best.tree = null; } if (best.carry) { best.carry = 0; best.drop = null; } best.state = 'grabbed'; }
+    else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) input.treeGrab = { tr, prog: 0, lastY: cy }; }
+  } else if (input.tool === 'miracle' && hitOk) { tryMiracle(hit); input.pressing = false; return; }
+  input.pressing = true;
 }
 function onToolUp() {
-  if (treeGrab) treeGrab = null; // losgelassen, bevor der Baum nachgab
+  if (input.treeGrab) input.treeGrab = null; // losgelassen, bevor der Baum nachgab
   if (heldTree.on) throwTree();
-  if (grabbed) { const v = grabbed; grabbed = null; v.state = 'falling'; const k = clamp(hand.vel.length(), 0, 14) / (hand.vel.length() || 1);
+  if (input.grabbed) { const v = input.grabbed; input.grabbed = null; v.state = 'falling'; const k = clamp(hand.vel.length(), 0, 14) / (hand.vel.length() || 1);
     v.vx = hand.vel.x * k; v.vz = hand.vel.z * k; v.vy = hand.vel.y * .4 * k + 2.5; }
-  pressing = false;
+  input.pressing = false;
 }
 // Karte mit der Maus verschieben: im Blick-Werkzeug mit links ziehen, in jedem Werkzeug mit Leertaste oder Strg + links.
 // OrbitControls tauscht bei gedrückter Strg-Taste Drehen und Verschieben, daher bei Strg die Belegung „Drehen“.
 let spaceDown = false, ctrlDown = false;
 function applyMouseButtons() {
-  const left = spaceDown || tool === 'blick' ? THREE.MOUSE.PAN : ctrlDown ? THREE.MOUSE.ROTATE : -1;
+  const left = spaceDown || input.tool === 'blick' ? THREE.MOUSE.PAN : ctrlDown ? THREE.MOUSE.ROTATE : -1;
   controls.mouseButtons = { LEFT: left, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   canvas.style.cursor = spaceDown || ctrlDown ? 'grab' : '';
 }
@@ -3987,20 +4252,20 @@ addEventListener('blur', () => { spaceDown = ctrlDown = false; applyMouseButtons
 canvas.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, true);
   if (e.pointerType === 'mouse' && (spaceDown || e.ctrlKey)) return; // verschiebt nur die Karte, die Hand bleibt untätig
-  if (pointers.size > 1) { if (primary !== null) { onToolUp(); primary = null; } return; }
+  if (pointers.size > 1) { if (input.primary !== null) { onToolUp(); input.primary = null; } return; }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (ringOpen) { closeRing(); return; } // Tippen daneben schließt das Kreismenü
-  if (tool === 'blick') return;
+  if (input.tool === 'blick') return;
   closeSheets();
-  primary = e.pointerId; ptrType = e.pointerType; pointerXY.x = e.clientX; pointerXY.y = e.clientY; onToolDown(e.clientX, e.clientY);
+  input.primary = e.pointerId; input.ptrType = e.pointerType; pointerXY.x = e.clientX; pointerXY.y = e.clientY; onToolDown(e.clientX, e.clientY);
 });
 canvas.addEventListener('pointermove', e => {
-  if (e.pointerType === 'mouse' && tool !== 'blick') { pointerXY.x = e.clientX; pointerXY.y = e.clientY; handShown = true; if (primary === null) ptrType = 'mouse'; }
-  if (e.pointerId === primary) { pointerXY.x = e.clientX; pointerXY.y = e.clientY; }
+  if (e.pointerType === 'mouse' && input.tool !== 'blick') { pointerXY.x = e.clientX; pointerXY.y = e.clientY; input.handShown = true; if (input.primary === null) input.ptrType = 'mouse'; }
+  if (e.pointerId === input.primary) { pointerXY.x = e.clientX; pointerXY.y = e.clientY; }
 });
-const endPtr = e => { pointers.delete(e.pointerId); if (e.pointerId === primary) { primary = null; onToolUp(); } };
+const endPtr = e => { pointers.delete(e.pointerId); if (e.pointerId === input.primary) { input.primary = null; onToolUp(); } };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && primary === null) handShown = false; });
+canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && input.primary === null) input.handShown = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const HINTS = {
@@ -4010,17 +4275,17 @@ const HINTS = {
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
 function setTool(t) {
-  tool = t; if (grabbed) onToolUp();
+  input.tool = t; if (input.grabbed) onToolUp();
   document.querySelectorAll('.tools button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   $('ctxSculpt').hidden = t !== 'sculpt'; $('ctxMiracle').hidden = t !== 'miracle';
   $('hint').textContent = HINTS[t];
   applyMouseButtons();
   controls.touches = { ONE: t === 'blick' ? THREE.TOUCH.ROTATE : -1, TWO: THREE.TOUCH.DOLLY_PAN };
-  if (t === 'blick') handShown = false;
+  if (t === 'blick') input.handShown = false;
 }
 document.querySelectorAll('.tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
-document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(b => b.addEventListener('click', () => { sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
-function chooseMiracle(m) { miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); }
+document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(b => b.addEventListener('click', () => { input.sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+function chooseMiracle(m) { input.miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); }
 document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener('click', () => chooseMiracle(b.dataset.m)));
 $('forestAlert').addEventListener('click', () => {
   const A = forestAlert; if (!A.hut) return;
@@ -4068,7 +4333,7 @@ function renderWork() {
       return `<li><b>${n}</b> ${R.label} <span>· ${nh} ${R.hut}${nh === 1 ? '' : 'n'}, Platz für ${nh * R.per}</span></li>`;
     }).join('');
     const notes = [];
-    for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${construction && construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
+    for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${build.construction && build.construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
     if (id === 'wood') notes.push(`${alive.length - young} Bäume zum Fällen, ${young} wachsen noch.`);
     if (id === 'jagd') notes.push(`Auf der Insel: ${wild.filter(a => a.kind === 'reh' && a.state !== 'dead').length} Rehe, ${wild.filter(a => a.kind === 'hase' && a.state !== 'dead').length} Hasen. Im Lager: ${fmt(S.meat)} Fleisch.`);
     { const at = {}; for (const h of huts) if (sp[h.role] !== undefined) for (const g in h.goods) if (h.goods[g] > 0) at[g] = (at[g] || 0) + h.goods[g];
@@ -4129,6 +4394,15 @@ $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
 function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
+// Kamera: folgt dem Tiergeist, bleibt über der Insel
+function updateCamera(dt) {
+  if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
+    camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
+  const tr = Math.hypot(controls.target.x, controls.target.z);
+  if (tr > 25) { const k = 25 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
+  controls.target.y = 1;
+  controls.update();
+}
 $('btnPet').addEventListener('click', () => reinforce('pet'));
 $('btnSlap').addEventListener('click', () => reinforce('slap'));
 $('btnFocus').addEventListener('click', () => { follow = !follow; renderFollow(); if (follow) closeSheets(); });
@@ -4136,18 +4410,16 @@ $('btnFollow').addEventListener('click', () => { follow = false; renderFollow();
 let resetArmed = false;
 $('btnReset').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Wirklich zurücksetzen?'; return; }
-  try { localStorage.removeItem(SAVE_KEY); } catch (err) {} skipSave = true; location.reload();
+  try { localStorage.removeItem(SAVE_KEY); } catch (err) {} stopSaving(); location.reload();
 });
-let skipSave = false;
 // Gelände auf den Auslieferungszustand zurücksetzen (alles andere bleibt): zweimal tippen, dann neu laden.
 // Gebäude ebnen ihren Platz beim Laden wieder selbst ein.
-var terrainReset = false; // var: save() kann es schon vor dieser Zeile prüfen
 for (const id of ['btnTerrainReset', 'btnTerrainReset2']) {
   let armed = 0;
   $(id).addEventListener('click', e => {
     const b = e.currentTarget;
     if (!armed) { armed = setTimeout(() => { armed = 0; b.classList.remove('armed'); b.textContent = id === 'btnTerrainReset' ? 'Insel zurücksetzen' : 'Gelände zurücksetzen'; }, 4000); b.classList.add('armed'); b.textContent = 'Wirklich? Alles Geformte geht verloren'; return; }
-    clearTimeout(armed); terrainReset = true; S.terrain = []; S.terrainN = N; save(); skipSave = true; location.reload();
+    clearTimeout(armed); resetTerrain(); save(); stopSaving(); location.reload();
   });
 }
 
@@ -4162,6 +4434,7 @@ function renderShrine() {
   $('shrineItems').querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => { const it = SHRINE.find(x => x.id === b.dataset.buy), c = it.cost();
     if (S.glaube < c || (it.ok && !it.ok())) return; S.glaube -= c; it.buy(); renderShrine(); save(); }));
 }
+on('fox', () => renderFox());
 function renderFox() {
   $('foxBars').innerHTML = ['help', 'play', 'mischief'].map(k => `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(S.w[k] * 100)} %</span></div>`).join('');
   const t = clock.elapsedTime;
@@ -4202,7 +4475,7 @@ function renderName() {
   $('btnFox').textContent = S.name; $('sheetFox').setAttribute('aria-label', S.name);
   if (document.activeElement !== $('foxName')) $('foxName').value = S.name;
   $('btnFollow').textContent = `Folgt ${S.name} ✕`;
-  if (tool === 'hand') $('hint').textContent = HINTS.hand;
+  if (input.tool === 'hand') $('hint').textContent = HINTS.hand;
 }
 $('foxName').addEventListener('change', () => { S.name = $('foxName').value.trim().slice(0, 16) || 'Fenja'; renderName(); renderFox(); save(); });
 $('foxName').addEventListener('keydown', e => { if (e.key === 'Enter') $('foxName').blur(); });
@@ -4215,292 +4488,9 @@ function renderForms() {
 }
 $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
 
-/* ------------------------------------------------------------------ offline progress */
-{
-  const away = Math.min((Date.now() - (S.ts || Date.now())) / 1000, 8 * 3600);
-  if (loaded && away > 30) {
-    const free = villagers.filter(v => !v.role).length, gRate = free * prayYield() * .45 / 22 + passive();
-    const logIn = roleCount('lumber') / 16 * away * .5, sawn = Math.min(S.logs + logIn, roleCount('sawyer') / 10 * away * .5);
-    const g = gRate * away * .5, h = Math.min(Math.floor(sawn) * 2, 400), l = Math.min(Math.floor(logIn - sawn + S.logs) - S.logs, 300);
-    S.glaube += g; S.holz += h; S.logs = Math.max(0, S.logs + l);
-    setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube${h > 0 ? `, +${fmt(h)} Bretter` : ''}${l > 0 ? `, +${fmt(l)} Stämme` : ''}.`, 5), 900);
-  }
-}
-function save() { if (skipSave) return; savePaths(); saveTerrain(); S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); S.hutGoods = huts.map(h => h.goods); S.hutInp = huts.map(h => h.inp | 0); S.ts = Date.now(); S.pop = villagers.length; S.houses = houses.length; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
-setInterval(save, 5000);
-document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
-addEventListener('pagehide', save); addEventListener('wk-save', save); // vor dem Neuladen (Update) speichern
-
-/* ------------------------------------------------------------------ loop */
-const clock = new THREE.Clock();
-const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
-const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
-let uiT = 0, secT = 0, birthT = 0, zzzT = 3, jobT = 0;
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-addEventListener('resize', resize); resize();
-setTool('hand'); renderName();
-
-let snowScanT = 0;
-function scanSnow() {
-  snowSkip.add(waterMat); for (const m of vAll) snowSkip.add(m.material);
-  hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
-  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell && !o.userData.noSnow) [].concat(o.material).forEach(snowify); });
-}
-function frame() {
-  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
-
-  // tool action
-  if (primary !== null || (handShown && tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
-  if (pressing && tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, sculptDir, dt);
-
-  // economy ticks
-  S.glaube += passive() * dt; incomeAcc += passive() * dt;
-  secT += dt; if (secT >= 1) { rate = rate * .85 + incomeAcc / secT * .15; incomeAcc = 0; secT = 0; }
-  birthT += dt; if (birthT > 9) { birthT = 0; if (villagers.length < cap()) { const p = homeSpot(), v = spawnVillager(p.x, p.z); if (v) floatText(v.x, 1.6, v.z, 'Neue Seele', 's'); } }
-  jobT -= dt; if (jobT <= 0) { jobT = 1; reconcileJobs(); }
-  if (!construction) { const b = nextBuild(); if (b && S.holz >= b.cost) { S.holz -= b.cost; construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
-  if (construction) { construction.t += dt; if (construction.t > 9) {
-    const c = construction; c.site.used = false; scaff.o.visible = false; construction = null;
-    if (c.role) { const e = addHut(c.role, c.site); S.huts[c.role]++; reconcileJobs(); floatText(e.x, 2.2, e.z, c.label, 's'); toast(`Eine neue ${c.label} steht. Platz für ${ROLES[c.role].per} weitere ${ROLES[c.role].label}.`); }
-    else { const hs = addHouse(c.site); S.houses = houses.length; floatText(hs.x, 2.2, hs.z, 'Neues Haus', 's'); toast(`Ein neues Haus steht. Platz für ${cap()} Seelen.`); }
-    save();
-  } }
-  for (const h of huts) if (h.saw) { h.sawing = Math.max(0, h.sawing - dt); if (h.sawing > 0) h.saw.rotation.x += dt * 14; }
-
-  navT -= dt; if (navT <= 0 || !navReady) { navT = 1; buildNav(); }
-  navBudget = 30000;
-  updateDay(dt, t);
-  updateWish(dt); updateForestAlert(dt, t);
-  zzzT -= dt;
-  if (zzzT <= 0) { zzzT = 2.2 + Math.random() * 1.5; const sl = villagers.filter(v => v.state === 'sleep' && v.home); if (sl.length) { const hs = sl[Math.floor(Math.random() * sl.length)].home; floatText(hs.x + rnd(.2), heightAt(hs.x, hs.z) + 1.9, hs.z + rnd(.2), 'Zzz', 'w'); } }
-
-  // villagers
-  for (const v of villagers) updateVillager(v, dt, t);
-  updateWear(dt);
-  if (grabbed) { grabbed.x = hand.g.position.x; grabbed.z = hand.g.position.z + .05; grabbed.y = hand.g.position.y - .62; }
-  for (const m of vAll) m.count = villagers.length;
-  lights.length = 0;
-  const lantern = sky.night > .3; // ab der Dämmerung trägt jeder eine Laterne
-  villagers.forEach((v, i) => {
-    const L = v.look;
-    if (v.state === 'sleep') { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte
-    let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
-    v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
-    v.st = v.state === 'lunch' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
-    if (v.state === 'walk' || v.state === 'flee') {
-      const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
-      bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
-      if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
-    } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
-    else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
-    else if (v.state === 'proc') { const s = Math.sin(t * (v.role === 'baker' ? 7 : 3) + v.ph); if (v.role === 'baker') { armA = armB = -1.15 + s * .25; tilt = .22; splay = .05; } else { armA = -1.9 + s * .12; armB = -1.7 - s * .12; splay = .2; tilt = -.04; } leg = .15; } // kneten bzw. Korn in den Trichter schütten
-    else if (v.state === 'tend') { const s = Math.sin(t * 7 + v.ph); armA = -.5; armB = -1.1 + s * .35; splay = .15; tilt = .1; } // Futter streuen
-    else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }
-    else if (v.state === 'aim') { const draw = smooth(1.3, .5, v.timer); armA = -1.57; armB = -1.45; splay = .08; armRz = .55 + draw * .35; tilt = -.05; leg = .2; } // Bogen spannen
-    else if (v.state === 'fish') { // auswerfen: Rute von hinten oben nach vorn, dann ruhig halten; beim Biss ruckt sie hoch
-      const c = v.fp === 'cast' ? smooth(.9, .1, v.timer) : 1, jerk = v.fp === 'bite' ? Math.abs(Math.sin(v.timer * 14)) * .3 : Math.sin(t * 1.3 + v.ph) * .03;
-      armB = -2.5 + c * 1.5 - jerk; armA = -.95; splay = .08; leg = .12;
-      if (v.fp === 'reel') { const u = 1 - v.timer / REEL_T; armB = -1.05 - smooth(.6, 1, u) * .55 - (v.hooked ? Math.abs(Math.sin(t * 9)) * .08 : 0); armA = -1.05 + Math.sin(t * 15) * .28; splay = .14 + Math.cos(t * 15) * .06; tilt = -.06; } // Rute heben, linke Hand kurbelt
-    }
-    else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
-    else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
-    else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
-      bite = Math.max(0, Math.sin(t * 1.4 + v.ph * 3)) ** 4 * v.st;
-      tilt = -.14 + bite * .06; armA = -.7; armB = -.7 - 1.75 * bite; splay = .12; armRz = .5 * bite;
-    }
-    else if (v.state === 'grabbed' || v.state === 'falling') {
-      const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
-      leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
-    } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
-    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
-    const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
-    if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
-    if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
-    else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
-    const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
-    const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
-    const vh = v.state === 'grabbed' || v.state === 'falling' ? (v.vh = v.h) : smoothH(v, dt);
-    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
-    const M = dummy.matrix;
-    const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
-    // Laterne in der linken Hand (nicht beim Hacken, Beten, Tragen: dann steht sie neben dem Bewohner)
-    const handLantern = lantern && !v.carry && ['walk', 'idle', 'flee', 'dizzy'].includes(v.state);
-    if (handLantern || sapling) { armA = (handLantern ? -.5 : -.35) + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .06 : 0); splay = Math.max(splay, .14); }
-    let legA = leg, legB = -leg;
-    if (v.st > 0) { // im Sitzen liegen die Beine vorne flach am Boden
-      const sl = -1.5 - tilt; legA += (sl - legA) * v.st; legB += (sl - legB) * v.st;
-      bob -= v.st * HIP_Y * VS * L.s * .92;
-      dummy.position.y = v.y + bob; dummy.updateMatrix();
-    }
-    if (v.kn > 0) { // auf den Fersen sitzen: Beine liegen hinten flach am Boden, Körper sinkt ab
-      const kl = 1.45 - tilt; legA += (kl - legA) * v.kn; legB += (kl - legB) * v.kn;
-      bob -= v.kn * HIP_Y * VS * L.s * .8;
-      dummy.position.y = v.y + bob; dummy.updateMatrix();
-    }
-    part(vParts.legL, .038, HIP_Y, legA, 0); part(vParts.legR, -.038, HIP_Y, legB, 0);
-    part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay + armRz);
-    if (bite >= 0) part(vBread, -.085, SHO_Y, armB, -splay + armRz); else vBread.setMatrixAt(i, zero);
-    if (!lantern || v.state === 'grabbed' || v.state === 'falling') { vLantern.setMatrixAt(i, zero); vLanternGlass.setMatrixAt(i, zero); }
-    else {
-      if (handLantern) { // hängt senkrecht an der Hand, pendelt beim Gehen
-        const ca = Math.cos(splay) * .13;
-        part(vLantern, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA), Math.sin(t * 5.5 + v.ph) * (v.state === 'walk' ? .25 : .05), 0, -ca * Math.sin(armA));
-      } else if (v.carry) part(vLantern, .15, .19, Math.sin(t * 5.5 + v.ph) * .2, 0, .13); // hängt am Holzbündel
-      else { // steht neben dem Bewohner am Boden
-        const c = Math.cos(vh), sn = Math.sin(vh), ox = .24, oz = .06, s2 = VS * L.s;
-        vTmp.makeRotationY(vh).setPosition(v.x + ox * c + oz * sn, groundAt(v.x + ox * c + oz * sn, v.z - ox * sn + oz * c) + .095 * s2, v.z - ox * sn + oz * c); vOut.copy(vTmp.scale(lV.set(s2, s2, s2)));
-        vLantern.setMatrixAt(i, vOut);
-      }
-      vLanternGlass.setMatrixAt(i, vOut);
-      lV.set(0, LANTERN_C, 0).applyMatrix4(vOut); lights.push({ x: lV.x, y: lV.y, z: lV.z });
-    }
-    vParts.body.setMatrixAt(i, M); vParts.head.setMatrixAt(i, M); vParts.eyes.setMatrixAt(i, M);
-    vParts.hair.forEach((m, k) => m.setMatrixAt(i, k === L.hair ? M : zero));
-    vParts.beard.setMatrixAt(i, L.beard ? M : zero);
-    vWood.forEach(m => m.setMatrixAt(i, v.carry === 1 ? M : zero)); vPlanks.setMatrixAt(i, v.carry === 2 ? M : zero);
-    vGame.setMatrixAt(i, v.carry === 3 ? M : zero); vBasket.setMatrixAt(i, v.carry === 4 ? M : zero);
-    vVeg.setMatrixAt(i, v.carry === 5 ? M : zero); vVegTop.setMatrixAt(i, v.carry === 5 ? M : zero); vMilk.setMatrixAt(i, v.carry === 6 ? M : zero);
-    vEggBasket.setMatrixAt(i, v.carry === 7 ? M : zero); vEggs.setMatrixAt(i, v.carry === 7 ? M : zero);
-    vGrainSack.setMatrixAt(i, v.carry === 8 ? M : zero); vFlourSack.setMatrixAt(i, v.carry === 9 ? M : zero); vLoafBasket.setMatrixAt(i, v.carry === 10 ? M : zero); vLoaves.setMatrixAt(i, v.carry === 10 ? M : zero);
-    // Jäger: Bogen und Köcher auf dem Rücken, zum Schuss nimmt er den Bogen in die linke Hand und spannt die Sehne
-    const aiming = v.role === 'hunter' && v.state === 'aim', drawn = aiming && v.timer < .8;
-    vBowBack.setMatrixAt(i, v.role === 'hunter' && !aiming ? M : zero);
-    if (aiming && !drawn) part(vBowAim, .075, SHO_Y + .005, 0, -.12, .15); else vBowAim.setMatrixAt(i, zero);
-    if (drawn) part(vBowDraw, .075, SHO_Y + .005, 0, -.12, .15); else vBowDraw.setMatrixAt(i, zero);
-    vQuiver.setMatrixAt(i, v.role === 'hunter' ? M : zero);
-    if (rodOn) { part(vRod, -.085, SHO_Y, armB, -splay + armRz); const tp = lV.copy(ROD_TIP).applyMatrix4(vOut); v.tip = v.tip || {}; v.tip.x = tp.x; v.tip.y = tp.y; v.tip.z = tp.z; } else vRod.setMatrixAt(i, zero);
-    for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
-    // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
-    if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
-    for (const set of [vAxe, vShovel]) {
-      if (set !== vTool) { set.forEach(m => m.setMatrixAt(i, zero)); continue; }
-      if (v.state === 'chop' || v.state === 'plant') set.forEach(m => part(m, 0, SHO_Y, armA, 0));
-      else if (shoulder) {
-        const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
-        // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand
-        set.forEach(m => part(m, -.07, SHO_Y + .02 + Math.cos(a) * sh, a, 0, Math.sin(a) * sh));
-      } else set.forEach(m => m.setMatrixAt(i, zero));
-    }
-    // Setzling in der linken Hand (abends hält sie die Laterne)
-    if (sapling && !handLantern) { const ca = Math.cos(splay) * .13; vSapling.forEach(m => part(m, .085 + Math.sin(splay) * .13, SHO_Y - ca * Math.cos(armA) - .02, 0, 0, -ca * Math.sin(armA))); }
-    else vSapling.forEach(m => m.setMatrixAt(i, zero));
-  });
-  for (const m of vAll) m.instanceMatrix.needsUpdate = true;
-  updateArrows(dt); updateFishingLines(t);
-  updateLights(t);
-  updateChips(dt);
-  updateShrine(dt, t);
-
-  // trees
-  const tc2 = TK.map(() => 0); let sc = 0;
-  for (const tr of trees) {
-    if (tr.gone) continue;
-    const y = heightAt(tr.x, tr.z);
-    if (y < .05) { tr.gone = true; if (tr.reserved && tr.reserved !== 'fox') tr.reserved.tree = null; tr.reserved = null; continue; }
-    if (tr.alive) {
-      if (tr.g < 1) tr.g = Math.min(1, tr.g + dt * .008 * (1 + 2 * weather.rain)); // Regen lässt Bäume schneller wachsen
-      const s = ST * tr.g, pull = treeGrab && treeGrab.tr === tr ? treeGrab.prog : 0;
-      if (tr.shake > 0) tr.shake = Math.max(0, tr.shake - dt * 3.5);
-      const shk = tr.shake ? Math.sin(t * 45) * tr.shake * .045 : 0;
-      dummy.position.set(tr.x, y + pull * .25, tr.z); dummy.rotation.set(Math.sin(t * 1.3 + tr.ph) * .03 + Math.sin(t * 31) * pull * .12 + shk, tr.rot, Math.sin(t * 27) * pull * .1); dummy.scale.setScalar(s); dummy.updateMatrix();
-      const tm = treeMeshes[tr.type], ti = tc2[tr.type]++; tm.setMatrixAt(ti, dummy.matrix); tm.setColorAt(ti, COL.setScalar(tr.tint || 1));
-    } else if (tr.stumpT > 0) {
-      tr.stumpT -= dt;
-      dummy.position.set(tr.x, y, tr.z); dummy.rotation.set(0, tr.rot, 0); dummy.scale.setScalar(ST); dummy.updateMatrix(); stumpSwarm.set(sc++, dummy.matrix);
-    } else if (tr.regrow > 0) { tr.regrow -= dt; if (tr.regrow <= 0) { tr.alive = true; tr.g = .15; } }
-    else if (!tr.reserved && Math.random() < dt / 900 * (1 + 3 * weather.rain)) { tr.alive = true; tr.g = .12; } // selten sät sich der Wald selbst aus, bei Regen öfter
-  }
-  treeMeshes.forEach((m, k) => { m.count = tc2[k]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }); stumpSwarm.commit(sc);
-  const rc = ROCK_GEOS.map(() => 0);
-  for (const r of rocks) { const y = heightAt(r.x, r.z); dummy.position.set(r.x, y - r.s * .28, r.z); dummy.rotation.set(r.tx, r.r, r.tz); dummy.scale.setScalar(r.s); dummy.updateMatrix(); rockMeshes[r.v].setMatrixAt(rc[r.v]++, dummy.matrix); }
-  rockMeshes.forEach((m, k) => { m.count = rc[k]; m.instanceMatrix.needsUpdate = true; });
-  const bc = BUSH_GEOS.map(() => 0);
-  for (const b of bushes) { const y = heightAt(b.x, b.z); dummy.position.set(b.x, y, b.z); dummy.rotation.set(Math.sin(t * 1.1 + b.r * 3) * .03, b.r, 0); dummy.scale.setScalar(b.s); dummy.updateMatrix(); bushMeshes[b.v].setMatrixAt(bc[b.v]++, dummy.matrix); }
-  bushMeshes.forEach((m, k) => { m.count = bc[k]; m.instanceMatrix.needsUpdate = true; });
-  refreshCover(coverFirst ? 1e6 : 450); coverFirst = false; grassU.uT.value = t;
-  for (const s of statics) s.o.position.set(s.x, heightAt(s.x, s.z), s.z);
-  updateWorkshops(dt, t);
-
-  updateFox(dt, t);
-  updateWild(dt, t); updateFish(dt, t); updateFarm(dt, t); updateBirds(dt, t); updateSharks(dt, t);
-  updateTrees(dt, t);
-
-  // hand
-  if (handAnim.kind) updateHandAnim(dt, t);
-  const showHand = !handAnim.kind && tool !== 'blick' && handShown && hitOk;
-  if (!handAnim.kind) hand.g.visible = showHand;
-  if (showHand) {
-    // auf dem Bildschirm etwa gleich groß, egal wie weit gezoomt ist
-    const hs = clamp(camera.position.distanceTo(hand.g.position) / 25, .42, 1.25); hand.g.scale.setScalar(hs);
-    const lift = heldTree.on ? 1.3 + ST * heldTree.g * .95 : grabbed ? 1.0 : ((pressing && tool === 'sculpt') ? .75 : 1.5) * hs;
-    if (treeGrab) {
-      // am Stamm festhalten und zittern, je weiter der Baum nachgibt
-      const tr = treeGrab.tr, j = treeGrab.prog * .05;
-      hand.target.set(tr.x + rnd(j), heightAt(tr.x, tr.z) + .95 * tr.g * ST + treeGrab.prog * .25, tr.z + rnd(j));
-    } else if (grabbed || heldTree.on) {
-      // Gehaltenes (Bewohner, Baum) bleibt beim Zupacken, wo es war, und folgt dann der Fingerbewegung;
-      // die Hand hängt senkrecht darüber
-      const x = hit.x + holdOff.x, z = hit.z + holdOff.z;
-      hand.target.set(x, Math.max(heightAt(x, z), 0) + lift, z);
-    } else {
-      // leere Hand: um 'lift' über dem Boden, aber auf der Sichtlinie durch den Zeiger, damit sie genau unter ihm liegt
-      const d = ray.ray.direction, k = lift / Math.max(.2, -d.y);
-      hand.target.set(hit.x, Math.max(hit.y, 0), hit.z).addScaledVector(d, -k);
-    }
-    // war die Hand unsichtbar (z. B. zwischen zwei Tipps am Handy), erscheint sie direkt am Ziel statt heranzufliegen
-    if (!hand.shown) { hand.g.position.copy(hand.target); hand.vel.set(0, 0, 0); }
-    hand.prev.copy(hand.g.position);
-    hand.g.position.lerp(hand.target, 1 - Math.exp(-dt * 16));
-    const v = tmpV.copy(hand.g.position).sub(hand.prev).divideScalar(Math.max(dt, 1e-3)); hand.vel.lerp(v, .35);
-    const dx = controls.target.x - camera.position.x, dz = controls.target.z - camera.position.z;
-    hand.g.rotation.y = Math.atan2(-dx, -dz);
-    const pose = grabbed || heldTree.on ? HAND_POSES.hold : treeGrab ? HAND_POSES.claw : hoverFox && !pressing ? HAND_POSES.flat : hoverHelp && !pressing ? HAND_POSES[hoverHelp.pose] || HAND_POSES.relax
-      : pressing ? (tool === 'sculpt' ? (sculptDir > 0 ? HAND_POSES.flat : HAND_POSES.fist) : HAND_POSES.grab) : HAND_POSES.relax;
-    poseHand(hand, pose, dt, t);
-  }
-  hand.shown = showHand;
-
-  // effects
-  if (rain.t > 0) {
-    rain.t -= dt; const p = rainGeo.attributes.position;
-    for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i) - dt * 11; if (y < surfaceAt(p.getX(i), p.getZ(i))) y = 6.5; p.setY(i, y); }
-    p.needsUpdate = true; rainCloud.position.set(rain.x, 6.6 + Math.sin(t) * .1, rain.z); placeProxy(rainCloudSh, rainCloud, 1);
-    rainPts.material.opacity = Math.min(.8, rain.t);
-    if (rain.t <= 0) { rainPts.visible = false; rainCloud.visible = false; rainCloudSh.visible = false; }
-  }
-  if (ringT > 0) { ringT -= dt; const k = 1 - ringT / 1.4; ring.scale.setScalar(.2 + k * .8); ring.material.opacity = Math.sin(Math.min(1, k * 1.2) * Math.PI) * .75; }
-  updateClouds(dt); updateWeatherRain(dt); updateSnowfall(dt, t); updatePuddles(dt, t);
-  if ((snowScanT -= dt) <= 0) { snowScanT = 2; scanSnow(); } // neue Gebäude und Bäume bekommen auch Schnee
-  // Wind: wechselt langsam zwischen ruhig und böig, bei Regen frischt er auf
-  streamU.uT.value = t; waterU.uT.value = t; waterU.uDir.value = weather.dir; updateSpray(dt, t); waterU.uWind.value += (clamp(weather.wind + noise(t * .012, 3.7) * .35 + (rain.t > 0 ? .3 : 0), .06, 1) - waterU.uWind.value) * Math.min(1, dt * .5);
-  updateTerrain(dt);
-
-  // camera
-  if (follow) { const k = 1 - Math.exp(-dt * 3), nx = controls.target.x + (fox.x - controls.target.x) * k, nz = controls.target.z + (fox.z - controls.target.z) * k;
-    camera.position.x += nx - controls.target.x; camera.position.z += nz - controls.target.z; controls.target.x = nx; controls.target.z = nz; }
-  const tr = Math.hypot(controls.target.x, controls.target.z);
-  if (tr > 25) { const k = 25 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
-  controls.target.y = 1;
-  controls.update();
-
-  // Tiergeist: Hand schwebt darüber (Maus) -> Einblendung; Kreismenü mitführen
-  hoverFox = tool === 'hand' && handShown && primary === null && !grabbed && !heldTree.on && foxUnder(pointerXY.x, pointerXY.y);
-  placeFoxUI(dt);
-  placeWishUI(); placeForestUI(); placeFieldTags(); updateHandHover(dt);
-
-  // floating texts
-  const rect = canvas.getBoundingClientRect();
-  for (let i = floats.length - 1; i >= 0; i--) {
-    const f = floats[i]; f.t += dt;
-    if (f.t > 1.5) { f.el.remove(); floats.splice(i, 1); continue; }
-    tmpV.copy(f.p).project(camera);
-    if (tmpV.z > 1) { f.el.style.opacity = 0; continue; }
-    const sx = (tmpV.x + 1) / 2 * rect.width, sy = (1 - tmpV.y) / 2 * rect.height - f.t * 34;
-    f.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -50%)`; f.el.style.opacity = String(Math.min(1, (1.5 - f.t) * 2.5));
-  }
-  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
-
-  // HUD
+/* ------------------------------------------------------------------ Anzeige (Kopfleiste, Lager, Uhr, Wetter) */
+let uiT = 0;
+function updateHud(dt, t) {
   uiT -= dt;
   if (uiT <= 0) {
     uiT = .25;
@@ -4508,7 +4498,7 @@ function frame() {
     // Lager: alle Rohstoffe und was als Nächstes gebaut wird
     $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish); $('sVeg').textContent = fmt(S.veg); $('sMilk').textContent = fmt(S.milk); $('sEggs').textContent = fmt(S.eggs); $('sGrain').textContent = fmt(S.grain); $('sFlour').textContent = fmt(S.flour); $('sBread').textContent = fmt(S.bread);
     for (const [id, k, r] of [['sMeat', 'meat', 'hunter'], ['sFish', 'fish', 'fisher'], ['sVeg', 'veg', 'farmer'], ['sMilk', 'milk', 'farmer'], ['sEggs', 'eggs', 'farmer'], ['sGrain', 'grain', 'farmer'], ['sFlour', 'flour', 'miller'], ['sBread', 'bread', 'baker']]) $(id).parentElement.hidden = !S[k] && !S.huts[r] && !(r === 'hunter' && S.huts.farmer);
-    { const nb = construction ? null : nextBuild(); $('sBuild').textContent = construction ? `${construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
+    { const nb = build.construction ? null : nextBuild(); $('sBuild').textContent = build.construction ? `${build.construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);
@@ -4527,6 +4517,76 @@ function frame() {
     if (!$('sheetFox').hidden) renderFox();
     if (fox.last && t - fox.lastT > 25) { fox.last = null; $('btnFox').classList.remove('pulse'); }
   }
+}
+
+/* ------------------------------------------------------------------ offline progress */
+{
+  const away = Math.min((Date.now() - (S.ts || Date.now())) / 1000, 8 * 3600);
+  if (loaded && away > 30) {
+    const free = villagers.filter(v => !v.role).length, gRate = free * prayYield() * .45 / 22 + passive();
+    const logIn = roleCount('lumber') / 16 * away * .5, sawn = Math.min(S.logs + logIn, roleCount('sawyer') / 10 * away * .5);
+    const g = gRate * away * .5, h = Math.min(Math.floor(sawn) * 2, 400), l = Math.min(Math.floor(logIn - sawn + S.logs) - S.logs, 300);
+    S.glaube += g; S.holz += h; S.logs = Math.max(0, S.logs + l);
+    setTimeout(() => toast(`Während du fort warst: +${fmt(g)} Glaube${h > 0 ? `, +${fmt(h)} Bretter` : ''}${l > 0 ? `, +${fmt(l)} Stämme` : ''}.`, 5), 900);
+  }
+}
+setInterval(save, 5000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('pagehide', save); addEventListener('wk-save', save); // vor dem Neuladen (Update) speichern
+
+/* ------------------------------------------------------------------ loop */
+const clock = new THREE.Clock();
+const dummy = new THREE.Object3D(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+setTool('hand'); renderName();
+
+let snowScanT = 0;
+function scanSnow() {
+  snowSkip.add(waterMat); for (const m of vAll) snowSkip.add(m.material);
+  hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
+  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell && !o.userData.noSnow) [].concat(o.material).forEach(snowify); });
+}
+function frame() {
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  updatePointer(dt);
+  updateIncome(dt); updateVillage(dt);
+  updateNav(dt);
+
+  updateDay(dt, t);
+  updateWish(dt); updateForestAlert(dt, t);
+  updateSleepers(dt);
+
+  // villagers
+  for (const v of villagers) updateVillager(v, dt, t);
+  updateWear(dt);
+  carryGrabbed();
+  renderVillagers(dt, t);
+  updateArrows(dt); updateFishingLines(t);
+  updateLights(t);
+  updateChips(dt);
+  updateShrine(dt, t);
+  renderNature(dt, t); updateCover(t); updateStatics();
+
+  updateWorkshops(dt, t);
+
+  updateFox(dt, t);
+  updateWild(dt, t); updateFish(dt, t); updateFarm(dt, t); updateBirds(dt, t); updateSharks(dt, t);
+  updateTrees(dt, t);
+  updateHand(dt, t);
+  updateMiracleFx(dt, t);
+
+  updateClouds(dt); updateWeatherRain(dt); updateSnowfall(dt, t); updatePuddles(dt, t);
+  if ((snowScanT -= dt) <= 0) { snowScanT = 2; scanSnow(); } // neue Gebäude und Bäume bekommen auch Schnee
+  updateWater(dt, t, rain.t > 0);
+  updateTerrain(dt);
+  updateCamera(dt);
+
+  placeFoxUI(dt);
+  placeWishUI(); placeForestUI(); placeFieldTags(); updateHandHover(dt);
+
+  updateFloats(dt);
+  updateHud(dt, t);
 
   renderer.render(scene, camera);
   if (!$('sheetFox').hidden) renderPortrait(dt, t);
