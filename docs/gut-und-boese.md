@@ -1,7 +1,7 @@
 # Gut und Böse – Folgen für die Welt
 
 Bisher ist der Spieler immer ein guter Gott: Er hilft, wirkt segensreiche Wunder, die Bewohner beten aus Liebe.
-Wie in *Black & White* soll er auch böse sein können. Die **Waage** (`S.align`), die guten und bösen Taten und die
+Er soll auch böse sein können. Die **Waage** (`S.align`), die guten und bösen Taten und die
 Veränderung der Hand stehen in `gott-und-hand.md` (Abschnitte 7 und 9). Hier geht es darum, wie Welt, Bewohner,
 Schrein und Kreatur auf die Ausrichtung reagieren.
 

@@ -97,7 +97,7 @@ ob der Finger noch auf dem Bildschirm ist.
   Wasser oder aus einer Gefahr gerettet. Nur ein kleines Gewicht, und es nimmt ab, wenn man denselben Bewohner
   ständig hin und her trägt (kein Punkte-Sammeln).
 - **Werfen** zählt böse, stärker je höher und weiter, ins Wasser oder gegen Gebäude, und bei Wiederholung.
-- Die Kreatur sieht zu und lernt beides (`kreatur.md` 4.8).
+- Die Kreatur sieht zu und lernt beides (`kreatur.md` 3.8).
 
 ## 4. Landschaft formen
 
@@ -140,7 +140,7 @@ ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende 
   entsteht ein Stapel, den Träger später einsammeln.
 - Werfen von Waren ist erlaubt (landen als Stapel), aber zerbrechliche Waren (Eier, Milch) gehen teilweise verloren.
 - Tippen = kleine Arbeit an Ort und Stelle, Packen und Tragen = Transport. Die Kreatur lernt dadurch, größere
-  Mengen gezielt zu verteilen (`kreatur.md` 4.7).
+  Mengen gezielt zu verteilen (`kreatur.md` 3.7).
 - Gehaltene Waren zählen nicht zum Lager, bis sie abgesetzt sind (Anzeige oben zeigt sie nicht doppelt).
 
 ## 6. Hand stärken (Schrein)

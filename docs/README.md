@@ -10,7 +10,7 @@ ausgeliefert. Regeln für den Code stehen in `CLAUDE.md` im Wurzelordner.
 | `gott-und-hand.md` | der Spieler als Gott: Werkzeuge, Wunder, Greifen und Tragen, Formen, Hand stärken, Waage und Taten, Aussehen der Hand |
 | `gut-und-boese.md` | wie Welt, Schrein und Kreatur auf die Waage reagieren |
 | `bewohner.md` | die Bewohner: Identität, Bedürfnisse, Gefühle und Ausdruck, Pausen und Urlaub, Freizeit und Sport, Animationen, Fokus auf einen Bewohner |
-| `kreatur.md` | die Kreatur (Tiergeist): Abgleich mit *Black & White*, Alter, Bedürfnisse, Ausrichtung, Leine, Eigenwille |
+| `kreatur.md` | die Kreatur (Tiergeist): Alter, Bedürfnisse, Ausrichtung, Eigenwille, Leine, Persönlichkeit |
 | `kreatur-lernen.md` | die Kreatur lernt durch Zusehen, was die Hand vormacht, bis hin zu Wundern |
 | `nahrung.md` | wofür die Lebensmittel da sind: Essen, Wachstum, Gaben, Kreatur füttern, Verarbeitung |
 | `jahreszeiten.md` | Frühling bis Winter: Verfärben, Laubfall, Wiesen, Felder; Kalender und Technik |
@@ -39,7 +39,7 @@ In Tabellen und Listen der Konzepte:
 Jedes Dokument hat seine eigene Reihenfolge. Diese Punkte verbinden sie:
 
 - **Nahrung** (`nahrung.md` 1) ist Voraussetzung für den Hunger der Bewohner (`bewohner.md` 3.2) und der Kreatur
-  (`kreatur.md` 4.2).
+  (`kreatur.md` 3.2).
 - **Waage** (`gott-und-hand.md` 7) ist Voraussetzung für alles in `gut-und-boese.md`, für die Reaktionen der Bewohner
   (`bewohner.md` 9), die Veränderung der Hand und die Bestenlisten „Gütigster/Finsterster Gott“.
 - **Halten als Zustand** (`gott-und-hand.md` 3.2) entscheidet mit, wie man einen Bewohner auswählt

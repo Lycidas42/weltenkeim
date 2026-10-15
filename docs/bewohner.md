@@ -325,7 +325,7 @@ verändern, steht in `gut-und-boese.md`.
 | Beten | aus Liebe: gleichmäßig, Freude erhöht den Ertrag | aus Furcht: in Schüben nach Schrecken, insgesamt etwa gleich viel, aber unregelmäßiger |
 | Arbeit | zufrieden, normales Tempo mit Pausen | schneller unter Angst, kürzere Pausen, kein freier Tag ohne Erlaubnis |
 | Hand kommt näher | winken, lächeln, Herz | ducken, fliehen, Ausrufezeichen (`gott-und-hand.md` 9) |
-| Kreatur | winken, mit ihr spielen | ausweichen, fliehen (`kreatur.md` 4.3) |
+| Kreatur | winken, mit ihr spielen | ausweichen, fliehen (`kreatur.md` 3.3) |
 | Freizeit | Feste, Sport, Musik | selten, leise, in Grüppchen |
 | Sprechblasen | „Gesegnet sei die Hand!“ | „Pst, er sieht uns …“ |
 
