@@ -293,9 +293,18 @@ nicht als Ersatz.
   (`docs/assets.md`).
 - **Skelett:** menschenähnlich (Arme, Hände mit Knochen, Kopf), damit sich Animationen aus freien Bibliotheken mit
   demselben Skelettaufbau in Blender übertragen lassen (Retargeting).
-- **Kandidaten** (vor der Wahl Lizenz, Dreiecke und mitgelieferte Animationen prüfen): Pakete von Quaternius und KayKit
-  (von dort stammen schon Tiere und Gebäude), Kenney, Poly Pizza. Fehlende Animationen aus einer freien
-  Animationsbibliothek für menschenähnliche Skelette übertragen.
+- **Kandidaten** (gesichtet, noch nicht heruntergeladen und im Spiel geprüft):
+  - **Quaternius „Ultimate Monsters“**: 50 animierte Monster, CC0 laut quaternius.com (auf Sketchfab widersprüchlich
+    als CC BY angegeben, daher von quaternius.com bzw. itch.io laden). Darunter ein Yeti, ein Panda und weitere
+    rundliche Wesen; im Schnitt etwa 4.000 Dreiecke je Figur. Animationen u. a. Gehen, Rennen, Angriff. Offen: ob das
+    Skelett menschenähnlich genug für übertragene Animationen ist.
+  - **Quaternius „Universal Animation Library“ 1 und 2**: CC0, menschenähnliches Standardskelett (auch zu Mixamo
+    passend). Teil 1 frei mit etwa 45 Animationen (Gehen, Rennen, Sitzen, Schieben …), Teil 2 mit Landwirtschaft und
+    Fischen, passend zum Lernen durch Vormachen. Liefert die Animationen, nicht die Figur.
+  - **KayKit „Character Animations“**: CC0, 133 Animationen für menschenähnliche Skelette (Interagieren, Aufheben …).
+    Eine Tierfigur gibt es bei KayKit nicht, am nächsten käme ein Werwolf (eigene Lizenz prüfen).
+  - Vorschlag: Yeti oder Panda aus „Ultimate Monsters“ als Figur, Arbeits- und Trageanimationen aus der „Universal
+    Animation Library“ in Blender übertragen.
 - **Benötigte Animationen:** Stehen, Gehen, Rennen, Aufheben, Gehen mit Last (vor dem Körper bzw. auf der Schulter),
   am Boden arbeiten (säen, ernten, pflanzen), Werfen, Wunder wirken, Sitzen bzw. Dösen, Freuen (Lob), Ducken (Tadel),
   später Winken. Die Namen kommen in `docs/assets.md` (Abschnitt „Animationen der Kreaturen“) dazu.
@@ -330,7 +339,7 @@ nicht als Ersatz.
 #### G. Reihenfolge
 
 1. **Modelle sichten:** zwei bis drei Kandidaten mit Lizenz, Dreiecken, Animationen und Screenshot im Spiel; Wahl
-   gemeinsam mit dem Nutzer.
+   gemeinsam mit dem Nutzer. 🟡 Kandidaten gesichtet (C), Test im Spiel steht aus.
 2. **Einbauen** mit Stehen, Gehen, Rennen, Sitzen; Theme-Einträge `body`, `hands`, `carry`; Treffen und Streicheln
    angepasst.
 3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
