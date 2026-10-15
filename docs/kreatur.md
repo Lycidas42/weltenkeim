@@ -354,8 +354,13 @@ nicht als Ersatz.
 1. **Modelle sichten:** zwei bis drei Kandidaten mit Lizenz, Dreiecken, Animationen und Screenshot im Spiel; Wahl
    gemeinsam mit dem Nutzer. ✅ Fertige Monster verworfen, eigener Entwurf (aufrechter Fuchs auf menschlichem Skelett) im Spiel geprüft (C).
 2. **Einbauen** mit Stehen, Gehen, Rennen, Sitzen; Theme-Einträge `body`, `hands`, `carry`; Treffen und Streicheln
-   angepasst.
-3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
+   angepasst. 🟡 Test auf Branch `claude/zweibeiner-test`: zwei Gestalten am Schrein, „Fuchsmensch“ (eigener Körper,
+   Animationen der Universal Animation Library 1+2, vier Schwanzknochen, die im Code schwingen) und „Mensch (Test)“
+   (KayKit „Mage“, CC0, 76 Animationen, davon 19 übernommen, inkl. Hinlegen und Liegen). Theme: `body`, `face`,
+   `hands`, `tail`, `anims` (Zuordnung der Animationsnamen). Treffen nur über die senkrechte Strecke; Streicheln
+   nutzt die vorhandene Messung des Rückens (bei Zweibeinern über Kopf und Schultern).
+3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen. 🟡 Tragen in beiden
+   Händen vor dem Bauch und eigene Trage-Animation (Fuchsmensch) vorhanden; Tragkraft und Werfen noch wie beim Fuchs.
 4. **Arbeiten am Boden** zusammen mit dem Lernen durch Vormachen (`kreatur-lernen.md`).
 5. **Detailmodell** in Blender für die Nahsicht (nach der Messung aus 3.11 F6).
 

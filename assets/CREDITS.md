@@ -29,6 +29,22 @@ Katze (`Cat.glb`):
 - Quelle: https://opengameart.org/content/animated-animales-low-poly
 - Bearbeitung: von FBX nach glTF konvertiert (FBX2glTF), Materialfarben neu gesetzt, Animationen umbenannt. Augen werden im Spielcode ergänzt.
 
+## Zweibeiner zum Ausprobieren (`models/animals/`, Test-Branch)
+
+Fuchsmensch (`Foxfolk.glb`):
+
+- Körper für Weltenkeim selbst gebaut in Blender 5.2 (runde Grundformen, Voxel-Remesh, Vertexfarben, eigene Schwanzknochen).
+- Skelett und Animationen: Universal Animation Library 1 und 2 (Standard) von Quaternius, https://quaternius.com
+- Lizenz: Creative Commons Zero (CC0 1.0)
+- Quelle: https://quaternius.itch.io/universal-animation-library und https://quaternius.itch.io/universal-animation-library-2
+
+Mensch (`Mage.glb`):
+
+- KayKit Character Pack: Adventurers 1.0 („Mage“) von Kay Lousberg, https://www.kaylousberg.com
+- Lizenz: Creative Commons Zero (CC0 1.0)
+- Quelle: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0
+- Bearbeitung: Stab, Zauberstab und Bücher entfernt, 19 der 76 Animationen behalten.
+
 ## Gotteshand (`models/hand/GodHand.glb`, Quelle `source/GodHand.blend`)
 
 Für Weltenkeim selbst gebaut in Blender 5.2 (Metaballs, jeder Finger als eigene Gruppe, Voxel-Remesh, eigenes Skelett mit 17 Knochen, Ärmel mit Saum; Haut, Nägel, Ärmel und Saum als eigene Materialien). Gehört zum Projekt, keine fremde Lizenz. Aufbau-Skript: `source/build_godhand.py`.

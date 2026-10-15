@@ -53,6 +53,17 @@ export default {
     'creature.alpaca': { file: 'animals/Alpaca.glb', head: 'Head', ws: 1, rest: 'hoof' },
     // Katze (Quaternius Animal Pack Vol.2): nur Idle/Walk, keine Augen – Augen werden am Kopfknochen ergänzt
     'creature.cat': { file: 'animals/Cat.glb', head: 'Bone003', ws: 1.2, eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },
+    // Zweibeiner (kreatur.md 3.12): body 'biped', Blickrichtung +Z (face 0), Animationen nach Namen (anims), Hände zum Tragen.
+    // Fuchsmensch: Körper selbst gebaut, Skelett und Bewegungen aus Quaternius Universal Animation Library 1+2 (CC0).
+    'creature.foxfolk': { file: 'animals/Foxfolk.glb', head: 'Head', body: 'biped', face: 0, ws: 1, hands: ['hand_l', 'hand_r'], tail: ['tail_01', 'tail_02', 'tail_03', 'tail_04'],
+      anims: { idle: 'Idle_Loop', idle2: 'Idle_FoldArms_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', carry: 'Walk_Carry_Loop', attack: 'TreeChopping_Loop', eat: 'PickUp_Table',
+        hit: 'Hit_Chest', cast: 'Spell_Simple_Shoot', praise: 'Yes', scold: 'Idle_No_Loop', lieDown: 'Sitting_Enter', lie: 'Sitting_Idle_Loop', standUp: 'Sitting_Exit',
+        harvest: 'Farm_Harvest', plant: 'Farm_PlantSeed', water: 'Farm_Watering', interact: 'Interact', throw: 'OverhandThrow' } },
+    // Mensch (Test): KayKit Adventurers „Mage“ ohne Stab und Buch (Kay Lousberg, CC0)
+    'creature.mage': { file: 'animals/Mage.glb', head: 'head', body: 'biped', face: 0, ws: 1, hands: ['handslot.l', 'handslot.r'],
+      anims: { idle: 'Idle', idle2: 'Unarmed_Idle', walk: 'Walking_A', run: 'Running_A', attack: '1H_Melee_Attack_Chop', eat: 'PickUp',
+        hit: 'Hit_A', cast: 'Spellcast_Shoot', praise: 'Cheer', scold: 'Hit_B', lieDown: 'Lie_Down', lie: 'Lie_Idle', standUp: 'Lie_StandUp',
+        interact: 'Interact', throw: 'Throw' } },
   },
   palette: {
     // Tagesverlauf. Stützstellen: Stunde, Himmel oben/Mitte/Horizont (= Nebel), Licht (Sonne bzw. Mond) und Stärke,

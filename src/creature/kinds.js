@@ -14,6 +14,9 @@ const CREATURES = {
   bull: { label: 'Stier', spirit: 'Stiergeist', h: 1.95, walk: 1.7, run: 3.4 },
   alpaca: { label: 'Alpaka', spirit: 'Alpakageist', h: 2.5, walk: 1.8, run: 3.4 },
   cat: { label: 'Katze', spirit: 'Katzengeist', h: 1.35, walk: 1.9, run: 3.6 },
+  // Zweibeiner zum Ausprobieren (kreatur.md 3.12)
+  foxfolk: { label: 'Fuchsmensch', spirit: 'Fuchsgeist', h: 2.3, walk: 1.9, run: 3.4 },
+  mage: { label: 'Mensch (Test)', spirit: 'Menschengeist', h: 2.1, walk: 1.8, run: 3.4 },
 };
 // Aussehen aus dem Theme dazunehmen: Datei, Fell-Modell (hd), Kopfknochen, Augen, Liegepose, eigene Reaktionen, Lauftempo
 for (const id in CREATURES) Object.assign(CREATURES[id], theme.models['creature.' + id]);

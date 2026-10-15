@@ -13,7 +13,7 @@ import { huts, lager, lagerDrop, localPt } from '../village/huts.js';
 import { hutWork } from '../village/build.js';
 import { blockedAt, buildNav, followPath, moveFree, navF, navReady, navV, setGoal } from '../world/nav.js';
 import { villagers } from '../village/villagers.js';
-import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, updateMouthTree } from './creature.js';
+import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, swayTail, updateMouthTree } from './creature.js';
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, hauling } from '../village/ai.js';
 import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
@@ -108,7 +108,7 @@ function updateFox(dt, t) {
     case 'cast': fox.timer -= dt; if (fox.timer <= 0) foxIdle(1.5); break;
     case 'haulUp': anim(fox.timer > .4 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { if (fox.haul && fox.haul.supply) { const p = hutWork(fox.haul.hut); foxWalk(p.x, p.z, 'haulDeliver'); } else { const p = localPt(lager, .2, 1.9); foxWalk(p.x, p.z, 'haulStore'); } } break;
     case 'pickup': anim(fox.timer < .85 ? 'eat' : 'idle'); fox.timer -= dt; if (fox.timer <= 0) { fox.carry = true; const p = localPt(lager, -.4, 1.9); foxWalk(p.x, p.z, 'store'); } break;
-    case 'walk': anim('walk'); if (followPath(fox, spd * dt)) {
+    case 'walk': anim((fox.carry || fox.carryGoods) && foxActs.carry ? 'carry' : 'walk'); if (followPath(fox, spd * dt)) {
       if (fox.next === 'tree') { if (fox.tree && fox.tree.alive) { fox.state = 'work'; fox.timer = fox.act === 'help' ? 1.8 : 1.1; fox.h = Math.atan2(fox.tree.x - fox.x, fox.tree.z - fox.z); } else { if (fox.tree) fox.tree.reserved = null; foxIdle(1); } }
       else if (fox.next === 'store') {
         // Baum ablegen: er liegt kurz vor dem Lager und wird zu Stämmen
@@ -180,7 +180,7 @@ function updateFox(dt, t) {
   const dvh = Math.atan2(Math.sin(fox.h - fox.vh), Math.cos(fox.h - fox.vh));
   fox.vh += Math.sign(dvh) * Math.min(Math.abs(dvh) * (1 - Math.exp(-dt * 7)), dt * 4.5);
   foxPivot.rotation.y = fox.vh;
-  foxMixer.update(dt);
+  foxMixer.update(dt); swayTail(t, fox.state === 'walk' || fox.state === 'play');
   updateMouthTree();
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)

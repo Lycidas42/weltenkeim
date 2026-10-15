@@ -81,6 +81,8 @@ const APP = [
   './assets/models/animals/Alpaca.glb',
   './assets/models/animals/Cat.glb',
   './assets/models/animals/Fox_HD.glb',
+  './assets/models/animals/Foxfolk.glb',
+  './assets/models/animals/Mage.glb',
   './assets/models/hand/GodHand.glb',
   './assets/models/building_home_A_blue.bin',
   './assets/models/building_home_A_blue.gltf',

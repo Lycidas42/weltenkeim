@@ -29,19 +29,24 @@ function buildRig(id, gltf, fur = false) {
   model.scale.setScalar(C.h / size.y);
   // Blickrichtung aus der Kopfposition ableiten, damit +Z vorne ist
   let box = restBox(model); const head = model.getObjectByName(C.head || 'Head'), c = box.getCenter(new THREE.Vector3());
-  if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
+  if (C.face !== undefined) model.rotation.y = C.face; // Zweibeiner: Kopf über der Mitte, Richtung steht im Theme
+  else if (head) { const hp = head.getWorldPosition(new THREE.Vector3()); model.rotation.y = -Math.atan2(hp.x - c.x, hp.z - c.z); }
   box = restBox(model); model.position.y = -box.min.y;
   const dims = box.getSize(new THREE.Vector3());
   // Fell erst nach dem Vermessen anlegen: die Schichten sind Skinned-Meshes ohne berechnete Knochenmatrizen
   if (fur && !model.userData.fur) model.userData.fur = addFur(model);
   model.traverse(o => { if (o.userData.shell) o.castShadow = o.receiveShadow = false; }); // Fellschichten werfen keinen Schatten
   const mixer = new THREE.AnimationMixer(model), acts = {};
-  for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) acts[k] = mixer.clipAction(clip); }
+  // Animationen: Vierbeiner nach den Quaternius-Namen (ANIM_PAT), Zweibeiner nach der Zuordnung im Theme (anims)
+  if (C.anims) { for (const [k, n] of Object.entries(C.anims)) { const clip = gltf.animations.find(a => a.name === n); if (clip) acts[k] = mixer.clipAction(clip); } }
+  else for (const [k, re] of Object.entries(ANIM_PAT)) { const clip = gltf.animations.find(a => re.test(a.name)); if (clip) acts[k] = mixer.clipAction(clip); }
   for (const [k, [f, ts]] of Object.entries(ANIM_FALLBACK)) if (!acts[k] && acts[f]) { acts[k] = mixer.clipAction(acts[f].getClip().clone()); acts[k].timeScale = ts; }
   if (acts.walk) acts.walk.timeScale = C.ws;
   if (C.rest && acts.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, acts.idle.getClip(), C.rest))) acts[k] = mixer.clipAction(clip);
   if (C.react && acts.idle) for (const [k, clip] of Object.entries(buildReactClips(model, acts.idle.getClip()))) acts[k] = mixer.clipAction(clip);
-  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast', 'praise', 'scold']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
+  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast', 'praise', 'scold', 'throw', 'interact']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
+  // Schwanzknochen ohne eigene Animation (Zweibeiner): schwingen im Code (swayTail)
+  if (C.tail) model.userData.tail = C.tail.map(n => model.getObjectByName(n)).filter(Boolean);
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
   return { model, mixer, acts, cur: null, id, dims };
@@ -74,6 +79,13 @@ function rigPlay(rig, name, restart = false) {
   if (!rig) return; const a = rig.acts[name]; if (!a) return;
   if (rig.cur === name) { if (restart) a.reset().play(); return; }
   a.reset().fadeIn(.25).play(); if (rig.cur && rig.acts[rig.cur]) rig.acts[rig.cur].fadeOut(.25); rig.cur = name;
+}
+// Schwanz sanft hin und her schwingen lassen, beim Laufen schneller; die Grundhaltung bleibt die der Ruhepose
+const swayQ = new THREE.Quaternion(), swayAx = new THREE.Vector3(0, 0, 1);
+function swayTail(t, moving) {
+  const T = foxModel && foxModel.userData.tail; if (!T) return;
+  const f = moving ? 7 : 2.2, a = moving ? .22 : .12;
+  T.forEach((b, i) => { const r = b.userData.rest; if (!r) return; b.quaternion.copy(r.q).multiply(swayQ.setFromAxisAngle(swayAx, Math.sin(t * f - i * .7) * a)); });
 }
 function useCreature(id, gltf) {
   if (foxModel) { foxPivot.remove(foxModel); foxMixer.stopAllAction(); }
@@ -256,8 +268,25 @@ const ACT_COL = { help: '#8fcf7b', play: '#f3c04d', mischief: '#ee8a72' };
 const mouthTrees = TK.map(g => { const o = shadowify(g.scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2), mouthV = new THREE.Vector3(), mouthF = new THREE.Vector3();
 const mouthSack = shadowify(model('prop.sack').scene.clone(true)); mouthSack.visible = false; scene.add(mouthSack);
+// Zweibeiner tragen vor dem Körper in beiden Händen: Mitte zwischen den Handknochen (Theme: hands)
+const handA = new THREE.Vector3(), handB = new THREE.Vector3();
+function handsMid(C) {
+  const m = foxModel.userData; if (!m.hands) m.hands = C.hands.map(n => foxModel.getObjectByName(n)).filter(Boolean);
+  if (m.hands.length < 2) return false;
+  m.hands[0].getWorldPosition(handA); m.hands[1].getWorldPosition(handB); mouthV.copy(handA).add(handB).multiplyScalar(.5); return true;
+}
 function updateMouthTree() {
   mouthTrees.forEach(o => o.visible = false); mouthSack.visible = false;
+  const CB = fox.kind && CREATURES[fox.kind];
+  if (CB && CB.hands && foxModel && (fox.carry || fox.carryGoods)) {
+    if (!handsMid(CB)) return;
+    const fh = foxPivot.rotation.y;
+    if (fox.carryGoods) { mouthSack.position.copy(mouthV); mouthSack.position.y -= .12; mouthSack.rotation.set(0, fh, 0); mouthSack.scale.setScalar(1.6); mouthSack.visible = true; return; }
+    const o = mouthTrees[fox.carryType || 0], s = ST * .5, side = mouthTmp.set(1, 0, 0).applyQuaternion(foxPivot.quaternion);
+    mouthQ.copy(foxPivot.quaternion).multiply(mouthZ); o.quaternion.copy(mouthQ); o.scale.setScalar(s);
+    o.position.copy(mouthV).addScaledVector(side, -TREE_H * s * .45); o.visible = true; // Stamm quer vor dem Bauch, mittig gefasst
+    return;
+  }
   if (fox.carryGoods && foxModel) { // Sack mit Waren im Maul
     const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
     if (head) { head.getWorldPosition(mouthV); const fh = foxPivot.rotation.y; mouthV.x += Math.sin(fh) * C.h * .17; mouthV.z += Math.cos(fh) * C.h * .17; mouthV.y -= C.h * .2; mouthSack.position.copy(mouthV); mouthSack.rotation.set(0, fh, 0); mouthSack.scale.setScalar(1.5 * C.h / 1.45); mouthSack.visible = true; }
@@ -279,4 +308,4 @@ function updateMouthTree() {
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };
+export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, swayTail, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };

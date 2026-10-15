@@ -43,6 +43,7 @@ function foxUnder(cx, cy) {
   const y = foxPivot.position.y, C = CREATURES[fox.kind], h = C.h, a = foxPivot.rotation.y, sx = Math.sin(a) * h, sz = Math.cos(a) * h;
   let dv = Infinity, lv = 0, dh = Infinity, lh = 0;
   if (segToScreen(fox.x, y + h * .1, fox.z, fox.x, y + h * .95, fox.z, tA, tB)) [dv, lv] = segDist(cx, cy);
+  if (C.body === 'biped') return dv < Math.max(36, lv * .3); // aufrecht: schmaler und hoch, nur die senkrechte Strecke
   if (segToScreen(fox.x - sx, y + h * .4, fox.z - sz, fox.x + sx * .95, y + h * .5, fox.z + sz * .95, tA, tB)) [dh, lh] = segDist(cx, cy);
   return dv < Math.max(36, lv * .55) || dh < Math.max(36, lv * .4, lh * .2);
 }
