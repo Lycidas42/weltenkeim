@@ -22,6 +22,11 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 - **Sie braucht ihn:** Hunger, Müdigkeit, Spieltrieb und Laune (3.2) sind an ihr ablesbar; Fürsorge zeigt Wirkung.
 - **Sie wird zu seiner:** lernt erkennbar aus seiner Erziehung (3.11, „Warum?“), wächst (3.1), behält Erinnerungen.
 - Nahe Ansicht mit Detail (Fell, Mimik) dort, wo man hinschaut: zuerst das Gesicht.
+- **Alles kommt aus der Stimmung:** Ein gemeinsamer Zustand (z. B. fröhlich, neugierig, müde, hungrig, beleidigt,
+  ängstlich, stolz), gespeist aus Bedürfnissen (3.2), Lob/Tadel, Ereignissen und Ausrichtung (3.3), steuert alles
+  zugleich: Gesicht (Augen, Lider, Brauen, Maul), Ohren, Schwanz, Haltung, Gangart, welche Zwischenhandlungen sie wählt
+  und welche Laute sie macht. So passen Ausdruck und Handlung immer zusammen, und das „Warum?“ (3.11) kann die
+  Stimmung als Grund nennen.
 
 ## 1. Ist-Stand
 
