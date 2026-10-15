@@ -82,22 +82,12 @@ den eine Claude-Code-Sitzung in der Cloud selbstständig bis zum Pull Request br
 
 **Labels:** `feature` (setzt die Vorlage), `bereit` (kann an Claude), `frage` (wartet auf eine Antwort).
 
-### Vorschlag für den Fahrplan
+### Fahrplan
 
-Wird beim Anlegen ins Fahrplan-Issue übernommen und dann hier gelöscht. Vorher braucht es einen automatischen
-Prüflauf (Spiel im Chromium ohne Bildschirm laden, `__wk.step(n)` rechnen, Fehler in der Konsole und
-Akzeptanzkriterien prüfen, Screenshots), damit eine Sitzung selbst feststellen kann, ob sie fertig ist.
-
-| # | Schritt | Konzept | Stand |
-|---|---|---|---|
-| 0 | Prüflauf für autarke Sitzungen (`dev/`) | – | 🔵 geplant |
-| 1 | Pilot: Symbole über dem Kopf für die vorhandenen Ereignisse (Jubel, Flucht, Wurf, Schlaf, Bitte) | `bewohner.md` 4.2 | 🔵 geplant |
-| 2 | Halten als Zustand: Absetzen per Tippen, Werfen per Wischen, Kamera frei beim Halten | `gott-und-hand.md` 3.2 | 🔵 geplant |
-| 3 | Waage mit Anzeige; vorhandene Taten zählen | `gott-und-hand.md` 7 | 🔵 geplant |
-| 4 | Bewohner essen mittags aus dem Lager, Gaben am Schrein | `nahrung.md` 1 und 3 | 💡 Idee (empfohlen) |
-| 5 | Bewohner mit Namen, Auswahl und Karte | `bewohner.md` 3.1, 8 | 🔵 geplant |
-| 6 | Kalender und Überblenden der Jahreszeiten | `jahreszeiten.md` 3, Punkt 1–2 | 🔵 geplant |
-| 7 | Lokale Welten: Weltenliste, Verzweigen, Export und Import | `spielstaende.md` 9, Etappe 1 | 🔵 geplant |
+Die Reihenfolge steht im Issue [#1 Fahrplan](https://github.com/Lycidas42/weltenkeim/issues/1): Feature-Issues hängen
+dort als Unter-Issues, Schritte ohne eigenes Issue stehen in seiner Beschreibung. Als Erstes kommt ein automatischer
+Prüflauf ([#2](https://github.com/Lycidas42/weltenkeim/issues/2)), damit eine Sitzung selbst feststellen kann, ob sie
+fertig ist.
 
 ## Abhängigkeiten zwischen den Vorhaben
 

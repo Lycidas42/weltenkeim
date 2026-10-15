@@ -102,7 +102,7 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 ### 4.2 Symbole über dem Kopf
 
-**Stand:** 🔵 geplant
+**Stand:** 🔵 geplant · [#3](https://github.com/Lycidas42/weltenkeim/issues/3)
 
 - Kleines Bild über dem Kopf, sitzt etwa 0,25 über dem Kopf, steigt kurz auf und verblasst nach 2 bis 4 s.
 - **Technik:** ein Sprite-Atlas (eine Textur, wenige Dutzend Bilder) und **eine** `InstancedMesh` aus Flächen, die
