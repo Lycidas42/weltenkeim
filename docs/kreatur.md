@@ -27,6 +27,11 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
   zugleich: Gesicht (Augen, Lider, Brauen, Maul), Ohren, Schwanz, Haltung, Gangart, welche Zwischenhandlungen sie wählt
   und welche Laute sie macht. So passen Ausdruck und Handlung immer zusammen, und das „Warum?“ (3.11) kann die
   Stimmung als Grund nennen.
+- **Stimmungen folgen dem Alter (3.1):** Als Jungtier ist sie sehr neugierig und verspielt, probiert alles aus und
+  macht dabei auch Unfug, ohne böse zu sein (kurze Aufmerksamkeit, wechselt oft die Tätigkeit, springt Dingen nach).
+  Mit dem Alter wird sie reifer und zielgerichteter: bleibt länger bei einer Aufgabe, plant Wege, wählt Tätigkeiten
+  nach dem, was sie gelernt hat; im altehrwürdigen Abschnitt ruhig und gelassen. Gleiches Lob wirkt beim Jungtier
+  schneller, aber flüchtiger.
 
 ## 1. Ist-Stand
 
