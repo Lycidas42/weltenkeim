@@ -15,7 +15,7 @@ import { fox } from './creature/kinds.js';
 import './assets/models.js';
 import './models/nature.js';
 import './world/spring.js';
-import { heldTree, input } from './hand/pointer.js';
+import { heldTree, input, pointers } from './hand/pointer.js';
 import { clouds, updateClouds, updatePuddles, updateSnowfall, updateWeatherRain } from './world/weather-fx.js';
 import { updateStatics } from './village/layout.js';
 import { trees } from './world/trees.js';
@@ -125,5 +125,5 @@ window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
   // draw = null gar keins (viele kurze Schritte in Prüfungen, Software-WebGL braucht pro Bild Sekunden)
   step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw === false && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
-  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager };
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager, pointers };
 requestAnimationFrame(frame);

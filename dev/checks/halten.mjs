@@ -6,7 +6,19 @@
 
 export default async (page, wk) => {
   const cdp = await page.context().newCDPSession(page);
-  const touch = (type, pts = []) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+  // Chromium liefert Zeigerbewegungen im Takt der Bilder aus; der Takt ist im Prüflauf angehalten. Daher nach jedem
+  // Ereignis warten, bis das Spiel es empfangen hat – sonst käme es womöglich erst nach dem nächsten Schritt an.
+  const delivered = async (act, n = 1) => {
+    const c = await page.evaluate(() => window.__ptr || 0); await act();
+    await page.waitForFunction(([c, n]) => (window.__ptr || 0) >= c + n, [c, n], { polling: 5, timeout: 3000 });
+  };
+  const touch = (type, pts = []) => delivered(() => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) }));
+  let mx = -1, my = -1;
+  const mouse = {
+    move: (x, y) => x === mx && y === my ? null : (mx = x, my = y, delivered(() => page.mouse.move(x, y))),
+    down: () => delivered(() => page.mouse.down()),
+    up: () => delivered(() => page.mouse.up()),
+  };
   // eigene Schritte ohne Zeichnen (wk.step zeichnet das letzte Bild, das kostet mit Software-WebGL Sekunden)
   wk = { ...wk, step: n => page.evaluate(n => window.__wk.step(n, 1 / 60, null), n) };
   const hold = () => wk.eval(w => w.holdState());
@@ -16,7 +28,8 @@ export default async (page, wk) => {
 
   // Ereignisse mitschreiben; Kamera etwas näher, Kreatur weit weg, Tag, kein Menü offen
   const setup = () => wk.eval(w => {
-    window.__ev = [];
+    window.__ev = []; window.__ptr = 0;
+    for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) addEventListener(t, () => window.__ptr++, true);
     w.on('handDrop', e => __ev.push({ type: 'drop', kind: e.kind, x: e.x, z: e.z, soft: e.soft }));
     w.on('handThrow', e => __ev.push({ type: 'throw', kind: e.kind, x: e.x, z: e.z }));
     w.closeSheets(); w.setTool('hand');
@@ -96,11 +109,11 @@ export default async (page, wk) => {
 
   mark('vor 3');
   // 3. Werkzeugwechsel zu Wunder und zurück: Gehaltenes bleibt, ist im Wunder-Werkzeug ausgeblendet, Symbol bleibt
-  await page.click('.tools button[data-tool="miracle"]'); await wk.step(5);
+  mx = -1; await page.click('.tools button[data-tool="miracle"]'); await wk.step(5);
   let h = await hold(), v = await vil(vi);
   if (h.kind !== 'villager' || !h.hidden || !v.hidden || h.hand.visible || !h.badge) fail(`Wunder-Werkzeug: ${JSON.stringify({ kind: h.kind, hidden: h.hidden, vHidden: v.hidden, hand: h.hand.visible, badge: h.badge })}`);
   await wk.shot('halten-wunder');
-  await page.click('.tools button[data-tool="hand"]'); await wk.step(5);
+  mx = -1; await page.click('.tools button[data-tool="hand"]'); await wk.step(5);
   h = await hold(); v = await vil(vi);
   if (h.kind !== 'villager' || h.hidden || v.hidden || !h.hand.visible) fail('zurück im Hand-Werkzeug ist das Gehaltene nicht wieder da');
 
@@ -144,15 +157,19 @@ export default async (page, wk) => {
     w.camera.position.set(t.x + d * Math.sin(pol) * Math.sin(az), t.y + d * Math.cos(pol), t.z + d * Math.sin(pol) * Math.cos(az));
   });
   await wk.step(30);
-  // Horizont: Bildschirmhöhe eines weit entfernten Punkts auf Meereshöhe in Blickrichtung; darüber ist Himmel
-  const hz = await wk.eval(w => { const c = w.camera.position, t = w.controls.target, dx = t.x - c.x, dz = t.z - c.z, l = Math.hypot(dx, dz); return w.toScreen(c.x + dx / l * 400, 0, c.z + dz / l * 400, { set: (a, b) => ({ x: a, y: b }) }); });
+  // Himmelspunkt: Strahl durch den Bildschirmpunkt trifft weder Gelände noch Meer (wie pick im Spiel); von oben suchen
+  const skyAt = q => wk.eval((w, q) => {
+    const c = w.camera, o = c.position, d = o.clone().set(q.x / innerWidth * 2 - 1, -q.y / innerHeight * 2 + 1, .5).unproject(c).sub(o).normalize();
+    for (let t = 0; t < 220; t += .15 + t * .01) { const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t; if (y < Math.max(w.heightAt(x, z), 0)) return false; }
+    return true;
+  }, q);
   let sky = null;
-  for (const y of [hz.y - 40, hz.y - 80, hz.y - 25]) { const q = { x: 300, y }; if (y > 0 && await onCanvas(q)) { sky = q; break; } }
-  if (!sky) fail(`kein Himmel auf dem Bildschirm (Horizont bei y = ${Math.round(hz.y)})`);
+  for (let y = 60; y < 640 && !sky; y += 15) for (const x of [330, 200, 60]) { const q = { x, y }; if (await onCanvas(q) && await skyAt(q)) { sky = q; break; } }
+  if (!sky) fail('kein Himmel auf dem Bildschirm');
   const before = await vil(vi), hb = await hold(), pt = await wk.eval(w => w.input.ptrType);
   await tap(sky, 2);
   ev = await lastEv(); v = await vil(vi);
-  if ((await hold()).kind || !ev || ev.type !== 'drop' || ev.soft) fail(`Tipp in den Himmel: nicht fallen gelassen (${JSON.stringify(ev)})`);
+  if ((await hold()).kind || !ev || ev.type !== 'drop' || ev.soft) fail(`Tipp in den Himmel: nicht fallen gelassen (${JSON.stringify(ev)}; ${JSON.stringify(await wk.eval(w => ({ ptrs: [...w.pointers.keys()], prim: w.input.primary, pr: w.input.pressing, pt: w.input.ptrType, drop: w.input.drop, tool: w.input.tool, ring: !document.getElementById('ring').hidden, h: w.holdState() })))}, sky ${JSON.stringify(sky)})`);
   for (let k = 0; k < 20 && (await vil(vi)).state === 'falling'; k++) await wk.step(10);
   v = await vil(vi);
   if (Math.hypot(v.x - before.x, v.z - before.z) > .15) fail(`fällt nicht senkrecht (versetzt um ${Math.hypot(v.x - before.x, v.z - before.z).toFixed(2)}; ${JSON.stringify({ before, v, hb, pt, sky, vi })})`);
@@ -216,11 +233,11 @@ export default async (page, wk) => {
 
   mark('vor 9');
   // 9. Maus: Klick packt, Schild „Absetzen“, Klick setzt ab, schnelles Ziehen wirft
-  const click = async p => { await page.mouse.move(p.x, p.y); await page.mouse.down(); await wk.step(2); await page.mouse.up(); await wk.step(2); };
+  const click = async p => { await mouse.move(p.x, p.y); await mouse.down(); await wk.step(2); await mouse.up(); await wk.step(2); };
   let p = await freeVillager(); await click(p); vi = await grabbedIndex();
   if ((await hold()).kind !== 'villager') fail('Maus: Klick packt den Bewohner nicht');
   lp = await landPoint((await hold()).screen);
-  await page.mouse.move(lp.sx, lp.sy); await wk.step(12);
+  await mouse.move(lp.sx, lp.sy); await wk.step(12);
   const hm = await hold(); // volle Hand folgt dem Mauszeiger wie die leere
   if (!near(hm.screen, { x: lp.sx, y: lp.sy }, 1)) fail('Maus: volle Hand folgt dem Zeiger nicht');
   const tip = await page.evaluate(() => { const t = document.getElementById('handTip'); return t.hidden ? null : t.textContent; });
@@ -229,9 +246,9 @@ export default async (page, wk) => {
   v = await vil(vi); ev = await lastEv();
   if ((await hold()).kind || !ev?.soft || Math.hypot(v.x - lp.x, v.z - lp.z) > .6) fail('Maus: Klick setzt nicht am Zeiger ab');
   p = await freeVillager(); await click(p); vi = await grabbedIndex(); await wk.step(10);
-  await page.mouse.move(195, 560); await page.mouse.down(); await wk.step(1);
-  for (let k = 1; k <= 5; k++) { await page.mouse.move(195, 560 - 35 * k); await wk.step(1); }
-  await page.mouse.up(); await wk.step(1);
+  await mouse.move(195, 560); await mouse.down(); await wk.step(1);
+  for (let k = 1; k <= 5; k++) { await mouse.move(195, 560 - 35 * k); await wk.step(1); }
+  await mouse.up(); await wk.step(1);
   ev = await lastEv();
   if ((await vil(vi)).state !== 'falling' || ev?.type !== 'throw') fail('Maus: schnelles Ziehen wirft nicht');
   await wk.step(120);
