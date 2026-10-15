@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { $, clamp, rnd } from '../core/util.js';
 import { PROC, RES, ROLES, S, emit, resText } from '../core/state.js';
-import { camera, canvas, controls, tA, tmpV, toScreen } from '../core/render.js';
+import { camera, canvas, controls, tmpV } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
 import { heightAt } from '../world/terrain.js';
 import { SPRAY_N, spray } from '../world/water.js';
@@ -137,18 +137,21 @@ function updateHandHover(dt) {
   if (!tip.hidden) { const r = canvas.getBoundingClientRect(); tip.style.transform = `translate(${Math.round(pointerXY.x - r.left + 18)}px, ${Math.round(pointerXY.y - r.top + 14)}px)`; }
 }
 // Zeiger: Bodenpunkt unter dem Finger bestimmen, beim Formen das Gelände verändern
-// Beim Halten steht die Hand an ihrem eigenen Bildschirmpunkt (input.hold) und gleitet bei Kamerabewegung mit über
-// die Welt; ein Finger, der mit voller Hand ansetzt und zieht, verschiebt diesen Punkt.
+// Die Hand ist dort, wo der Zeiger ist – leer wie voll: am Rechner folgt sie dem Mauszeiger, am Handy dem ziehenden
+// Finger und bleibt nach dem Anheben dort stehen. Beim Halten merkt sie sich diesen Bildschirmpunkt (input.hold) und
+// gleitet bei Kamerabewegung mit über die Welt. Ein Tipp (bzw. Klick) ohne Ziehen setzt ab.
 const TAP_PX = 10, TAP_T = .3, THROW_PX = 700; // Tipp: kaum bewegt und kurz; Wurf: Wischen schneller als 700 px/s
-const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, ox: 0, oy: 0, trail: [] }; // mode: 'move' (volle Hand) oder 'direct'
+const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, trail: [] }; // mode: 'move' (mit voller Hand angesetzt) oder 'direct'
 const carrying = () => heldKind() && (input.tool === 'hand' || input.tool === 'blick');
 function updatePointer(dt) {
   if (input.primary !== null) { // Spur des Fingers in Spielzeit, für Tipp und Wischgeschwindigkeit
     press.t += dt; press.trail.push({ x: pointerXY.x, y: pointerXY.y, t: press.t });
     while (press.trail.length > 2 && press.trail[1].t < press.t - .1) press.trail.shift();
   }
-  if (carrying() && press.mode !== 'direct') {
-    if (press.mode === 'move' && press.moved) { input.hold.x = pointerXY.x + press.ox; input.hold.y = pointerXY.y + press.oy; }
+  if (carrying()) {
+    const follow = !input.drop && input.tool === 'hand' && (input.ptrType === 'mouse' || press.mode === 'direct' || (press.mode === 'move' && press.moved));
+    if (follow) { input.hold.x = pointerXY.x; input.hold.y = pointerXY.y - touchLift(); }
+    if (press.mode !== 'direct') holdOff.multiplyScalar(Math.exp(-dt * 5)); // Maus: Gepacktes rutscht nach dem Zupacken unter den Zeiger
     if (!input.drop) pick(input.hold.x, input.hold.y);
   } else if (input.primary !== null || (input.handShown && input.tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
   if (input.pressing && input.tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, input.sculptDir, dt);
@@ -221,27 +224,17 @@ function onToolUp() {
   if (input.tool === 'hand' && heldKind() && press.mode) {
     if (press.mode === 'move' && !press.moved && press.t < TAP_T) setDownAt(press.x0, press.y0);
     else if (swipeSpeed() > THROW_PX) letGo('throw');
-    else settleHold();
   }
   input.pressing = false; press.mode = null;
 }
 // Zweiter Finger (Zoomen, Verschieben): der Druck endet, ohne dass etwas fällt
 function cancelPress() {
   if (input.treeGrab) input.treeGrab = null;
-  if (input.tool === 'hand' && heldKind() && press.mode) settleHold();
   input.pressing = false; press.mode = null;
 }
 function swipeSpeed() {
   const T = press.trail; if (T.length < 2) return 0;
   const a = T[0], b = T[T.length - 1]; return Math.hypot(b.x - a.x, b.y - a.y) / Math.max(b.t - a.t, 1 / 60);
-}
-// Nach dem Zupacken (Hand folgt dem Finger) den Haltepunkt auf den Bildschirmpunkt der Hand setzen
-function settleHold() {
-  if (press.mode !== 'direct') return;
-  const lx = pointerXY.x, ly = pointerXY.y - touchLift();
-  if (pick(lx, ly)) { const x = hit.x + holdOff.x, z = hit.z + holdOff.z; toScreen(x, Math.max(heightAt(x, z), 0), z, tA); input.hold.x = tA.x; input.hold.y = tA.y; }
-  else { input.hold.x = lx; input.hold.y = ly; }
-  holdOff.set(0, 0, 0);
 }
 // Absetzen per Tipp: zählt der Punkt unter dem Finger; ohne Bodenpunkt (Himmel) fällt das Gehaltene senkrecht herunter
 function setDownAt(cx, cy) {
@@ -319,7 +312,7 @@ canvas.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse' && input.tool !== 'blick') { pointerXY.x = e.clientX; pointerXY.y = e.clientY; input.handShown = true; if (input.primary === null) input.ptrType = 'mouse'; }
   if (e.pointerId === input.primary) {
     pointerXY.x = e.clientX; pointerXY.y = e.clientY;
-    if (!press.moved && Math.hypot(e.clientX - press.x0, e.clientY - press.y0) > TAP_PX) { press.moved = true; press.ox = input.hold.x - e.clientX; press.oy = input.hold.y - e.clientY; }
+    if (!press.moved && Math.hypot(e.clientX - press.x0, e.clientY - press.y0) > TAP_PX) press.moved = true;
   }
 });
 const endPtr = e => { pointers.delete(e.pointerId); if (e.pointerId === input.primary) { input.primary = null; onToolUp(); } };

@@ -67,9 +67,17 @@ export default async (page, wk) => {
   mark('vor 1');
   // 1. Packen, Finger anheben: bleibt in der Hand, die Hand steht still
   let vi = await grabVillager();
-  const h0 = await hold(); await wk.step(240); const h1 = await hold();
+  const h0 = await hold(); await wk.step(240); let h1 = await hold();
   if (h1.kind !== 'villager' || (await vil(vi)).state !== 'grabbed') fail('Bewohner nach 4 s nicht mehr in der Hand');
   if (Math.hypot(h1.hand.x - h0.hand.x, h1.hand.z - h0.hand.z) > .05) fail('Hand bewegt sich ohne Finger');
+  // langsam ziehen: die Hand geht wie die leere Hand unter den Finger (90 px darüber) und bleibt nach dem Anheben dort
+  await touch('touchStart', [[150, 640]]); await wk.step(2);
+  for (let k = 1; k <= 15; k++) { await touch('touchMove', [[150 + k * 4, 640 - k * 3]]); await wk.step(3); }
+  await wk.step(10); await touch('touchEnd'); await wk.step(30);
+  const h1b = await hold();
+  if (h1b.kind !== 'villager') fail('langsames Ziehen hat den Bewohner losgelassen');
+  if (!near(h1b.screen, { x: 210, y: 595 - 90 }, 2)) fail(`Hand folgt dem ziehenden Finger nicht (${Math.round(h1b.screen.x)}, ${Math.round(h1b.screen.y)})`);
+  await wk.step(60); h1 = await hold();
 
   mark('vor 2');
   // 2. Zwei Finger zoomen: nichts fällt, die Hand bleibt am selben Bildschirmpunkt und gleitet über die Welt
@@ -141,13 +149,13 @@ export default async (page, wk) => {
   let sky = null;
   for (const y of [hz.y - 40, hz.y - 80, hz.y - 25]) { const q = { x: 300, y }; if (y > 0 && await onCanvas(q)) { sky = q; break; } }
   if (!sky) fail(`kein Himmel auf dem Bildschirm (Horizont bei y = ${Math.round(hz.y)})`);
-  const before = await vil(vi);
+  const before = await vil(vi), hb = await hold(), pt = await wk.eval(w => w.input.ptrType);
   await tap(sky, 2);
   ev = await lastEv(); v = await vil(vi);
   if ((await hold()).kind || !ev || ev.type !== 'drop' || ev.soft) fail(`Tipp in den Himmel: nicht fallen gelassen (${JSON.stringify(ev)})`);
   for (let k = 0; k < 20 && (await vil(vi)).state === 'falling'; k++) await wk.step(10);
   v = await vil(vi);
-  if (Math.hypot(v.x - before.x, v.z - before.z) > .15) fail(`fällt nicht senkrecht (versetzt um ${Math.hypot(v.x - before.x, v.z - before.z).toFixed(2)})`);
+  if (Math.hypot(v.x - before.x, v.z - before.z) > .15) fail(`fällt nicht senkrecht (versetzt um ${Math.hypot(v.x - before.x, v.z - before.z).toFixed(2)}; ${JSON.stringify({ before, v, hb, pt, sky, vi })})`);
   await wk.eval(w => { const t = w.controls.target; w.camera.position.set(t.x, t.y + 18, t.z + 14); });
   await wk.step(30);
 
@@ -159,7 +167,7 @@ export default async (page, wk) => {
   const fp = await wk.eval(w => w.toScreen(w.fox.x, w.heightAt(w.fox.x, w.fox.z) + .45, w.fox.z, { set: (a, b) => ({ x: a, y: b }) }));
   await tap(fp, 2);
   const ring = await page.evaluate(() => !document.getElementById('ring').hidden);
-  if (!ring) fail('Kreismenü öffnet sich mit voller Hand nicht');
+  if (!ring) fail(`Kreismenü öffnet sich mit voller Hand nicht (Tipp ${Math.round(fp.x)}, ${Math.round(fp.y)} auf ${await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.id || document.elementFromPoint(x, y)?.className, [fp.x, fp.y])}, Kreatur ${JSON.stringify(await wk.eval(w => ({ x: w.fox.x, z: w.fox.z, st: w.fox.state, t: [w.controls.target.x, w.controls.target.z] })))})`);
   if ((await hold()).kind !== 'villager') fail('Antippen der Kreatur hat das Gehaltene losgelassen');
   await tap({ x: 60, y: 700 }, 2); // schließt das Kreismenü
   if ((await hold()).kind !== 'villager') fail('Schließen des Kreismenüs hat das Gehaltene losgelassen');
@@ -213,6 +221,8 @@ export default async (page, wk) => {
   if ((await hold()).kind !== 'villager') fail('Maus: Klick packt den Bewohner nicht');
   lp = await landPoint((await hold()).screen);
   await page.mouse.move(lp.sx, lp.sy); await wk.step(12);
+  const hm = await hold(); // volle Hand folgt dem Mauszeiger wie die leere
+  if (!near(hm.screen, { x: lp.sx, y: lp.sy }, 1)) fail('Maus: volle Hand folgt dem Zeiger nicht');
   const tip = await page.evaluate(() => { const t = document.getElementById('handTip'); return t.hidden ? null : t.textContent; });
   if (tip !== 'Absetzen') fail(`Maus: Schild unter dem Zeiger zeigt „${tip}“ statt „Absetzen“`);
   await click({ x: lp.sx, y: lp.sy }); await wk.step(60);

@@ -81,8 +81,9 @@ ob der Finger noch auf dem Bildschirm ist.
 - **Kamera frei:** Während die Hand etwas hält, gehen alle Kamera-Aktionen: zwei Finger zoomen und verschieben, das
   Blick-Werkzeug ebenso, am Rechner Mausrad, rechte Maustaste, Leertaste/Strg. Die Hand bleibt dabei am selben
   Bildschirmpunkt und gleitet so mit über die Welt – so trägt man etwas weit über die Insel.
-- **Bewegen:** Ein Finger, der irgendwo im Hand-Werkzeug ansetzt und zieht, zieht die Hand mit. Loslassen nach
-  langsamem Ziehen = weiter halten; die Hand bleibt am neuen Punkt.
+- **Bewegen:** Die Hand ist dort, wo der Zeiger ist – leer wie voll, damit sich beim Greifen nichts ändert. Am Handy
+  geht sie beim Ziehen unter den Finger (ein Stück darüber) und bleibt nach dem Anheben dort; am Rechner folgt sie
+  dem Mauszeiger. Loslassen nach langsamem Ziehen = weiter halten.
 - **Absetzen (sanft):** nur per kurzem Tipp (bzw. Klick) auf einen Punkt der Welt – Boden, Gebäude, Feld. Die Hand
   gleitet dorthin, senkt sich und stellt das Gehaltene ab. Bewohner landen auf den Füßen, ohne Schwindel, und gehen
   weiter ihrer Arbeit nach; Bäume werden zu Stämmen. Im Wasser: Bewohner schwimmen an Land, Baum „Platsch!“.
@@ -99,8 +100,8 @@ ob der Finger noch auf dem Bildschirm ist.
   (Symbol am Knopf bleibt); zurück im Hand-Werkzeug ist beides wieder da. Gehaltene Bewohner arbeiten so lange nicht.
 - **Kreismenü der Kreatur** bleibt erreichbar: Kreatur mit voller Hand antippen öffnet es, die Hand hält weiter.
   Später: Absetzen auf der Kreatur = ihr das Gehaltene geben (Futter, Holz zum Lernen; kommt mit `nahrung.md`).
-- **Rechner:** dasselbe mit der Maus – Klick = Absetzen bzw. Fallenlassen, Ziehen mit gedrückter Maustaste und
-  schnelles Loslassen = Werfen.
+- **Rechner:** dasselbe mit der Maus – die Hand folgt dem Zeiger, Klick = Absetzen bzw. Fallenlassen, Ziehen mit
+  gedrückter Maustaste und schnelles Loslassen = Werfen.
 - **Ereignisse:** `handDrop` (`{ kind, what, x, z, soft }`) und `handThrow` (`{ kind, what, x, z, vx, vz }`), damit
   die Waage sie später zählen kann.
 - **Speichern/Neuladen:** Nach dem Neuladen ist die Hand leer (Bewohner zählen weiter über `S.pop`, ein gehaltener
