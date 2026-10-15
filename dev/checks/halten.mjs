@@ -264,6 +264,22 @@ export default async (page, wk) => {
   if ((await vil(vi)).state !== 'falling' || ev?.type !== 'throw') fail('Maus: schnelles Ziehen wirft nicht');
   await wk.step(120);
 
+  // Kamera nah und flach, Bäume liegen hinter ihr: nirgends „Ausreißen“, ein Druck ins Leere packt keinen Baum
+  // (Punkte hinter der Kamera werden beim Projizieren gespiegelt und trafen sonst das halbe Bild)
+  await wk.eval(w => { const t = w.controls.target, d = 8, pol = 1.3, az = .7; w.camera.position.set(t.x + d * Math.sin(pol) * Math.sin(az), t.y + d * Math.cos(pol), t.z + d * Math.sin(pol) * Math.cos(az)); });
+  await wk.step(10);
+  if (!(await wk.eval(w => w.trees.some(t => t.alive && (t.x - w.camera.position.x) * (w.controls.target.x - w.camera.position.x) + (t.z - w.camera.position.z) * (w.controls.target.z - w.camera.position.z) < 0)))) fail('Testaufbau: kein Baum hinter der Kamera');
+  for (const [x, y] of [[60, 400], [200, 450], [330, 600]]) {
+    if (await wk.eval((w, [x, y]) => w.trees.some(t => t.alive && Math.hypot(...(o => [o.x - x, o.y - y])(w.toScreen(t.x, w.heightAt(t.x, t.z) + 1, t.z, { set: (a, b) => ({ x: a, y: b }) }))) < 80), [x, y])) continue; // dort steht wirklich ein Baum
+    await mouse.move(x, y); await wk.step(15);
+    const t = await page.evaluate(() => { const e = document.getElementById('handTip'); return e.hidden ? '' : e.textContent; });
+    if (t === 'Ausreißen') fail(`„Ausreißen“ über freiem Boden bei (${x}, ${y}) – Baum hinter der Kamera getroffen`);
+    await mouse.down(); await wk.step(3);
+    const tg = await wk.eval(w => !!w.input.treeGrab); await mouse.up(); await wk.step(2);
+    if (tg) fail(`Druck ins Leere bei (${x}, ${y}) packt einen Baum hinter der Kamera`);
+  }
+  await wk.eval(w => { const t = w.controls.target; w.camera.position.set(t.x, t.y + 18, t.z + 14); }); await wk.step(30);
+
   mark('vor 10');
   // 10. Mit voller Hand auf ein reifes Feld tippen: nicht geerntet, dort abgesetzt
   if (!(await wk.eval(w => w.fields.length))) { // kein Hof: Spielstand mit Hof speichern und neu laden

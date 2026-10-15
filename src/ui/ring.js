@@ -2,7 +2,7 @@
 
 import { $, clamp } from '../core/util.js';
 import { S } from '../core/state.js';
-import { canvas, clock, tA, tB, toScreen } from '../core/render.js';
+import { behindCam, canvas, clock, tA, tB, toScreen } from '../core/render.js';
 import { CREATURES, fox } from '../creature/kinds.js';
 import { heldTree, input, pointerXY } from '../hand/pointer.js';
 import { ACT_COL, ACT_DESC, ACT_LABEL, foxPivot } from '../creature/creature.js';
@@ -35,7 +35,8 @@ function closeRing() { ringOpen = false; $('ring').classList.remove('open'); $('
 addEventListener('keydown', e => { if (e.key === 'Escape' && ringOpen) closeRing(); });
 // Tier unter dem Finger: Abstand zur Strecke Füße–Kopfhöhe auf dem Bildschirm, Toleranz wächst mit der Größe
 function foxUnder(cx, cy) {
-  const y = foxPivot.position.y, C = CREATURES[fox.kind]; toScreen(fox.x, y + C.h * .1, fox.z, tA); toScreen(fox.x, y + C.h * .85, fox.z, tB);
+  const y = foxPivot.position.y, C = CREATURES[fox.kind]; toScreen(fox.x, y + C.h * .1, fox.z, tA); if (behindCam()) return false;
+  toScreen(fox.x, y + C.h * .85, fox.z, tB); if (behindCam()) return false;
   const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
   return Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u) < Math.max(36, Math.sqrt(L2) * .55);
 }

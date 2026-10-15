@@ -37,6 +37,6 @@ function pick(cx, cy) {
     prev = t; t += .15 + t * .01; if (t > 220) break; }
   hitOk = false; return false;
 }
-function screenDist(x, y, z, cx, cy) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); return Math.hypot((tmpV.x + 1) / 2 * r.width + r.left - cx, (1 - tmpV.y) / 2 * r.height + r.top - cy); }
+function screenDist(x, y, z, cx, cy) { const r = canvas.getBoundingClientRect(); tmpV.set(x, y, z).project(camera); if (tmpV.z > 1) return Infinity; return Math.hypot((tmpV.x + 1) / 2 * r.width + r.left - cx, (1 - tmpV.y) / 2 * r.height + r.top - cy); }
 
 export { heldKind, heldObjs, heldTree, hit, hitOk, holdOff, input, pick, pointerXY, pointers, ray, rootBall, screenDist, setHoldOff, touchLift };
