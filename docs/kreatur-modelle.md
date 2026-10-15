@@ -28,6 +28,10 @@ Weitere Kandidaten aus der Recherche: Detective Bunny (OpenGameArt, CC0, eigene 
 CC BY, nur 3 Animationen), Styloo „Chibi Characters“ (itch.io). Animationen lassen sich leichter ergänzen als Modelle:
 Bei gleichem Skelett ist eine neue Animation nur ein weiterer Eintrag beim Export.
 
+**Vergleichen:** Im Schrein-Panel unter „Test: Gestalten auf der Insel“ schaltet „Alle Gestalten“ alle übrigen
+Gestalten als Statisten dazu (`src/creature/parade.js`, `S.testParade`). Sie wandern, stehen, machen Gesten, arbeiten
+aber nicht. 11 Statisten: rund 4 s Laden, etwa 2 ms Rechenzeit pro Bild am Rechner.
+
 ## 3. Rohdaten und Werkzeuge
 
 - **Rohdaten** liegen nur lokal in `dev/assets-raw/` (in `.gitignore`): die Zips der Universal Animation Library 1+2
