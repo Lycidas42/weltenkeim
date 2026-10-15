@@ -89,8 +89,11 @@ werden sie vom Workflow `.github/workflows/labels.yml`; neue Labels dort eintrag
 
 Die Reihenfolge steht im Issue [#1 Fahrplan](https://github.com/Lycidas42/weltenkeim/issues/1): Feature-Issues hängen
 dort als Unter-Issues, Schritte ohne eigenes Issue stehen in seiner Beschreibung. Als Erstes kommt ein automatischer
-Prüflauf ([#2](https://github.com/Lycidas42/weltenkeim/issues/2)), damit eine Sitzung selbst feststellen kann, ob sie
-fertig ist.
+Prüflauf, damit eine Sitzung selbst feststellen kann, ob sie fertig ist.
+
+**Prüflauf:** ✅ vorhanden · [#2](https://github.com/Lycidas42/weltenkeim/issues/2) – `node dev/check.mjs` lädt das Spiel
+in Chromium ohne Bildschirm (frischer Start und Spielstände aus `dev/saves/`), rechnet Spielzeit vor, meldet Fehler und
+legt Screenshots in `dev/out/` ab; eigene Prüfungen unter `dev/checks/<name>.mjs`.
 
 ## Abhängigkeiten zwischen den Vorhaben
 

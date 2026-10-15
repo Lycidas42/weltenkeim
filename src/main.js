@@ -59,6 +59,7 @@ addEventListener('pagehide', save); addEventListener('wk-save', save); // vor de
 setTool('hand'); renderName();
 
 let snowScanT = 0;
+let drawFrames = true; // __wk.step(n, dt, false) rechnet ohne zu zeichnen (Prüflauf: Software-WebGL ist langsam)
 function scanSnow() {
   snowSkip.add(waterMat); for (const m of vAll) snowSkip.add(m.material);
   hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
@@ -111,6 +112,7 @@ function tick(dt, t) {
   updateFloats(dt);
   updateHud(dt, t);
 
+  if (!drawFrames) return;
   renderer.render(scene, camera);
   if (!$('sheetFox').hidden) renderPortrait(dt, t);
 }
@@ -118,7 +120,7 @@ $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
 window.__wk = {
-  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab)
-  step: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) { clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } },
+  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte
+  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || i === n - 1; clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
   setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);

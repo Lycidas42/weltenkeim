@@ -41,6 +41,7 @@
 - Neue Assets nur mit freier Lizenz (CC0 bevorzugt) und immer in `assets/CREDITS.md` sowie im Info-Panel (`#sheetInfo` in `index.html`) nennen.
 - Zielgerät ist das Handy: Touch-Bedienung, Safe-Area-Abstände, Performance im Blick behalten (Instancing für viele gleiche Objekte, Schattenauflösung mobil 1024).
 - Debug-Zugang: `window.__wk` am Ende von `src/main.js` gibt Spielstand, Bewohner, Kamera, Wegfindung usw. für Tests in der Konsole frei. Bleibt bewusst dauerhaft drin; bei Bedarf um weitere Objekte ergänzen.
-  - `__wk.step(n)` rechnet n Bilder ohne Browser-Takt durch. So lässt sich auch testen, wenn der Tab verborgen ist und keine Bilder kommen.
+  - `__wk.step(n)` rechnet n Bilder ohne Browser-Takt durch. So lässt sich auch testen, wenn der Tab verborgen ist und keine Bilder kommen. `__wk.step(n, 1 / 60, false)` zeichnet nur das letzte Bild (schnell im Chromium ohne Bildschirm).
   - Hinweis: `controls.target.y` wird jeden Frame auf 1 gesetzt.
 - Lokal testen: Server aus `.claude/launch.json` (`weltenkeim` auf 8765, `weltenkeim-lan` auf 8000 fürs Handy im WLAN) oder `npx serve` / `python -m http.server`. Der Service Worker cached auch lokal; beim Testen in den DevTools „Update on reload“ aktivieren oder Cache leeren.
+  - Prüflauf ohne Bildschirm: `node dev/check.mjs` (frischer Start und Spielstände aus `dev/saves/`, Screenshots nach `dev/out/`, Exit-Code ≠ 0 bei Fehlern); Feature-Prüfungen unter `dev/checks/<name>.mjs`, Aufruf `node dev/check.mjs <name>`. Anleitung im Kopf des Skripts.
