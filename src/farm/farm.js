@@ -24,6 +24,7 @@ const CROPS = [
   { label: 'Weizen', grow: 240, yield: 6, rows: 6, per: 13, sp: .22, res: 'grain' }, // Korn für die Mühle
 ];
 const FIELD_STATES = ['leer', 'grow', 'reif'];
+const FIELD_STAGES = 4; // Wachstumsstufen bis zur Reife (Regenwunder hebt ein Feld auf die nächste)
 const cropGeo = (() => {
   const P = (geo, fn, slot) => paint(geo, fn, false, slot), C = (c, c2, k = 6) => (x, y, z, ny, col) => col.set(c).lerp(COL2.set(c2), clamp(y * k, 0, 1));
   const ring = (n, make) => mergeGeometries([...Array(n)].map((_, k) => make(k).rotateY(k / n * Math.PI * 2 + k * .3)));
@@ -266,4 +267,4 @@ function updateFarm(dt, t) {
   }
 }
 
-export { CROPS, buildFarm, farms, fieldAt, fieldFront, fields, stock, updateFarm };
+export { CROPS, FIELD_STAGES, buildFarm, farms, fieldAt, fieldFront, fields, stock, updateFarm };

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, rnd, smooth } from '../core/util.js';
 import { dummy, scene } from '../core/render.js';
-import { heightAt } from '../world/terrain.js';
+import { heightAt, seaAt } from '../world/terrain.js';
 import { SPRAY_N, spray } from '../world/water.js';
 import { spawnChips } from '../world/particles.js';
 import { COL2, paint } from '../models/nature.js';
@@ -17,7 +17,7 @@ const fishGeo = mergeGeometries([
 ]);
 const FISH_N = 54, fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .4, metalness: .2 }), FISH_N);
 fishMesh.frustumCulled = false; fishMesh.userData.noSnow = true; scene.add(fishMesh);
-const waterDepthAt = (x, z) => -.02 - heightAt(x, z);
+const waterDepthAt = (x, z) => seaAt(x, z, -.02) ? -.02 - heightAt(x, z) : -1; // trockene Grube im Inland: kein Wasser
 {
   let tries = 0;
   for (let sch = 0; sch < 9 && tries < 3000; tries++) { // neun Schwärme

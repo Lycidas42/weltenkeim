@@ -51,7 +51,7 @@ import { throwTree, updateTrees, uprootTree } from './hand/grab.js';
 import { closeSheets, openSheet, renderName, setCreature, updateCamera } from './ui/sheets.js';
 import { placeFoxUI } from './ui/ring.js';
 import { carryGrabbed, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
-import { placeFieldTags, placeForestUI, updateHud } from './ui/hud.js';
+import { placeFieldTags, placeForestUI, placeHutTags, updateHud } from './ui/hud.js';
 import { SLOTS, setSlot, slotState } from './core/colors.js';
 
 setInterval(save, 5000);
@@ -109,7 +109,7 @@ function tick(dt, t) {
   updateEmotes(dt, t); // nach der Kamera: Symbole zeigen zu ihr
 
   placeFoxUI(dt);
-  placeWishUI(); placeForestUI(); placeFieldTags(); updateHandHover(dt);
+  placeWishUI(); placeForestUI(); placeFieldTags(); placeHutTags(); updateHandHover(dt);
 
   updateFloats(dt);
   updateHud(dt, t);

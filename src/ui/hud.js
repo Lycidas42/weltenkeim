@@ -1,7 +1,8 @@
-// Anzeige: Kopfleiste, Lager, Uhr, Wetter, Schilder über Feldern und Wald
+// Anzeige: Kopfleiste, Lager, Uhr, Wetter, Schilder über Feldern, Hütten und Wald
 
+import * as THREE from 'three';
 import { $, clamp, fmt, fmt1 } from '../core/util.js';
-import { MIRACLES, S, cap } from '../core/state.js';
+import { MIRACLES, ROLES, S, cap } from '../core/state.js';
 import { camera, canvas, tA, tmpV, toScreen } from '../core/render.js';
 import { rate } from './feedback.js';
 import { WEATHER, dayPhase, moonDir, skipTo, sunDir } from '../world/sky.js';
@@ -10,28 +11,48 @@ import { waterU } from '../world/water.js';
 import { fox } from '../creature/kinds.js';
 import { input } from '../hand/pointer.js';
 import { build, houses } from '../village/houses.js';
-import { updateLagerStock } from '../village/huts.js';
+import { huts, updateLagerStock } from '../village/huts.js';
 import { CROPS, fields } from '../farm/farm.js';
 import { villagers } from '../village/villagers.js';
 import { nextBuild } from '../village/economy.js';
 import { alertRing, forestAlert } from '../village/forest-alert.js';
 import { SHRINE, WX_ICON, renderFox, renderWork, windWord } from './sheets.js';
 
-// Reifegrad über den Feldern, solange die Hand gewählt ist: Frucht und Fortschrittsring, reife Felder golden
+// Reifegrad über den Feldern, solange Hand oder Wunder gewählt sind: Frucht und Fortschrittsring, reife Felder golden
 const fieldTagEls = [];
 function placeFieldTags() {
-  const box = $('fieldTags'), show = input.tool === 'hand' && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
+  const box = $('fieldTags'), show = (input.tool === 'hand' || input.tool === 'miracle') && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
   fields.forEach((f, i) => {
     let el = fieldTagEls[i];
     if (!el) { el = document.createElement('div'); el.className = 'ftag'; el.innerHTML = '<i></i><span></span>'; box.appendChild(el); fieldTagEls[i] = el; el._k = ''; }
     const y = heightAt(f.x, f.z) + .45, dist = camera.position.distanceTo(tmpV.set(f.x, y, f.z));
     toScreen(f.x, y, f.z, tA); const on = show && dist < 34 && tmpV.set(f.x, y, f.z).project(camera).z < 1 && tA.x > r.left - 40 && tA.x < r.right + 40 && tA.y > r.top + 150 && tA.y < r.bottom - 120;
     el.hidden = !on; if (!on) return;
-    const C = CROPS[f.c], pct = Math.floor(f.g * 100), k = f.state + C.label + pct;
+    const C = CROPS[f.c], pct = Math.floor(f.g * 100), wet = f.state === 'grow' && f.water > 0, k = f.state + C.label + pct + wet;
     if (el._k !== k) {
       el._k = k; el.className = 'ftag' + (f.state === 'reif' ? ' ripe' : f.state === 'leer' ? ' empty' : '');
       el.style.setProperty('--p', f.state === 'leer' ? 0 : pct);
-      el.lastChild.innerHTML = f.state === 'reif' ? `${C.label} <small>reif · antippen</small>` : f.state === 'leer' ? `<small>leer, wird besät</small>` : `${C.label} <small>${pct} %</small>`;
+      el.lastChild.innerHTML = f.state === 'reif' ? `${C.label} <small>reif · antippen</small>` : f.state === 'leer' ? `<small>leer, wird besät</small>` : `${C.label} <small>${pct} %${wet ? ' · Regen' : ''}</small>`;
+    }
+    el.style.transform = `translate(${Math.round(tA.x - r.left - el.offsetWidth / 2)}px, ${Math.round(tA.y - r.top - el.offsetHeight)}px)`;
+  });
+}
+// Belegung über jeder Arbeitshütte (immer sichtbar): Ring und „belegt / Plätze“
+const hutTagEls = [], hutBox = new THREE.Box3();
+function placeHutTags() {
+  const box = $('fieldTags'), show = !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
+  huts.forEach((h, i) => {
+    let el = hutTagEls[i];
+    if (!el) { el = document.createElement('div'); el.className = 'ftag htag'; el.innerHTML = '<i></i><span></span>'; box.appendChild(el); hutTagEls[i] = el; el._k = ''; }
+    if (h.tagY === undefined) h.tagY = hutBox.setFromObject(h.o).max.y - heightAt(h.x, h.z) + .25; // über dem Dach
+    const y = heightAt(h.x, h.z) + h.tagY, dist = camera.position.distanceTo(tmpV.set(h.x, y, h.z));
+    toScreen(h.x, y, h.z, tA); const on = show && dist < 34 && tmpV.set(h.x, y, h.z).project(camera).z < 1 && tA.x > r.left - 40 && tA.x < r.right + 40 && tA.y > r.top + 150 && tA.y < r.bottom - 120;
+    el.hidden = !on; if (!on) return;
+    const R = ROLES[h.role], n = villagers.reduce((k, v) => k + (v.hut === h && v.role === h.role ? 1 : 0), 0), k = h.role + n;
+    if (el._k !== k) {
+      el._k = k; el.classList.toggle('empty', n === 0); el.classList.toggle('full', n >= R.per);
+      el.style.setProperty('--p', Math.round(n / R.per * 100));
+      el.lastChild.innerHTML = `${R.hut} <small>${n}/${R.per} ${n === 1 ? R.label : R.pl || R.label}</small>`;
     }
     el.style.transform = `translate(${Math.round(tA.x - r.left - el.offsetWidth / 2)}px, ${Math.round(tA.y - r.top - el.offsetHeight)}px)`;
   });
@@ -77,4 +98,4 @@ function updateHud(dt, t) {
   }
 }
 
-export { placeFieldTags, placeForestUI, updateHud };
+export { placeFieldTags, placeForestUI, placeHutTags, updateHud };

@@ -150,6 +150,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .ftag.ripe i{background:radial-gradient(circle,#fff3c8 40%,#2a1d08 42%,#2a1d08 52%,transparent 54%)}
 .ftag.ripe small{color:#4a3510}
 .ftag.empty{opacity:.75}
+/* Hüttenschilder: Ring zeigt die Belegung, voll besetzt grün umrandet */
+.htag{font-size:11px}
+.htag i{width:16px;height:16px}
+.htag.full{border-color:#8fd16a}
 @keyframes ftagPulse{50%{box-shadow:0 0 0 4px rgba(231,181,74,.35)}}
 #wish,#forestAlert{position:absolute;left:0;top:0;z-index:3;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 9px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--glaube);border-radius:12px;padding:7px 12px 9px 9px;font:inherit;color:var(--ink);text-align:left;box-shadow:0 0 0 0 rgba(243,192,77,.6);animation:pulse 1.6s ease-out infinite;max-width:240px}
 #wish::after,#forestAlert::after{content:"";position:absolute;left:50%;bottom:-7px;width:12px;height:12px;margin-left:-6px;background:var(--panel-solid);border-right:1px solid var(--glaube);border-bottom:1px solid var(--glaube);transform:rotate(45deg)}

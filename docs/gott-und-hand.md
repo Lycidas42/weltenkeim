@@ -39,7 +39,7 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
 
 | Wunder | Wirkung | Kosten | Richtung | Stand |
 |---|---|---|---|---|
-| Regen | Fläche: Bäume wachsen, Setzlinge sprießen, Felder werden gegossen (wachsen eine Weile doppelt so schnell), Pfützen | 20 Glaube | gut | ✅ vorhanden (`castRain`) |
+| Regen | Fläche: Bäume wachsen, Setzlinge sprießen, Felder wachsen bis zur nächsten Stufe und danach eine Weile schneller, Pfützen | 20 Glaube | gut | ✅ vorhanden (`castRain`) |
 | Eile | Fläche: Bewohner gehen und arbeiten schneller, auch in Werkstätten | 12 Glaube | gut | ✅ vorhanden (`castHaste`) |
 | Bann | Fläche: Wild erstarrt eine Weile, Jäger treffen sicher | ca. 10 | neutral | 🔵 geplant (heute Hand-Hilfe „Bannen“) |
 | Wirbelsturm | Ein Wirbel zieht über eine kurze Bahn: reißt Bäume aus, wirbelt Waren und Bewohner durch die Luft, deckt Dächer ab. Spielerisch nutzbar zum Roden. Bahn per Wischgeste | teuer | böse (im Dorf), neutral (im leeren Wald) | 🔵 geplant |
@@ -147,7 +147,7 @@ ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende 
 | Aktion | heute | künftig | Begründung |
 |---|---|---|---|
 | Feld säen / ernten | Hand | **Hand** | körperliche Arbeit |
-| Feld gießen | Hand | **Wunder Regen** | Wasser vom Himmel ist Sache der Götter |
+| Feld gießen | ✅ Wunder Regen | **Wunder Regen** | Wasser vom Himmel ist Sache der Götter |
 | Vieh füttern (Milch, Eier, Fleisch) | Hand | **Hand** | körperliche Arbeit |
 | Fisch greifen | Hand | **Hand** (ein Fisch pro Tipp) | körperlich; ein Schwarm wäre ein Wunder |
 | Wild bannen | Hand | **Wunder Bann** | übernatürlich |

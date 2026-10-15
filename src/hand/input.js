@@ -5,8 +5,7 @@ import { $, clamp, rnd } from '../core/util.js';
 import { PROC, RES, ROLES, S, emit, resText } from '../core/state.js';
 import { camera, canvas, controls, tmpV } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
-import { heightAt } from '../world/terrain.js';
-import { SPRAY_N, spray } from '../world/water.js';
+import { heightAt, seaAt } from '../world/terrain.js';
 import { sculpt } from '../world/sculpt.js';
 import { spawnChips } from '../world/particles.js';
 import { treeKindAt } from '../models/nature.js';
@@ -35,7 +34,7 @@ function harvestByHand(f) {
   if (f.by && f.by.field === f) { const v = f.by; v.field = null; if (v.state === 'harvest' || (v.state === 'walk' && v.next === 'harvest')) idle(v, .3); }
   f.by = null; f.state = 'leer'; f.g = 0; f.c = (f.c + 1) % CROPS.length;
 }
-// Die Hand hilft bei allem, was die Arbeiter tun: säen, gießen, ernten, Vieh füttern, Fische greifen, Wild bannen
+// Die Hand hilft bei allem, was die Arbeiter tun: säen, ernten, Vieh füttern, Fische greifen, Wild bannen
 // und erlegtes Wild aufheben, Setzlinge pflanzen, eine Ladung in Säge, Mühle oder Bäckerei verarbeiten und Waren ins Lager bringen.
 // Erst bestimmen, was die Hand an dieser Stelle tun würde (Aktion, Schild, Handhaltung), dann ausführen.
 // So zeigt die Hand schon beim Darüberfahren, was sie kann.
@@ -58,18 +57,15 @@ function helpAt(cx, cy, picked = false) {
     } };
   }
   if (!hitOk) return null;
-  // Felder: leer → säen, wachsend → gießen, reif → ernten
+  // Felder: leer → säen, reif → ernten (wachsen lässt sie nur das Wunder Regen)
   const fl = fieldAt(hit.x, hit.z);
   if (fl) {
     const y = heightAt(fl.x, fl.z), C = CROPS[fl.c];
     const free = () => { if (fl.by && fl.by.field === fl) { const v = fl.by; v.field = null; fl.by = null; if (['sow', 'harvest'].includes(v.state) || (v.state === 'walk' && ['sow', 'harvest'].includes(v.next))) idle(v, .3); } }; // der Bauer muss nicht mehr hin
     if (fl.state === 'reif') return { label: `${C.label} ernten`, pose: 'claw', run() { free(); harvestByHand(fl); } };
     if (fl.state === 'leer') return { label: `${C.label} säen`, pose: 'pinch', run() { free(); fl.state = 'grow'; fl.g = 0; floatText(fl.x, y + .5, fl.z, `${C.label} gesät`, 's'); for (let k = 0; k < 10; k++) { const p = farmPt(fl.F, fl.lx + rnd(FARM.fw / 2), fl.lz + rnd(FARM.fd / 2)); spawnChips(p.x, heightAt(p.x, p.z) + .05, p.z, Math.random() * 6.28); } } };
-    if (fl.water > 30) return { label: `${C.label} ${Math.floor(fl.g * 100)} %`, pose: 'relax', run() { toast(`${C.label}: zu ${Math.floor(fl.g * 100)} % gewachsen, gerade gegossen.`, 2); } };
-    return { label: `${C.label} gießen`, pose: 'cup', run() { // Tropfen fallen aufs Feld, eine Weile wächst es doppelt so schnell
-      fl.water = 60; floatText(fl.x, y + .5, fl.z, `${C.label} gegossen`, 's');
-      for (let k = 0; k < 40; k++) { if (spray.length >= SPRAY_N) spray.shift(); const p = farmPt(fl.F, fl.lx + rnd(FARM.fw / 2), fl.lz + rnd(FARM.fd / 2)); spray.push({ x: p.x, y: heightAt(p.x, p.z) + .8 + Math.random() * .5, z: p.z, vx: 0, vy: -1 - Math.random(), vz: 0, t: 0, life: .7, s: Math.random() * .5 }); }
-    } };
+    // wachsendes Feld: die Hand kann nichts tun, schneller wächst es nur durch das Wunder Regen
+    return { label: `${C.label} ${Math.floor(fl.g * 100)} %`, pose: 'relax', run() { toast(`${C.label}: zu ${Math.floor(fl.g * 100)} % gewachsen. Schneller wächst es nur mit dem Wunder Regen.`, 2.5); } };
   }
   // Weide: Tiere füttern, Milch, Eier und Fleisch gleich ins Lager
   for (const F of farms) {
@@ -98,7 +94,7 @@ function helpAt(cx, cy, picked = false) {
     return { label: null, pose: 'relax', run() { toast(P ? `${ROLES[hb.role].hut}: Es fehlt ${RES[P.inp][1]}.` : hb.role === 'sawyer' ? 'Sägemühle: Es fehlen Stämme.' : `${ROLES[hb.role].hut}: Gerade nichts abzuholen.`, 2); } };
   }
   // Wasser: einen Fisch greifen
-  if (heightAt(hit.x, hit.z) < -.05) {
+  if (seaAt(hit.x, hit.z)) {
     let fi = -1, fd = 1.1 * 1.1; fish.forEach((f, i) => { const d = (f.x - hit.x) ** 2 + (f.z - hit.z) ** 2; if (d < fd && !f.jump) { fd = d; fi = i; } });
     if (fi < 0) return null;
     const f = fish[fi];
