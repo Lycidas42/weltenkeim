@@ -18,9 +18,11 @@ die freien „Universal Base Characters“ (nur muskulöse Superhelden).
 
 1. ✅ Die drei übrigen KayKit-Figuren (Barbar, Schurkin, Ritter).
 2. ✅ Zweiter eigener Tiermensch: Bär (`ART['bear']`; Parameter `belly`, `limbs`, `legs`, `head`, runde Ohren, Stummelschwanz).
-3. 100Avatars (Polygonal Mind): Eichhörnchen, Teddy, Katze, Hase. Lizenz an der Quelle prüfen (die Registry
-   `github.com/ToxSam/open-source-avatars` nennt CC0, nicht bestätigt). Format VRM mit menschenähnlichem Skelett;
-   Animationen der Universal Animation Library müssten übertragen werden.
+3. 100Avatars (Polygonal Mind), z. B. Eichhörnchen, Teddy, Katze, Hase. Lizenz an der Quelle geprüft: Das Original-Repo
+   `github.com/PolygonalMind/100Avatars` (Runde 1) steht unter **CC BY 4.0** (Datei `CCLicense.md`; README: frei nutzbar,
+   nur nicht unverändert verkaufen). Die Sammelseite opensourceavatars.com nennt CC0, das gilt dafür nicht. Also nutzbar
+   mit Nennung in `assets/CREDITS.md` und im Info-Panel. Dateien je Avatar als FBX und VRM, Skelett von Mixamo
+   (passt zur Universal Animation Library). Noch nicht geladen; welche Avatare Tiere sind, im Repo nachsehen.
 
 Weitere Kandidaten aus der Recherche: Detective Bunny (OpenGameArt, CC0, eigene Animationen), Chibi Sloth (Sketchfab,
 CC BY, nur 3 Animationen), Styloo „Chibi Characters“ (itch.io). Animationen lassen sich leichter ergänzen als Modelle:
