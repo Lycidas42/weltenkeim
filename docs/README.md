@@ -80,7 +80,10 @@ den eine Claude-Code-Sitzung in der Cloud selbstständig bis zum Pull Request br
 5. **Abnahme:** Pull Request ansehen (Screenshots im PR), am Handy ausprobieren, mergen. Das Issue schließt sich
    dabei, weil `develop` der Standard-Branch ist. Veröffentlicht wird weiterhin nur auf Freigabe nach `main`.
 
-**Labels:** `feature` (setzt die Vorlage), `bereit` (kann an Claude), `frage` (wartet auf eine Antwort).
+**Labels:** `feature` (setzt die Vorlage), `bereit` (kann an Claude), `frage` (wartet auf eine Antwort). Angelegt
+werden sie vom Workflow `.github/workflows/labels.yml`; neue Labels dort eintragen.
+
+**Screenshots** der Sitzungen liegen im Branch `screenshots` (je Issue ein Ordner) und sind im Pull Request verlinkt.
 
 ### Fahrplan
 

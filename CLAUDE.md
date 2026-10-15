@@ -25,7 +25,8 @@
   - Branch `claude/issue-<n>-<kurzname>` von `develop`; Pull Request nach `develop` mit `Closes #<n>`, nie nach `main`.
   - Nur den Umfang des Issues umsetzen. Was darüber hinaus auffällt, als Kommentar ins Issue schreiben, nicht mitbauen.
   - Bei einer Gestaltungsfrage, die das Issue nicht beantwortet: Frage als Kommentar ins Issue, Label `frage` setzen, nicht raten.
-  - Vor dem Pull Request jedes Akzeptanzkriterium im Spiel prüfen (Chromium ohne Bildschirm, `__wk`), Screenshots in den PR, abgehakte Kriterien im PR auflisten.
+  - Vor dem Pull Request jedes Akzeptanzkriterium im Spiel prüfen (Chromium ohne Bildschirm, `__wk`), abgehakte Kriterien im PR auflisten.
+  - Screenshots nicht nach `develop` committen, sondern in den Branch `screenshots` (eigener Verlauf ohne Spielcode) unter `issue-<n>/` pushen und im PR als Bild einbinden: `![Beschreibung](https://github.com/Lycidas42/weltenkeim/blob/screenshots/issue-<n>/<datei>.png?raw=true)`. Gibt es den Branch noch nicht, als verwaisten Branch anlegen (`git switch --orphan screenshots`). Wird der Push dorthin abgelehnt, die Bilder im eigenen Branch unter `dev/screenshots/issue-<n>/` ablegen und vor dem Merge wieder entfernen.
   - Im selben Pull Request die Stand-Marke im Konzept anpassen.
 - Spieltexte und UI auf Deutsch. Zahlen mit Komma als Dezimaltrennzeichen (`fmt`, `fmt1` in `src/core/util.js`).
 - Spielstand: `localStorage['weltenkeim-save']`, Objekt `S` (`src/core/state.js`) mit Versionsfeld `v` und Zeitstempel `ts`.

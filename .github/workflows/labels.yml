@@ -1,0 +1,27 @@
+# Labels für den Ablauf über Issues (docs/README.md) anlegen bzw. angleichen.
+# Läuft, wenn sich diese Datei auf develop ändert, oder von Hand (Actions → Labels → Run workflow).
+name: Labels
+
+on:
+  push:
+    branches: [develop]
+    paths: [.github/workflows/labels.yml]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Labels anlegen oder aktualisieren
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -e
+          label() { gh label create "$1" --color "$2" --description "$3" --force; }
+          label feature 1d76db "Feature-Auftrag nach der Vorlage „Feature umsetzen“"
+          label bereit  0e8a16 "Entscheidungen geklärt, Claude kann es selbstständig umsetzen"
+          label frage   d93f0b "Wartet auf eine Antwort im Issue"
