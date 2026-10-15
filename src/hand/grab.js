@@ -1,7 +1,7 @@
 // Bäume greifen, ausreißen und werfen
 
 import { clamp, rnd } from '../core/util.js';
-import { tA, tB, toScreen } from '../core/render.js';
+import { behindCam, tA, tB, toScreen } from '../core/render.js';
 import { addLogs, floatText } from '../ui/feedback.js';
 import { heightAt } from '../world/terrain.js';
 import { fox } from '../creature/kinds.js';
@@ -21,7 +21,8 @@ function treeAt(cx, cy) {
   let best = null, bd = 1e9;
   for (const t of trees) {
     if (!t.alive || t.gone || t.g < .6) continue;
-    const y = heightAt(t.x, t.z); toScreen(t.x, y, t.z, tA); toScreen(t.x, y + TREE_H * ST * t.g, t.z, tB);
+    const y = heightAt(t.x, t.z); toScreen(t.x, y, t.z, tA); if (behindCam()) continue;
+    toScreen(t.x, y + TREE_H * ST * t.g, t.z, tB); if (behindCam()) continue;
     const ex = tB.x - tA.x, ey = tB.y - tA.y, L2 = ex * ex + ey * ey || 1, u = clamp(((cx - tA.x) * ex + (cy - tA.y) * ey) / L2, 0, 1);
     const d = Math.hypot(cx - tA.x - ex * u, cy - tA.y - ey * u), tol = Math.max(26, Math.sqrt(L2) * .38);
     if (d < tol && d / tol < bd) { bd = d / tol; best = t; }
@@ -53,7 +54,7 @@ function updateTrees(dt, t) {
   }
   const o = heldObjs[heldTree.type];
   heldObjs.forEach(x => x.visible = false); rootBall.visible = false;
-  if (!heldTree.on) return;
+  if (!heldTree.on || (!heldTree.flying && input.heldHidden)) return;
   const s = ST * heldTree.g;
   if (heldTree.flying) {
     heldTree.vel.y -= 16 * dt; heldTree.pos.addScaledVector(heldTree.vel, dt); heldTree.tilt += heldTree.spin * dt + dt * 2.5;

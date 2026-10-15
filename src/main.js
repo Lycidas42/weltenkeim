@@ -1,7 +1,7 @@
 // Start: Hauptschleife und Debug-Zugang
 
 import { $ } from './core/util.js';
-import { PROC, S, loaded, save } from './core/state.js';
+import { PROC, S, loaded, on, save } from './core/state.js';
 import './core/noise.js';
 import { camera, clock, controls, renderer, scene, sun, toScreen } from './core/render.js';
 import { updateFloats, updateIncome } from './ui/feedback.js';
@@ -15,7 +15,7 @@ import { fox } from './creature/kinds.js';
 import './assets/models.js';
 import './models/nature.js';
 import './world/spring.js';
-import { heldTree, input } from './hand/pointer.js';
+import { heldTree, input, pointers } from './hand/pointer.js';
 import { clouds, updateClouds, updatePuddles, updateSnowfall, updateWeatherRain } from './world/weather-fx.js';
 import { updateStatics } from './village/layout.js';
 import { trees } from './world/trees.js';
@@ -28,7 +28,7 @@ import './village/build.js';
 import { bushes, cover, renderNature, rocks } from './world/nature.js';
 import { buildNav, findPath, navF, navV, nearBuilding, updateNav } from './world/nav.js';
 import { updateCover } from './world/cover.js';
-import { vAll, villagers } from './village/villagers.js';
+import { spawnVillager, vAll, villagers } from './village/villagers.js';
 import { updateLights } from './village/night.js';
 import { hand } from './hand/hand.js';
 import './creature/creature.js';
@@ -43,6 +43,7 @@ import { arrows, startFishing, updateArrows, updateFishingLines, updateSleepers,
 import { reconcileJobs } from './village/jobs.js';
 import { placeWishUI, startWish, updateWish } from './village/wishes.js';
 import { renderVillagers } from './village/render.js';
+import { emotes, updateEmotes } from './village/emotes.js';
 import { updateVillage } from './village/economy.js';
 import { foxHaul, reinforce, updateFox } from './creature/ai.js';
 import { forestAlert, updateForestAlert } from './village/forest-alert.js';
@@ -50,8 +51,8 @@ import { castHaste, castRain, rain, tryMiracle, updateMiracleFx } from './hand/m
 import { throwTree, updateTrees, uprootTree } from './hand/grab.js';
 import { closeSheets, openSheet, renderName, setCreature, updateCamera } from './ui/sheets.js';
 import { placeFoxUI } from './ui/ring.js';
-import { carryGrabbed, handHelp, harvestByHand, helpAt, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
-import { placeFieldTags, placeFoodSign, placeForestUI, updateHud } from './ui/hud.js';
+import { carryGrabbed, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
+import { placeFieldTags, placeFoodSign, placeForestUI, placeHutTags, updateHud } from './ui/hud.js';
 import { SLOTS, setSlot, slotState } from './core/colors.js';
 
 setInterval(save, 5000);
@@ -106,14 +107,15 @@ function tick(dt, t) {
   updateWater(dt, t, rain.t > 0);
   updateTerrain(dt);
   updateCamera(dt);
+  updateEmotes(dt, t); // nach der Kamera: Symbole zeigen zu ihr
 
   placeFoxUI(dt);
-  placeWishUI(); placeForestUI(); placeFieldTags(); placeFoodSign(); updateHandHover(dt);
+  placeWishUI(); placeForestUI(); placeFieldTags(); placeHutTags(); placeFoodSign(); updateHandHover(dt);
 
   updateFloats(dt);
   updateHud(dt, t);
 
-  if (!drawFrames) return;
+  if (!drawFrames) { camera.updateMatrixWorld(); return; } // sonst erst beim Zeichnen: Zeiger und Bildschirmpunkte nutzen die Kamera
   renderer.render(scene, camera);
   if (!$('sheetFox').hidden) renderPortrait(dt, t);
 }
@@ -122,8 +124,9 @@ setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
 window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
-  // draw = null gar keines (schnell: Software-WebGL übersetzt beim ersten Zeichnen neuer Dinge sekundenlang Shader)
-  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw !== null && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
+  // draw = null gar keins (viele kurze Schritte in Prüfungen, Software-WebGL braucht pro Bild Sekunden)
+  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw === false && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear, hand, holdState, on, emotes, renderer, scene, spawnVillager, pointers,
   setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear,
   // Nahrung: Versorgung je Bewohner (satt/hungrig), Dorf (abwechslungsreich), Vorrat und Wachstumszustand
   food: { state: food, start: { fresh: !loaded, bread: S.bread, fish: S.fish, veg: S.veg, meat: S.meat, milk: S.milk, eggs: S.eggs }, MEAL, FOOD_COL, portions, days, pickMeal, takePortions, eatLunch, growthState, workMul, prayMul, villagers: () => villagers.map(v => ({ food: v.food || null, meal: v.meal || null, ateDay: v.ateDay ?? null, work: workMul(v), pray: prayMul(v) })) } };

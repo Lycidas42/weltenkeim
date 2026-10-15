@@ -35,7 +35,7 @@ async function setCreature(id) {
 
 const HINTS = {
   get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
-  get hand() { return `Bewohner packen, Bäume ausreißen. Bei der Arbeit helfen: Felder säen, gießen, ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name} antippen für mehr.`; },
+  get hand() { return `Bewohner und Bäume: drücken und halten packt. Gepacktes bleibt in der Hand: Tippen setzt ab, schnelles Wischen wirft. Bei der Arbeit helfen: Felder säen und ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name} antippen für mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
@@ -80,10 +80,10 @@ function renderWork() {
     el.classList.toggle('off', k === 0);
     el.querySelector('.roles').innerHTML = Object.keys(sp).map(r => {
       const R = ROLES[r], n = roleCount(r), nh = huts.filter(h => h.role === r).length;
-      return `<li><b>${n}</b> ${R.label} <span>· ${nh} ${R.hut}${nh === 1 ? '' : 'n'}, Platz für ${nh * R.per}</span></li>`;
+      return `<li><b>${n}</b> ${n === 1 ? R.label : R.pl || R.label} <span>· ${!nh ? `noch ${R.m ? 'kein' : 'keine'} ${R.hut}, je Hütte ${R.per} Plätze` : `${nh === 1 ? `1 ${R.hut} mit ${R.per} Plätzen` : `${nh} ${R.huts} mit je ${R.per} Plätzen`}, ${n} von ${nh * R.per} belegt`}</span></li>`;
     }).join('');
     const notes = [];
-    for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf eine neue ${ROLES[r].hut}${build.construction && build.construction.role === r ? ', sie wird gerade gebaut.' : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
+    for (const r in sp) { const wait = (k ? sp[r] : 0) - roleCount(r); if (wait > 0) notes.push(`${wait} ${wait === 1 ? ROLES[r].label : ROLES[r].pl || ROLES[r].label} ${wait === 1 ? 'wartet' : 'warten'} auf ${ROLES[r].m ? 'einen neuen' : 'eine neue'} ${ROLES[r].hut}${build.construction && build.construction.role === r ? `, ${ROLES[r].m ? 'er' : 'sie'} wird gerade gebaut.` : ` (${ROLES[r].cost(S.huts[r])} Bretter).`}`); }
     if (id === 'wood') notes.push(`${alive.length - young} Bäume zum Fällen, ${young} wachsen noch.`);
     if (id === 'jagd') notes.push(`Auf der Insel: ${wild.filter(a => a.kind === 'reh' && a.state !== 'dead').length} Rehe, ${wild.filter(a => a.kind === 'hase' && a.state !== 'dead').length} Hasen. Im Lager: ${fmt(S.meat)} Fleisch.`);
     { const at = {}; for (const h of huts) if (sp[h.role] !== undefined) for (const g in h.goods) if (h.goods[g] > 0) at[g] = (at[g] || 0) + h.goods[g];

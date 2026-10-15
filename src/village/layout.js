@@ -24,7 +24,8 @@ const onSacred = (x, z, m = 0) => sacredDist(x, z) < .6 + m;
 const LUNCH_AT = PLAZA; // Mittagspause im Schatten der Dorflinde
 // Wassermühle: am Bachufer außerhalb des Häuserrings, wo der Bach ruhig fließt und das Ufer knapp über dem Wasser liegt.
 // Das Haus steht am Ufer, das Rad an seiner Rückwand taucht in den Bach. Der Platz wird einmal gewählt und gespeichert
-// (S.millSite), damit die Mühle nicht wandert, wenn der Spieler das Gelände formt.
+// (S.millSite), damit die Mühle nicht wandert, wenn der Spieler das Gelände formt. Höhe aus dem ursprünglichen Bachbett
+// (Wasserspiegel + .17), nicht aus dem aktuellen: sonst senkt das Einebnen des Platzes Bach und Mühle bei jedem Laden weiter ab.
 const MILL_K = 1.6;
 const MILL = (() => {
   const P = STREAM.pts, len = STREAM.len, ok = q => q && P[q.i] && Math.abs(q.sd) === 1;
@@ -43,7 +44,7 @@ const MILL = (() => {
   }
   const { i, sd } = S.millSite, p = P[i], nx = p.nx * sd, nz = p.nz * sd, ry = Math.atan2(nx, nz);
   const tx = P[i + 1].x - P[i - 1].x, tz = P[i + 1].z - P[i - 1].z; // Fließrichtung: unten am Rad läuft das Wasser mit
-  return { x: p.x + nx * .2, z: p.z + nz * .2, ry, y: p.y + .17, hx: p.x + nx * 1.1, hz: p.z + nz * 1.1, k: MILL_K, dir: Math.sign(tx * Math.cos(ry) - tz * Math.sin(ry)) || 1 };
+  return { x: p.x + nx * .2, z: p.z + nz * .2, ry, y: p.bed0 + .225, hx: p.x + nx * 1.1, hz: p.z + nz * 1.1, k: MILL_K, dir: Math.sign(tx * Math.cos(ry) - tz * Math.sin(ry)) || 1 };
 })();
 const MILL_POS = { x: MILL.hx, z: MILL.hz }; // Mitte des Mühlenhauses (Abstände für Bäume, Hütten, Felder)
 

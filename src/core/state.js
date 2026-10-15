@@ -35,15 +35,16 @@ const templeCost = () => Math.round(30 * Math.pow(1.7, S.temple - 1));
 const handCost = () => Math.round(40 * Math.pow(1.8, S.hand - 1));
 const SOUL_COST = 15;
 // Berufe: Spezialisten arbeiten von ihrer Hütte aus, jede Hütte hat Platz für `per` von ihnen. Hütten kosten Holz.
+// per: Arbeitsplätze je Hütte; pl/huts: Mehrzahl (fehlt pl, ist sie gleich der Einzahl); m: Hütte ist männlich (der Bauernhof)
 const ROLES = {
-  lumber: { label: 'Holzfäller', hut: 'Holzfällerhütte', per: 4, cost: n => 14 + 8 * n },
-  forester: { label: 'Förster', hut: 'Försterhütte', per: 3, cost: n => 12 + 6 * n },
-  sawyer: { label: 'Säger', hut: 'Sägemühle', per: 2, cost: n => 24 + 12 * n },
-  hunter: { label: 'Jäger', hut: 'Jagdhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
-  fisher: { label: 'Fischer', hut: 'Fischerhütte', per: 2, cost: n => 16 + 8 * n, opt: true },
-  farmer: { label: 'Bauer', hut: 'Bauernhof', per: 3, cost: n => 30 + 14 * n, opt: true },
-  miller: { label: 'Müller', hut: 'Mühle', per: 2, cost: n => 26 + 12 * n, opt: true },
-  baker: { label: 'Bäcker', hut: 'Bäckerei', per: 2, cost: n => 22 + 10 * n, opt: true },
+  lumber: { label: 'Holzfäller', hut: 'Holzfällerhütte', huts: 'Holzfällerhütten', per: 4, cost: n => 14 + 8 * n },
+  forester: { label: 'Förster', hut: 'Försterhütte', huts: 'Försterhütten', per: 3, cost: n => 12 + 6 * n },
+  sawyer: { label: 'Säger', hut: 'Sägemühle', huts: 'Sägemühlen', per: 2, cost: n => 24 + 12 * n },
+  hunter: { label: 'Jäger', hut: 'Jagdhütte', huts: 'Jagdhütten', per: 2, cost: n => 16 + 8 * n, opt: true },
+  fisher: { label: 'Fischer', hut: 'Fischerhütte', huts: 'Fischerhütten', per: 2, cost: n => 16 + 8 * n, opt: true },
+  farmer: { label: 'Bauer', pl: 'Bauern', hut: 'Bauernhof', huts: 'Bauernhöfe', m: true, per: 3, cost: n => 30 + 14 * n, opt: true },
+  miller: { label: 'Müller', hut: 'Mühle', huts: 'Mühlen', per: 2, cost: n => 26 + 12 * n, opt: true },
+  baker: { label: 'Bäcker', hut: 'Bäckerei', huts: 'Bäckereien', per: 2, cost: n => 22 + 10 * n, opt: true },
 };
 // Arbeitsstätten: der Spieler weist ihnen Bewohner zu (0 oder mindestens `min`), sie verteilen sich auf die Berufe
 const WORKS = {

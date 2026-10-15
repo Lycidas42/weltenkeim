@@ -5,15 +5,16 @@ import { clamp, rnd, smooth } from '../core/util.js';
 import { noise } from '../core/noise.js';
 import { renderer, scene } from '../core/render.js';
 import { sky, weather } from './sky.js';
-import { HALF, N, NOISE_GLSL, SIZE, hTex, heightAt, streamU } from './terrain.js';
+import { HALF, N, NOISE_GLSL, SIZE, hTex, heightAt, seaAt, seaTex, streamU } from './terrain.js';
 
 // Wasser: Wellen und Brandung im Vertex-Shader, Kräuselung durch Wind (Böen ziehen als Flecken übers Wasser),
 // Farbe nach Tiefe (türkis im Flachen, tiefblau draußen), Schaum am Strand und bei starkem Wind Schaumkronen,
 // Spiegelung des Himmels am flachen Blickwinkel, Sonnenglitzern über die Lichtberechnung.
-const waterU = { uT: { value: 0 }, uWind: { value: .5 }, uDir: { value: 0 }, uH: { value: hTex }, uSkyH: { value: sky.hor } };
+const waterU = { uT: { value: 0 }, uWind: { value: .5 }, uDir: { value: 0 }, uH: { value: hTex }, uSea: { value: seaTex }, uSkyH: { value: sky.hor } };
 const WATER_GLSL = NOISE_GLSL + `
-uniform float uT, uWind, uDir; uniform sampler2D uH; varying vec3 vWP;
-float hAt(vec2 xz) { vec2 uv = (xz + ${HALF.toFixed(1)}) / ${SIZE.toFixed(1)} * ${((N - 1) / N).toFixed(5)} + ${(.5 / N).toFixed(5)}; return texture2D(uH, uv).r * 5. - 3.; }
+uniform float uT, uWind, uDir; uniform sampler2D uH, uSea; varying vec3 vWP;
+vec2 hUV(vec2 xz) { return (xz + ${HALF.toFixed(1)}) / ${SIZE.toFixed(1)} * ${((N - 1) / N).toFixed(5)} + ${(.5 / N).toFixed(5)}; }
+float hAt(vec2 xz) { return texture2D(uH, hUV(xz)).r * 5. - 3.; }
 // Wellen: fünf Züge verschiedener Länge und Richtung, ausgerichtet nach dem Wind. Langsam wandernde Rauschfelder
 // heben und senken die Höhe stellenweise (Wellengruppen), so sieht nicht jede Welle gleich aus.
 vec2 rot2(vec2 d, float a) { float c = cos(a), s = sin(a); return vec2(d.x * c - d.y * s, d.x * s + d.y * c); }
@@ -41,6 +42,7 @@ waterMat.onBeforeCompile = sh => {
       vWP = (modelMatrix * vec4(transformed, 1.)).xyz;`);
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSkyH;\n' + WATER_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
+      { vec2 su = hUV(vWP.xz); if (su.x > 0. && su.y > 0. && su.x < 1. && su.y < 1. && texture2D(uSea, su).r < .5) discard; } // Gruben im Inland: kein Meer
       float wDepth = max(0., -.02 - hAt(vWP.xz));
       float gust = vns(vWP.xz * .07 + vec2(uT * .06, uT * .035));
       vec3 wc = mix(vec3(.25, .72, .7), vec3(.03, .22, .38), smoothstep(0., 1.8, wDepth));
@@ -79,7 +81,7 @@ function scanShore() {
   shoreLine.length = 0;
   for (let k = 0; k < 720; k++) {
     const a = k / 720 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a); let r = 6, last = heightAt(dx * r, dz * r);
-    for (; r < HALF - .5; r += .15) { const h = heightAt(dx * r, dz * r); if (last >= 0 && h < 0) { shoreLine.push({ x: dx * r, z: dz * r, dx, dz }); } last = h; }
+    for (; r < HALF - .5; r += .15) { const h = heightAt(dx * r, dz * r); if (last >= 0 && h < 0 && seaAt(dx * r, dz * r, 0)) { shoreLine.push({ x: dx * r, z: dz * r, dx, dz }); } last = h; }
   }
 }
 let sprayAcc = 0, shoreT = 0;

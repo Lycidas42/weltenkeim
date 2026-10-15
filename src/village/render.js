@@ -20,7 +20,7 @@ function renderVillagers(dt, t) {
   const lantern = sky.night > .3; // ab der Dämmerung trägt jeder eine Laterne
   villagers.forEach((v, i) => {
     const L = v.look;
-    if (v.state === 'sleep') { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte
+    if (v.state === 'sleep' || v.hidden) { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte bzw. gehalten bei ausgeblendeter Hand
     let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
     v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
     v.st = v.state === 'lunch' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen

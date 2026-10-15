@@ -105,7 +105,9 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 ### 4.2 Symbole über dem Kopf
 
-**Stand:** 🔵 geplant · [#3](https://github.com/Lycidas42/weltenkeim/issues/3)
+**Stand:** 🟡 teilweise – Symbole für vorhandene Ereignisse da (Herz bei Jubel, Ausrufezeichen bei Flucht, Sternchen bei
+Schwindel, Wunsch-Symbol bei der Bitte, Funkeln nach sanftem Absetzen; `src/village/emotes.js`), Gefühle und
+Bedürfnisse noch nicht · [#3](https://github.com/Lycidas42/weltenkeim/issues/3)
 
 - Kleines Bild über dem Kopf, sitzt etwa 0,25 über dem Kopf, steigt kurz auf und verblasst nach 2 bis 4 s.
 - **Technik:** ein Sprite-Atlas (eine Textur, wenige Dutzend Bilder) und **eine** `InstancedMesh` aus Flächen, die
@@ -314,9 +316,10 @@ damit 40 Bewohner bei derselben Arbeit nicht wie Klone wirken:
 
 - **Blick-Werkzeug:** Tippen auf einen Bewohner wählt ihn aus (die Hand ist dort ausgeblendet, es gibt also keinen
   Konflikt mit dem Greifen).
-- **Hand-Werkzeug:** Greifen bleibt wie es ist. Vorschlag: kurzes Tippen ohne Ziehen auf einen Bewohner wählt ihn aus,
-  Drücken und Ziehen packt ihn. Hängt an der Umstellung „Halten als Zustand“ (`gott-und-hand.md` 3.2) und ist
-  dort mitzuentscheiden.
+- **Hand-Werkzeug:** kurzes Tippen (bzw. Klick) ohne Ziehen auf einen Bewohner wählt ihn aus; Drücken und kurz
+  Halten oder Ziehen packt ihn. Das Packen ist mit „Halten als Zustand“ (`gott-und-hand.md` 3.2,
+  [#6](https://github.com/Lycidas42/weltenkeim/issues/6)) so umgestellt; bis das Auswählen kommt, zeigt ein Tipp nur
+  „Halten zum Aufnehmen“.
 - Ausgewählt: dezenter Ring am Boden unter dem Bewohner, die Kamera folgt ihm wie heute der Kreatur („Folgen“,
   `setFollow` wird dafür auf ein beliebiges Ziel erweitert). Wischen löst das Folgen, die Karte bleibt offen.
 

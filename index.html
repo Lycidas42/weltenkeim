@@ -153,6 +153,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .ftag.empty{opacity:.75}
 #foodSign{z-index:2;padding:4px 11px;border-color:#f2a088;color:#f6c9b8}
 #foodSign[hidden]{display:none}
+/* Hüttenschilder: Ring zeigt die Belegung, voll besetzt grün umrandet */
+.htag{font-size:11px}
+.htag i{width:16px;height:16px}
+.htag.full{border-color:#8fd16a}
 @keyframes ftagPulse{50%{box-shadow:0 0 0 4px rgba(231,181,74,.35)}}
 #wish,#forestAlert{position:absolute;left:0;top:0;z-index:3;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 9px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--glaube);border-radius:12px;padding:7px 12px 9px 9px;font:inherit;color:var(--ink);text-align:left;box-shadow:0 0 0 0 rgba(243,192,77,.6);animation:pulse 1.6s ease-out infinite;max-width:240px}
 #wish::after,#forestAlert::after{content:"";position:absolute;left:50%;bottom:-7px;width:12px;height:12px;margin-left:-6px;background:var(--panel-solid);border-right:1px solid var(--glaube);border-bottom:1px solid var(--glaube);transform:rotate(45deg)}
@@ -190,6 +194,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .tools button{background:transparent;border:1px solid transparent;border-radius:12px;padding:6px 4px 7px;display:grid;justify-items:center;gap:1px}
 .tools button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tools button span{font-size:13px;font-weight:700}
+.tools button{position:relative}
+#heldBadge{position:absolute;top:2px;right:calc(50% - 26px);width:19px;height:19px;border-radius:50%;background:var(--glaube);color:#2a2112;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+#heldBadge[hidden]{display:none}
+#heldBadge svg{width:12px;height:12px;stroke:currentColor;fill:currentColor;stroke-width:1.2}
 .tools button[aria-pressed="true"]{background:rgba(243,192,77,.16);border-color:rgba(243,192,77,.55);color:var(--glaube)}
 
 /* sheets */
@@ -404,7 +412,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     </div>
     <nav class="tools" aria-label="Werkzeuge">
       <button data-tool="blick" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Blick</span></button>
-      <button data-tool="hand" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V10m0-5.5a1.5 1.5 0 0 1 3 0V10m0-4a1.5 1.5 0 0 1 3 0v5m0-3a1.5 1.5 0 0 1 3 0v6.5A6.5 6.5 0 0 1 12.5 21h-.8a6 6 0 0 1-4.6-2.2L4 15a1.6 1.6 0 0 1 2.4-2.1L7 13.5"/></svg><span>Hand</span></button>
+      <button data-tool="hand" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V10m0-5.5a1.5 1.5 0 0 1 3 0V10m0-4a1.5 1.5 0 0 1 3 0v5m0-3a1.5 1.5 0 0 1 3 0v6.5A6.5 6.5 0 0 1 12.5 21h-.8a6 6 0 0 1-4.6-2.2L4 15a1.6 1.6 0 0 1 2.4-2.1L7 13.5"/></svg><span>Hand</span><i id="heldBadge" hidden></i></button>
       <button data-tool="sculpt" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M2 19l6-8 4 5 3-4 7 7z"/><path d="M15 5v5m-2.5-2.5L15 5l2.5 2.5"/></svg><span>Formen</span></button>
       <button data-tool="miracle" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.8 2.8M16.2 16.2 19 19M5 19l2.8-2.8M16.2 7.8 19 5"/><circle cx="12" cy="12" r="3"/></svg><span>Wunder</span></button>
     </nav>
