@@ -213,19 +213,23 @@ function layStream(sw) { // Lage des Wasserbands aus Bett und Hochwasser
   pos.needsUpdate = foam.needsUpdate = true; streamMesh.geometry.computeVertexNormals();
 }
 layStream(0);
-// Nach dem Formen: Bach folgt dem Gelände. Heben oder senken beide Ufer, steigt oder sinkt das Bett mit; es fließt aber
+// Nach dem Formen: Bach folgt dem Gelände. Heben oder senken beide Ufer, steigt oder sinkt das Bett mit; liegt ein Ufer
+// tiefer als das Wasser, sinkt das Bett darunter. Ein einzeln gesenktes Ufer (z. B. der Mühlenplatz) zieht das Bett nicht mit; es fließt aber
 // immer bergab, eine aufgeschüttete Stelle gräbt der Bach wieder durch. Liefert die geänderten Geländepunkte (neu färben).
 function fitStream() {
   const P = STREAM.pts, changed = [];
   let prev = 1e9;
   for (const p of P) {
     const hl = heightAt(p.x + p.nx * p.bank, p.z + p.nz * p.bank), hr = heightAt(p.x - p.nx * p.bank, p.z - p.nz * p.bank);
-    p.bed = Math.min(p.bed0 + Math.min(hl - p.gL0, hr - p.gR0), prev - .004); prev = p.bed; p.y = p.bed + .055; p.ref = Math.min(hl, hr);
+    const dl = hl - p.gL0, dr = hr - p.gR0, d = dl > 0 && dr > 0 ? Math.min(dl, dr) : dl < 0 && dr < 0 ? Math.max(dl, dr) : 0; // nur wenn beide Ufer mitgehen
+    const cap = (h, g0) => h < g0 && g0 > p.bed0 + .1 ? h - .1 : 1e9; // ein gesenktes Ufer, das vorher über dem Wasser lag
+    p.bed = Math.min(p.bed0 + d, cap(hl, p.gL0), cap(hr, p.gR0), prev - .004); prev = p.bed; p.y = p.bed + .055; p.refL = hl; p.refR = hr; // Wasser bleibt unter dem tieferen Ufer
   }
   const C4 = STREAM.cells;
   for (let c = 0; c < C4.length; c += 4) {
     const k = C4[c], a = P[C4[c + 1] - 1], b = P[C4[c + 1]], t = C4[c + 2], bd = C4[c + 3];
-    const bed = a.bed + (b.bed - a.bed) * t, w = a.w + (b.w - a.w) * t, ref = a.ref + (b.ref - a.ref) * t;
+    const left = (-HALF + (k % N) * CELL - a.x) * a.nx + (-HALF + Math.floor(k / N) * CELL - a.z) * a.nz > 0; // Böschung je Seite bis zu ihrem eigenen Ufer
+    const bed = a.bed + (b.bed - a.bed) * t, w = a.w + (b.w - a.w) * t, ref = left ? a.refL + (b.refL - a.refL) * t : a.refR + (b.refR - a.refR) * t;
     const allowed = bed + Math.max(0, ref - bed) * smooth(w * .55, w + 1, bd);
     if (H[k] > allowed + .002) { H[k] = allowed; tPos.setY(k, allowed); changed.push(k); }
   }
