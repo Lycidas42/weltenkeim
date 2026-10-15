@@ -10,9 +10,10 @@ import { smoothH } from '../world/nav.js';
 import { HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VS, chopPose, digPose, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers } from './villagers.js';
 import { lV, lights } from './night.js';
 import { REEL_T } from './ai.js';
+import { FOOD_COL } from './food.js';
 
 // Jeder Bewohner besteht aus Teilen (Beine, Arme, Kopf, Werkzeug …), die hier je nach Tätigkeit gestellt werden
-const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4();
+const vEuler = new THREE.Euler(), vTmp = new THREE.Matrix4(), vOut = new THREE.Matrix4(), mealC = new THREE.Color();
 function renderVillagers(dt, t) {
   for (const m of vAll) m.count = villagers.length;
   lights.length = 0;
@@ -40,8 +41,8 @@ function renderVillagers(dt, t) {
     }
     else if (v.state === 'pray') { const c = prayPose(((2 * PRAY_T - v.timer) / PRAY_T) % 1); tilt = c.tilt * v.kn; armA = armB = -1.2 + (c.arm + 1.2) * v.kn; splay = c.splay; }
     else if (v.state === 'beg') { const s = Math.sin(t * 2.2 + v.ph); tilt = -.2 * v.kn; armA = -2.9 + s * .12; armB = -2.9 - s * .12; splay = .4 + s * .05; }
-    else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu vom Brot ab
-      bite = Math.max(0, Math.sin(t * 1.4 + v.ph * 3)) ** 4 * v.st;
+    else if (v.state === 'lunch') { // sitzt im Gras und beißt ab und zu von seinem Essen ab (ohne Essen: leere Hände im Schoß)
+      bite = v.meal ? Math.max(0, Math.sin(t * 1.4 + v.ph * 3)) ** 4 * v.st : 0;
       tilt = -.14 + bite * .06; armA = -.7; armB = -.7 - 1.75 * bite; splay = .12; armRz = .5 * bite;
     }
     else if (v.state === 'grabbed' || v.state === 'falling') {
@@ -75,7 +76,10 @@ function renderVillagers(dt, t) {
     }
     part(vParts.legL, .038, HIP_Y, legA, 0); part(vParts.legR, -.038, HIP_Y, legB, 0);
     part(vParts.armL, .085, SHO_Y, armA, splay); part(vParts.armR, -.085, SHO_Y, armB, -splay + armRz);
-    if (bite >= 0) part(vBread, -.085, SHO_Y, armB, -splay + armRz); else vBread.setMatrixAt(i, zero);
+    if (bite >= 0 && v.meal) {
+      part(vBread, -.085, SHO_Y, armB, -splay + armRz);
+      if (v.mealC !== v.meal) { v.mealC = v.meal; vBread.setColorAt(i, mealC.setHex(FOOD_COL[v.meal])); vBread.instanceColor.needsUpdate = true; }
+    } else vBread.setMatrixAt(i, zero);
     if (!lantern || v.state === 'grabbed' || v.state === 'falling') { vLantern.setMatrixAt(i, zero); vLanternGlass.setMatrixAt(i, zero); }
     else {
       if (handLantern) { // hängt senkrecht an der Hand, pendelt beim Gehen

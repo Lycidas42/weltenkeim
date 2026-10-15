@@ -35,6 +35,7 @@ const APP = [
   './src/village/ai.js',
   './src/village/build.js',
   './src/village/economy.js',
+  './src/village/food.js',
   './src/village/emotes.js',
   './src/village/forest-alert.js',
   './src/village/houses.js',

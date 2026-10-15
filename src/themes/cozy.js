@@ -105,6 +105,8 @@ export default {
       robes: [0xc2553d, 0x3d7cc2, 0xd9a441, 0x6b9b4a, 0x8c5fb3, 0xe07a5f, 0x4aa3a0, 0xd8d0c0],
       pants: [0x5b4636, 0x3e4a5c, 0x6a5a45, 0x4a3b30, 0x6b6156],
     },
+    // Nahrung: Farbe des Essens in der Hand bei der Mittagspause und der Gabe auf dem Altar
+    food: { bread: 0xc98b4c, fish: 0x8fb4c6, meat: 0xb4513f, veg: 0xe8873a, milk: 0xf2f0e8, eggs: 0xf1e2c4 },
     // Symbole über dem Kopf (src/village/emotes.js): Kontur und Fläche je Symbol
     emotes: { line: 0x2b2420, heart: 0xf0697a, wonder: 0xfff0a6, wish: 0xfffaf0, dizzy: 0xffd45a, fear: 0xfffaf0 },
   },

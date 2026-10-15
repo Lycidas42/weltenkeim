@@ -8,6 +8,7 @@ import { hutSite } from './huts.js';
 import { addHut } from './build.js';
 import { homeSpot, spawnVillager, villagers } from './villagers.js';
 import { hutCap, reconcileJobs, roleCount, wantRoles } from './jobs.js';
+import { SOUL_FOOD, food, growthState, noteStall, takePortions } from './food.js';
 
 // Was als Nächstes gebaut wird: zuerst Hütten für zugewiesene Spezialisten ohne Platz, dann Wohnhäuser
 function nextBuild() {
@@ -17,10 +18,15 @@ function nextBuild() {
   const site = freeSite(); return site ? { role: null, label: 'Haus', cost: houseCost(), site } : null;
 }
 reconcileJobs();
-// Wachstum des Dorfes: neue Seelen, Berufe abgleichen, Bauaufträge vergeben und fertigstellen
+// Wachstum des Dorfes: neue Seelen (nur mit Vorrat für 2 Tage, jede kostet 3 Portionen), Berufe abgleichen,
+// Bauaufträge vergeben und fertigstellen (Häuser entstehen auch ohne Nahrung und bleiben dann leer)
 let birthT = 0, jobT = 0;
 function updateVillage(dt) {
-  birthT += dt; if (birthT > 9) { birthT = 0; if (villagers.length < cap()) { const p = homeSpot(), v = spawnVillager(p.x, p.z); if (v) floatText(v.x, 1.6, v.z, 'Neue Seele', 's'); } }
+  birthT += dt; if (birthT > 9) {
+    birthT = 0; food.growth = growthState();
+    if (food.growth === 'ok') { const p = homeSpot(), v = spawnVillager(p.x, p.z); if (v) { takePortions(SOUL_FOOD); floatText(v.x, 1.6, v.z, 'Neue Seele', 's'); } }
+    else if (food.growth === 'food') noteStall();
+  }
   jobT -= dt; if (jobT <= 0) { jobT = 1; reconcileJobs(); }
   if (!build.construction) { const b = nextBuild(); if (b && S.holz >= b.cost) { S.holz -= b.cost; build.construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
   if (build.construction) { build.construction.t += dt; if (build.construction.t > 9) {

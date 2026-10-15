@@ -1,34 +1,57 @@
 # Nahrung: wofür Fleisch, Fisch, Gemüse, Milch, Eier und Brot?
 
-Stand 0.2.8: Die Produktion ist komplett, die Waren landen im Lager, haben aber noch keinen Zweck (auch das Brot,
-in das die Bewohner mittags beißen, wird nicht verbraucht). Hier Vorschläge zur Auswahl; sie lassen sich kombinieren.
+Die Produktion ist komplett, die Waren landen im Lager. Seit [#8](https://github.com/Lycidas42/weltenkeim/issues/8)
+essen die Bewohner mittags davon, das Dorf wächst nur mit Vorrat, und gut versorgte Bewohner bringen Gaben zum Schrein
+(Abschnitte 1–3). Die übrigen Abschnitte sind Vorschläge zur Auswahl; sie lassen sich kombinieren.
 
 Verwandt: `bewohner.md` (Hunger als Bedürfnis, Mittagspause, Feierabend), `kreatur.md` (Hunger der Kreatur),
 `jahreszeiten.md` (Ernte im Herbst, Winter mit Vorräten). Stand der Features: siehe `README.md`.
 
 ## 1. Bewohner essen (Grundversorgung)
 
-**Stand:** 💡 Idee – empfohlen als erster Schritt
+**Stand:** ✅ vorhanden ([#8](https://github.com/Lycidas42/weltenkeim/issues/8), `src/village/food.js`) – Bitte um
+Nahrung und Wunder „Segen der Ernte“ noch offen
 
-- Jeder Bewohner isst zur Mittagspause auf dem Dorfplatz eine Mahlzeit aus dem Lager (heute beißt er schon in ein Brot – das wäre dann echt). Hunger ist eines der drei Bedürfnisse der Bewohner (`bewohner.md` 3.2).
-- Verbrauch pro Tag: z. B. 1 Portion je Bewohner; Brot, Fisch, Fleisch, Gemüse zählen als Portion, Milch und Eier als halbe.
-- **Gut versorgt** (abwechslungsreich, mind. 3 Sorten in den letzten Tagen): Bewohner arbeiten etwas schneller und beten mehr (Glaube +).
-- **Hunger** (Lager leer): langsamer, beten weniger, betteln am Schrein um Nahrung („Wunder: Segen der Ernte“ als neue Bitte, analog Regen/Eile).
-- Anzeige oben: kleine „Vorrat reicht für X Tage“-Angabe am Lager.
+- Jeder Bewohner nimmt sich zur Mittagspause auf dem Dorfplatz einmal am Tag eine **Portion** aus dem Lager: Brot,
+  Fisch, Fleisch, Gemüse je 1 Stück, Milch und Eier zählen halb (2 Stück = 1 Portion). Korn und Mehl sind keine Mahlzeit.
+- Er nimmt die Sorte, von der am meisten im Lager liegt; so verteilt sich der Verbrauch von selbst. Was er isst, hält
+  er in der Hand (Farbe je Sorte, `theme.palette.food`); ohne Essen sitzt er mit leeren Händen da.
+- Versorgung je Bewohner als einfacher Tageswert (nur zur Laufzeit): **satt** oder **hungrig**, gilt bis zur nächsten
+  Mittagspause. Das Dorf ist **abwechslungsreich** versorgt, wenn in den letzten 3 Tagen mindestens 3 Sorten gegessen
+  wurden.
+- **Wirkung:** satt und abwechslungsreich: Arbeitstempo +10 %, Gebetsertrag +20 %. Nur satt: wie bisher. Hungrig:
+  Gebetsertrag −30 %, Arbeitstempo unverändert. Niemand verhungert, hört auf zu arbeiten oder verlässt die Insel.
+- Beim ersten Hunger (einmal je Spielstand) ein Hinweis mit Tipp (Fischerhütte, Jagd, Bauernhof).
+- **Anzeige:** im Lager „Vorrat reicht für etwa X Tage“ (Portionen ÷ Bewohner), unter einem Tag hervorgehoben; das
+  Arbeit-Panel (Tippen aufs Lager) nennt dazu Portionen, Wachstum und Versorgung.
+- **Startvorrat:** Neue Spiele beginnen mit 30 Portionen (12 Brot, 10 Fisch, 8 Gemüse), alte Spielstände nicht.
+- **Spielstand:** Spieltag `S.day`, gegessene Sorten der letzten Tage `S.meals`, letzte Gabe `S.offer`, gezeigte
+  Hinweise `S.foodHints`.
+- Noch offen: **Hunger** als Bitte am Schrein um Nahrung („Wunder: Segen der Ernte“ als neue Bitte, analog
+  Regen/Eile).
 
 ## 2. Bevölkerungswachstum
 
-**Stand:** 💡 Idee
+**Stand:** ✅ vorhanden ([#8](https://github.com/Lycidas42/weltenkeim/issues/8)) – zweite Siedlungsstufe noch Idee
 
-- Neue Seelen kosten heute Glaube und einen freien Platz in einem Haus. Zusätzlich könnte ein Bewohner nur dazukommen, wenn genug Nahrung im Lager ist (z. B. 10 Portionen pro neuem Bewohner).
-- Höchstzahl (heute 40) könnte mit einer zweiten Siedlungsstufe steigen, wenn die Versorgung stimmt.
+- Von selbst kommt alle 9 s ein Bewohner dazu, solange in den Häusern Platz ist **und** der Vorrat für mindestens
+  **2 Tage** für alle Bewohner reicht. Jeder neue Bewohner verbraucht **3 Portionen**.
+- Häuser und Hütten werden weiter aus Brettern gebaut; sie bleiben nur leer, solange die Nahrung fehlt.
+- **„Seele rufen“** am Schrein (Glaube) geht weiter ohne Nahrung; das Schrein-Panel sagt das, wenn das Wachstum stockt.
+- **Sichtbar:** im Lager „Wachstum: Das Dorf wächst“, „Wachstum stockt: zu wenig Nahrung“ oder „Kein Platz in den
+  Häusern“; über dem neuesten Haus das Schild „Wartet auf Nahrung“; beim ersten Stocken (einmal je Spielstand) ein
+  Hinweis mit Tipp.
+- „Während du fort warst“ rechnet Wachstum und Verbrauch nicht nach.
+- 💡 Höchstzahl (heute 40) könnte mit einer zweiten Siedlungsstufe steigen, wenn die Versorgung stimmt.
 
 ## 3. Feste und Opfergaben am Schrein
 
-**Stand:** 💡 Idee – Gaben empfohlen als erster Schritt
+**Stand:** 🟡 teilweise – Gaben vorhanden ([#8](https://github.com/Lycidas42/weltenkeim/issues/8)), Dorffest noch Idee
 
-- Bewohner bringen ab und zu Brot, Obst oder Fisch zum Schrein (sichtbar als Gaben auf dem Altar) – gibt viel Glaube.
-- Gelegentliches **Dorffest** auf dem Dorfplatz (Tische, Lagerfeuer, Musik), verbraucht viele Waren, bringt einen großen Glaubensschub und gute Laune für eine Weile. Das Lagerfeuer am Feierabend (`bewohner.md` 5.2) ist die kleine, tägliche Form davon.
+- **Gaben:** Ist das Dorf abwechslungsreich versorgt, holt nachmittags ein freier Bewohner eine Portion aus dem Lager
+  und legt sie auf den Altar (höchstens eine Gabe je Tag). Sie liegt dort bis zum Abend und bringt einmalig 8 Glaube
+  (Schwebetext „Gabe“).
+- 💡 Gelegentliches **Dorffest** auf dem Dorfplatz (Tische, Lagerfeuer, Musik), verbraucht viele Waren, bringt einen großen Glaubensschub und gute Laune für eine Weile. Das Lagerfeuer am Feierabend (`bewohner.md` 5.2) ist die kleine, tägliche Form davon.
 
 ## 4. Die Kreatur füttern
 
@@ -53,6 +76,9 @@ Verwandt: `bewohner.md` (Hunger als Bedürfnis, Mittagspause, Feierabend), `krea
 - Frische Waren (Fisch, Milch) verderben langsam, wenn zu viel im Lager liegt; verarbeitete halten länger. Das gibt der Verarbeitung einen Sinn, macht das Spiel aber anspruchsvoller – für ein entspanntes Aufbauspiel eventuell weglassen.
 - Mit Jahreszeiten (`jahreszeiten.md`) bekommt Vorratshaltung ohnehin einen Sinn: Im Winter wächst auf den Feldern nichts, das Dorf lebt von Ernte, Fisch, Jagd und Verarbeitetem.
 
-## Empfehlung für den ersten Schritt
+## Empfehlung für die nächsten Schritte
 
-1 (Mittagessen mit Versorgungsbonus) + 3 (Gaben am Schrein) – beides nutzt vorhandene Abläufe (Mittagspause, Beten) und gibt der Nahrung sofort einen sichtbaren Zweck, ohne Strafe zu erzwingen. Hunger nur sanft (weniger Glaube statt Stillstand).
+Der erste Schritt ist umgesetzt: 1 (Mittagessen mit Versorgungsbonus), 2 (Wachstum nur mit Vorrat) und die Gaben aus 3,
+Hunger nur sanft (weniger Glaube statt Stillstand). Als Nächstes bieten sich an: die Bitte um Nahrung am Schrein mit dem
+Wunder „Segen der Ernte“ (1), die Kreatur füttern (4) und das Dorffest (3), sobald es Feierabend und Laune gibt
+(`bewohner.md` 3.2, 5.2).

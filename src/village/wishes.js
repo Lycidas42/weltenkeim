@@ -24,7 +24,7 @@ const WISHES = {
     need: () => S.logs >= 25 && roleCount('sawyer') > 0 },
 };
 function startWish(kind) {
-  const free = villagers.filter(v => !v.role && !v.haul && !v.carry && ['idle', 'pray', 'walk'].includes(v.state));
+  const free = villagers.filter(v => !v.role && !v.haul && !v.carry && !v.gift && ['idle', 'pray', 'walk'].includes(v.state) && v.next !== 'lunch'); // nicht auf dem Weg zum Mittagessen oder mit einer Gabe
   if (!free.length) return;
   free.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
   const v = free[0]; v.wish = true; goBeg(v);
