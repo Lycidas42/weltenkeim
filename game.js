@@ -533,6 +533,7 @@ function updateDepth() {
 }
 updateDepth(); terrainU.uDep.value = depTex; terrainU.uSkyH.value = sky.hor;
 let terrainDirty = false, terrainT = 0;
+const markTerrainDirty = () => { terrainDirty = true; }; // Normalen, Höhen- und Tiefenkarte gleich nachziehen
 function updateTerrain(dt) { terrainU.uWet.value = weather.wet; terrainT -= dt; if (!terrainDirty || terrainT > 0) return; terrainT = .12; terrainDirty = false; tGeo.computeVertexNormals(); updateHTex(); updateDepth(); }
 // Wasser: Wellen und Brandung im Vertex-Shader, Kräuselung durch Wind (Böen ziehen als Flecken übers Wasser),
 // Farbe nach Tiefe (türkis im Flachen, tiefblau draußen), Schaum am Strand und bei starkem Wind Schaumkronen,
@@ -684,7 +685,7 @@ function sculpt(px, pz, dir, dt) {
     const k = j * N + i, h = clamp(H[k] + str * (1 + Math.cos(Math.PI * d)) / 2, -3, 8.5);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true; terrainDirty = true;
+  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty();
 }
 // Bauplatz einebnen: innen ganz auf die Höhe der Mitte, zum Rand hin weich auslaufend
 function flattenAt(px, pz, R) {
@@ -697,7 +698,7 @@ function flattenAt(px, pz, R) {
     const k = j * N + i, h = H[k] + (target - H[k]) * smooth(1, .55, d);
     H[k] = h; tPos.setY(k, h); const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b);
   }
-  tPos.needsUpdate = true; tCol.needsUpdate = true; terrainDirty = true;
+  tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty();
 }
 
 /* ------------------------------------------------------------------ assets */
@@ -4011,7 +4012,7 @@ function updateTrees(dt, t) {
 const FOX_ACTIONS = [
   { id: 'pet', label: () => 'Streicheln', icon: '<path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.6 4 4 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>', run: () => reinforce('pet') },
   { id: 'slap', label: () => 'Klaps', icon: '<path d="M7 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0v5m0-2.5a1.5 1.5 0 0 1 3 0v5A6.5 6.5 0 0 1 12.5 21h-.6a6 6 0 0 1-4.7-2.3L4.4 15"/><path d="M3 6l2 1.5M2.5 10H5"/>', run: () => reinforce('slap') },
-  { id: 'follow', label: () => follow ? 'Nicht folgen' : 'Folgen', pressed: () => follow, icon: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>', run: () => { follow = !follow; renderFollow(); } },
+  { id: 'follow', label: () => follow ? 'Nicht folgen' : 'Folgen', pressed: () => follow, icon: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>', run: () => setFollow(!follow) },
   { id: 'sheet', label: () => 'Charakter', icon: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3.5"/>', run: () => openSheet('sheetFox') },
 ];
 let ringOpen = false, hoverFox = false;
@@ -4291,7 +4292,7 @@ $('forestAlert').addEventListener('click', () => {
   const A = forestAlert; if (!A.hut) return;
   setTool('miracle'); chooseMiracle('rain');
   // Kamera zur Lichtung schwenken (Blickwinkel bleibt)
-  const dx = A.at.x - controls.target.x, dz = A.at.z - controls.target.z; controls.target.x += dx; controls.target.z += dz; camera.position.x += dx; camera.position.z += dz; follow = false;
+  const dx = A.at.x - controls.target.x, dz = A.at.z - controls.target.z; controls.target.x += dx; controls.target.z += dz; camera.position.x += dx; camera.position.z += dz; setFollow(false);
   toast('Tippe in den Ring, um dort Regen zu wirken.', 3);
 });
 $('wish').addEventListener('click', () => { if (!wish.kind) return; setTool('miracle'); chooseMiracle(wish.kind); toast(wish.kind === 'rain' ? 'Tippe auf den Wald, um Regen zu wirken.' : 'Tippe dorthin, wo die Bewohner arbeiten, um ihnen Eile zu schenken.', 3); });
@@ -4393,6 +4394,7 @@ $('btnFox').addEventListener('click', () => openSheet('sheetFox'));
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
+function setFollow(on) { follow = on; renderFollow(); }
 function renderFollow() { $('btnFollow').hidden = !follow; $('btnFocus').setAttribute('aria-pressed', follow); $('btnFocus').textContent = follow ? 'Folgen aus' : 'Folgen'; }
 // Kamera: folgt dem Tiergeist, bleibt über der Insel
 function updateCamera(dt) {
@@ -4405,8 +4407,8 @@ function updateCamera(dt) {
 }
 $('btnPet').addEventListener('click', () => reinforce('pet'));
 $('btnSlap').addEventListener('click', () => reinforce('slap'));
-$('btnFocus').addEventListener('click', () => { follow = !follow; renderFollow(); if (follow) closeSheets(); });
-$('btnFollow').addEventListener('click', () => { follow = false; renderFollow(); });
+$('btnFocus').addEventListener('click', () => { setFollow(!follow); if (follow) closeSheets(); });
+$('btnFollow').addEventListener('click', () => setFollow(false));
 let resetArmed = false;
 $('btnReset').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Wirklich zurücksetzen?'; return; }
@@ -4547,8 +4549,13 @@ function scanSnow() {
   hand.g.traverse(o => { if (o.material) [].concat(o.material).forEach(m => snowSkip.add(m)); });
   scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && !o.userData.shell && !o.userData.noSnow) [].concat(o.material).forEach(snowify); });
 }
+// Ein Bild: alle Bereiche fortschreiben, dann zeichnen
 function frame() {
-  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  const dt = Math.min(clock.getDelta(), .05);
+  tick(dt, clock.elapsedTime);
+  requestAnimationFrame(frame);
+}
+function tick(dt, t) {
   updatePointer(dt);
   updateIncome(dt); updateVillage(dt);
   updateNav(dt);
@@ -4590,12 +4597,14 @@ function frame() {
 
   renderer.render(scene, camera);
   if (!$('sheetFox').hidden) renderPortrait(dt, t);
-  requestAnimationFrame(frame);
 }
 $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
-window.__wk = { S, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+window.__wk = {
+  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab)
+  step: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) { clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } },
+  input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);
 }
 
