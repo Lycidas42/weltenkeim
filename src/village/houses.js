@@ -60,7 +60,9 @@ function addHouse(site) {
   site.used = true; const b = houses.length % 2, h = place(b ? 'house.b' : 'house.a', site.x, site.z, site.ry, SB); h.b = b;
   h.o.traverse(o => { if (o.isMesh) o.material = houseMat(o.material); });
   const back = GARDEN_R - HOUSE_R, gx = site.x - Math.sin(site.ry) * back, gz = site.z - Math.cos(site.ry) * back; // hinter dem Haus, nach außen
-  if (heightAt(gx, gz) > .3 && !onSacred(gx, gz, .9) && Math.hypot(gx - SHRINE_POS.x, gz - SHRINE_POS.z) > 4) { const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
+  if (heightAt(gx, gz) > .3 && !onSacred(gx, gz, .9) && Math.hypot(gx - SHRINE_POS.x, gz - SHRINE_POS.z) > 4) {
+    flattenAt(gx, gz, 1.25); // Beetfläche eben (auch für ältere Spielstände), sonst steckt der Garten am Hang in der Erde
+    const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
   houses.push(h); return h;
 }
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
