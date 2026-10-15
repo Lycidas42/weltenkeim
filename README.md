@@ -46,3 +46,7 @@ Supabase ist noch nicht angebunden. Geplant ist es wie bei Kernwacht für Cloud-
 ## Veröffentlichen
 
 GitHub Pages aus dem Branch `main`, Ordner `/` (Root). Jeder Push auf `main` geht nach ein bis zwei Minuten live.
+
+## Lizenz
+
+© Lycidas42. Alle Rechte vorbehalten. Der Code ist zum Ansehen öffentlich, darf aber ohne Erlaubnis nicht weiterverwendet, verändert oder verbreitet werden. Ausgenommen sind die eingebundenen Fremdbestandteile mit eigener Lizenz: Three.js (`vendor/three-0.170.0/LICENSE`, MIT) und die Modelle (`assets/CREDITS.md`).
