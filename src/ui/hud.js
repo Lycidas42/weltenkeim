@@ -17,21 +17,21 @@ import { nextBuild } from '../village/economy.js';
 import { alertRing, forestAlert } from '../village/forest-alert.js';
 import { SHRINE, WX_ICON, renderFox, renderWork, windWord } from './sheets.js';
 
-// Reifegrad über den Feldern, solange die Hand gewählt ist: Frucht und Fortschrittsring, reife Felder golden
+// Reifegrad über den Feldern, solange Hand oder Wunder gewählt sind: Frucht und Fortschrittsring, reife Felder golden
 const fieldTagEls = [];
 function placeFieldTags() {
-  const box = $('fieldTags'), show = input.tool === 'hand' && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
+  const box = $('fieldTags'), show = (input.tool === 'hand' || input.tool === 'miracle') && !document.querySelector('.sheet:not([hidden])'), r = canvas.getBoundingClientRect();
   fields.forEach((f, i) => {
     let el = fieldTagEls[i];
     if (!el) { el = document.createElement('div'); el.className = 'ftag'; el.innerHTML = '<i></i><span></span>'; box.appendChild(el); fieldTagEls[i] = el; el._k = ''; }
     const y = heightAt(f.x, f.z) + .45, dist = camera.position.distanceTo(tmpV.set(f.x, y, f.z));
     toScreen(f.x, y, f.z, tA); const on = show && dist < 34 && tmpV.set(f.x, y, f.z).project(camera).z < 1 && tA.x > r.left - 40 && tA.x < r.right + 40 && tA.y > r.top + 150 && tA.y < r.bottom - 120;
     el.hidden = !on; if (!on) return;
-    const C = CROPS[f.c], pct = Math.floor(f.g * 100), k = f.state + C.label + pct;
+    const C = CROPS[f.c], pct = Math.floor(f.g * 100), wet = f.state === 'grow' && f.water > 0, k = f.state + C.label + pct + wet;
     if (el._k !== k) {
       el._k = k; el.className = 'ftag' + (f.state === 'reif' ? ' ripe' : f.state === 'leer' ? ' empty' : '');
       el.style.setProperty('--p', f.state === 'leer' ? 0 : pct);
-      el.lastChild.innerHTML = f.state === 'reif' ? `${C.label} <small>reif · antippen</small>` : f.state === 'leer' ? `<small>leer, wird besät</small>` : `${C.label} <small>${pct} %</small>`;
+      el.lastChild.innerHTML = f.state === 'reif' ? `${C.label} <small>reif · antippen</small>` : f.state === 'leer' ? `<small>leer, wird besät</small>` : `${C.label} <small>${pct} %${wet ? ' · Regen' : ''}</small>`;
     }
     el.style.transform = `translate(${Math.round(tA.x - r.left - el.offsetWidth / 2)}px, ${Math.round(tA.y - r.top - el.offsetHeight)}px)`;
   });

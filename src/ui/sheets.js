@@ -34,7 +34,7 @@ async function setCreature(id) {
 
 const HINTS = {
   get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
-  get hand() { return `Bewohner packen, Bäume ausreißen. Bei der Arbeit helfen: Felder säen, gießen, ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name} antippen für mehr.`; },
+  get hand() { return `Bewohner packen, Bäume ausreißen. Bei der Arbeit helfen: Felder säen und ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name} antippen für mehr.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
   miracle: 'Wunder wählen, dann auf die Welt tippen.'
 };
