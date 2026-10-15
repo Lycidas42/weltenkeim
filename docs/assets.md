@@ -93,7 +93,7 @@ Diese Modelle entstehen im Code und lassen sich noch nicht per Datei ersetzen:
 - Schrein
 - Ofen, Lager, Steg
 
-Ihre Grundfarben stehen aber schon in der Palette des Themes (`palette`): Gelände, Himmel, Bewohner sowie die
+Ihre Grundfarben stehen aber schon in der Palette des Themes (`palette`): Gelände, Himmel, Bewohner, Essen (`food`) sowie die
 Farbrollen der Natur (siehe 4.1). Einzelne Modelle können auch durch Dateien ersetzt werden: Dafür bekommen sie einen
 Schlüssel im Theme, und der Code-Baustein wird zur Rückfallebene.
 

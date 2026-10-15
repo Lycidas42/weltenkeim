@@ -74,7 +74,7 @@ const vLantern = vMesh(mergeGeometries([
 const LANTERN_C = -.059;
 const vLanternGlass = new THREE.InstancedMesh(new THREE.CylinderGeometry(.022, .022, .046, 6).translate(0, LANTERN_C, 0), new THREE.MeshBasicMaterial({ color: 0xffd27a, toneMapped: false }), VCAP);
 vLanternGlass.frustumCulled = false; vLanternGlass.count = 0; scene.add(vLanternGlass);
-const vBread = vMesh(new THREE.CapsuleGeometry(.018, .03, 3, 6).rotateZ(Math.PI / 2).translate(0, -.14, .012), 0xc98b4c, .9);
+const vBread = vMesh(new THREE.CapsuleGeometry(.018, .03, 3, 6).rotateZ(Math.PI / 2).translate(0, -.14, .012), 0xffffff, .9); // Essen in der Hand, Farbe je Sorte (render.js)
 // Spaten des Försters: wie die Axt im Schulterraum, Blatt unten
 const vShovel = [
   vMesh(new THREE.CylinderGeometry(.01, .011, .27, 6).translate(0, -.175, 0), 0x7a5230, .9),

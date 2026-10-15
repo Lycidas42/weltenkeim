@@ -1,4 +1,4 @@
-// Verhalten der Bewohner: Arbeit, Tragen, Jagen, Fischen, Essen, Schlafen, Beten
+// Verhalten der Bewohner: Arbeit, Tragen, Jagen, Fischen, Essen, Schlafen, Beten, Gaben zum Schrein
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -21,6 +21,7 @@ import { CROPS, fieldFront } from '../farm/farm.js';
 import { hutWork } from './build.js';
 import { followPath, moveFree, navV, nearBuilding, setGoal } from '../world/nav.js';
 import { CHOP_HIT, CHOP_T, DIG_T, homeSpot, villagers } from './villagers.js';
+import { GIFT_GLAUBE, MEAL, eatLunch, food, giftDue, prayMul, takePortion, workMul } from './food.js';
 import { fish, killAnimal, removeAnimal, wild } from '../wildlife/land.js';
 import { fishGeo, fishMesh, splash } from '../wildlife/sea.js';
 
@@ -31,6 +32,14 @@ function goHome(v) {
   const hs = houses[villagers.indexOf(v) % Math.max(1, houses.length)]; if (!hs) { idle(v, 2); return; }
   v.home = hs; const d = houseDoor(hs, .12 + Math.random() * .1); walk(v, d.x, d.z, 'sleep');
 }
+// Gabe: Portion im Lager holen, zum Schrein tragen und auf den Altar legen (v.gift: true = holt sie noch, sonst die Sorte)
+function goGift(v) {
+  if (!v.gift) { v.gift = true; food.giftBy = v; }
+  if (v.gift === true) { const p = lagerDrop(); walk(v, p.x, p.z, 'giftPick'); return; }
+  if (!v.carry) { endGift(v); idle(v, .3); return; } // unterwegs fallen gelassen (Hand)
+  const p = shrinePt(rnd(.25), 1.95 + Math.random() * .15); walk(v, p.x, p.z, 'gift');
+}
+function endGift(v) { if (!v.gift) return; if (food.giftBy === v) food.giftBy = null; if (v.gift !== true && v.carry) { S[v.gift] += 1 / MEAL[v.gift]; v.carry = 0; } v.gift = null; }
 function goPray(v) { const a = Math.random() * Math.PI * 2, r = 1.95 + Math.random() * .9; walk(v, SHRINE_POS.x + Math.cos(a) * r, SHRINE_POS.z + Math.sin(a) * r, 'pray'); }
 function findTree(x, z) {
   let best = null, bd = 1e9;
@@ -38,9 +47,10 @@ function findTree(x, z) {
   return best;
 }
 function chooseJob(v) {
-  if (S.hour >= BED || S.hour < WAKE) { goHome(v); return; }           // Feierabend: heim in die Hütte
+  if (S.hour >= BED || S.hour < WAKE) { endGift(v); goHome(v); return; } // Feierabend: heim in die Hütte
   if (S.hour >= LUNCH[0] && S.hour < LUNCH[1]) { goLunch(v); return; } // Mittagspause am Brunnen
   if (v.wish) { if (wish.kind && wish.by === v) { goBeg(v); return; } v.wish = false; }
+  if (v.gift || (!v.role && !v.haul && !v.carry && giftDue())) { goGift(v); return; } // Gabe zum Schrein bringen
   if (v.drop && v.carry) { walkDrop(v); return; } // Ware erst an der Hütte ablegen
   if (v.role && v.hut) { JOB[v.role](v); return; }
   if (haulJob(v)) return;
@@ -181,7 +191,7 @@ function updateArrows(dt) {
 function startFishing(v) { const J = v.hut.jetty; v.state = 'fish'; v.fp = 'cast'; v.timer = .9; v.h = Math.atan2(J.dx, J.dz); }
 function fishStep(v, dt) {
   const J = v.hut && v.hut.jetty; if (!J) { idle(v, .5); return; }
-  v.timer -= dt;
+  v.timer -= dt * workMul(v);
   if (v.timer > 0) return;
   if (v.fp === 'cast') { v.fp = 'wait'; v.timer = 3 + Math.random() * 6; return; }
   if (v.fp === 'wait') { v.fp = 'bite'; v.timer = .9; return; }
@@ -287,7 +297,14 @@ function arrive(v) {
       break;
     case 'pray': v.state = 'pray'; v.timer = 2 * PRAY_T; v.h = Math.atan2(SHRINE_POS.x - v.x, SHRINE_POS.z - v.z); break;
     case 'beg': if (v.wish && wish.kind) { v.state = 'beg'; v.timer = 0; v.h = Math.atan2(wish.at.x - v.x, wish.at.z - v.z); } else idle(v, .3); break;
-    case 'lunch': v.state = 'lunch'; v.until = LUNCH[1] + Math.random() * .4; v.h = Math.atan2(LUNCH_AT.x - v.x, LUNCH_AT.z - v.z); break;
+    case 'giftPick': { const k = v.gift === true && takePortion(); if (!k) { endGift(v); idle(v, .4); break; } v.gift = k; v.carry = RES[k][2]; goGift(v); break; }
+    case 'gift': { // auf den Altar legen, einmalig Glaube
+      const k = v.gift; if (!k || k === true || !v.carry) { endGift(v); idle(v, .3); break; }
+      v.carry = 0; v.gift = null; food.giftBy = null; food.gifts++; S.offer = { d: S.day, k };
+      v.h = Math.atan2(SHRINE_POS.x - v.x, SHRINE_POS.z - v.z); floatText(v.x, v.y + 1.05, v.z, 'Gabe', 's'); addGlaube(GIFT_GLAUBE, v.x, v.y, v.z); spawnMote(v.x, v.y + .45, v.z);
+      idle(v, 1.2); break;
+    }
+    case 'lunch': eatLunch(v); v.state = 'lunch'; v.until = LUNCH[1] + Math.random() * .4; v.h = Math.atan2(LUNCH_AT.x - v.x, LUNCH_AT.z - v.z); break;
     case 'sleep': // verschwindet in der Hütte, wacht morgens zu einer eigenen Zeit auf
       if (S.hour >= BED || S.hour < WAKE) { v.state = 'sleep'; v.wake = WAKE + Math.random() * .9; if (v.home) v.h = Math.atan2(v.home.x - v.x, v.home.z - v.z) + Math.PI; }
       else idle(v, .3);
@@ -309,7 +326,7 @@ function updateVillager(v, dt, t) {
       }
       addWear(v.x, v.z, dt); if (followPath(v, sp * dt)) arrive(v); break;
     case 'chop': {
-      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
       const tr = v.tree, now = v.cp % 1;
       if (tr && tr.alive && ((before < CHOP_HIT && now >= CHOP_HIT) || (now < before && before < CHOP_HIT))) { // Treffer
         tr.shake = 1; spawnChips(tr.x - Math.sin(v.h) * .08, surfaceAt(tr.x, tr.z) + .22, tr.z - Math.cos(v.h) * .08, v.h);
@@ -321,7 +338,7 @@ function updateVillager(v, dt, t) {
       const now = ((2 * PRAY_T - v.timer) / PRAY_T) % 1;
       if (before < .4 && now >= .4 && v.timer > 0) spawnMote(v.x + Math.sin(v.h) * .05, v.y + .45, v.z + Math.cos(v.h) * .05); // Arme oben: Funke steigt auf
     }
-      if (v.timer <= 0) { addGlaube(prayYield(), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
+      if (v.timer <= 0) { addGlaube(prayYield() * prayMul(v), v.x, v.y, v.z); idle(v, 1 + Math.random() * 3); } break;
     case 'lunch': if (S.hour >= v.until || S.hour < LUNCH[0]) idle(v, Math.random() * 1.5); break;
     case 'aim': { const a = v.prey; if (a && wild.includes(a) && a.state !== 'dead') v.h = Math.atan2(a.x - v.x, a.z - v.z); v.timer -= dt; if (v.timer <= 0) { shoot(v); idle(v, .9); } break; }
     case 'fish': fishStep(v, dt); break;
@@ -329,13 +346,13 @@ function updateVillager(v, dt, t) {
       if (!v.wish || !wish.kind) { idle(v, .4); break; }
       v.timer += dt; if (v.timer > 1.6) { v.timer = 0; spawnMote(v.x, v.y + .45, v.z); } break;
     case 'saw': { // Stamm an der Kreissäge entlangschieben, Sägemehl fliegt
-      const k = dt * (v.haste > 0 ? 2 : 1); v.timer -= k; if (v.hut) v.hut.sawing = .3;
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v); v.timer -= k; if (v.hut) v.hut.sawing = .3;
       if (Math.random() < dt * 6 && v.hut) { const sw = localPt(v.hut, .28, .12); spawnChips(sw.x, heightAt(sw.x, sw.z) + .45, sw.z, v.h + Math.PI); }
       if (v.timer <= 0) { v.carry = 0; if (v.hut) { v.hut.planks += 2; floatText(v.x, v.y + .7, v.z, '+2 Bretter', 'h'); } idle(v, .2); }
       break;
     }
     case 'plant': {
-      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
       const now = v.cp % 1; if ((before < .55 && now >= .55) || now < before) spawnChips(v.x + Math.sin(v.h) * .2, v.y + .03, v.z + Math.cos(v.h) * .2, v.h + Math.PI);
       if (v.timer <= 0) {
         const sp = v.plant; v.plant = null; v.saplings = Math.max(0, (v.saplings || 0) - 1);
@@ -349,7 +366,7 @@ function updateVillager(v, dt, t) {
       break;
     }
     case 'sow': case 'harvest': { // in gebückter Haltung säen oder ernten, Erde fliegt
-      const k = dt * (v.haste > 0 ? 2 : 1), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), before = v.cp % 1; v.timer -= k; v.cp += k / DIG_T;
       const now = v.cp % 1; if ((before < .55 && now >= .55) || now < before) spawnChips(v.x + Math.sin(v.h) * .25, v.y + .03, v.z + Math.cos(v.h) * .25, v.h + Math.PI);
       if (v.timer > 0) break;
       const f = v.field; v.field = null;
@@ -361,14 +378,14 @@ function updateVillager(v, dt, t) {
       break;
     }
     case 'tend': { // Futter in den Trog streuen, dann Milch, Eier und ab und zu Fleisch mitnehmen
-      v.timer -= dt; if (v.timer > 0) break;
+      v.timer -= dt * workMul(v); if (v.timer > 0) break;
       const F = v.hut && v.hut.farm; if (!F) { idle(v, .3); break; }
       const g = { milk: Math.floor(F.milk), eggs: Math.floor(F.eggs), meat: Math.floor(F.pork) }; F.milk -= g.milk; F.eggs -= g.eggs; F.pork -= g.meat;
       if (g.milk + g.eggs + g.meat > 0) { v.carry = g.milk ? 6 : g.eggs ? 7 : 3; walkDrop(v, g); } else idle(v, 1);
       break;
     }
     case 'proc': { // mahlen bzw. backen
-      const k = dt * (v.haste > 0 ? 2 : 1), P = PROC[v.role]; v.timer -= k; if (v.hut) v.hut.busy = .5;
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), P = PROC[v.role]; v.timer -= k; if (v.hut) v.hut.busy = .5;
       if (!P || !v.hut) { idle(v, .3); break; }
       if (v.role === 'miller' && Math.random() < dt * 3) { const q = localPt(v.hut, .2, .5); spawnChips(q.x, heightAt(q.x, q.z) + .25, q.z, Math.random() * 6.28); } // Mehlstaub
       if (v.timer <= 0) { v.hut.goods[P.out] = (v.hut.goods[P.out] || 0) + P.m; floatText(v.x, v.y + .7, v.z, `+${resText(P.out, P.m)}`, 'h'); idle(v, .3); }

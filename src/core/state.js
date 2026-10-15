@@ -3,7 +3,7 @@
 import { fmt } from './util.js';
 
 const SAVE_KEY = 'weltenkeim-save';
-const S = { v: 1, theme: 'cozy', glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0, hof: 0, muehle: 0, baeckerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0, farmer: 0, miller: 0, baker: 0 }, logs: 0, meat: 0, fish: 0, veg: 0, milk: 0, eggs: 0, grain: 0, flour: 0, bread: 0, fields: [], hutGoods: [], hutInp: [], paths: [], terrain: [], terrainN: 0, millSite: null, weather: 'heiter', weatherLocked: false, ts: Date.now() };
+const S = { v: 1, theme: 'cozy', glaube: 15, holz: 6, temple: 1, hand: 1, houses: 2, pop: 6, w: { help: .34, play: .33, mischief: .33 }, creature: 'fox', name: 'Fenja', gender: 'w', handStyle: { skin: '#e9b48c', nails: '#f4ddd3', sleeve: '#33507f', trim: '#dba843' }, hour: 8, timePaused: false, jobs: { wood: 3, saw: 1, jagd: 0, fischerei: 0, hof: 0, muehle: 0, baeckerei: 0 }, huts: { lumber: 1, forester: 1, sawyer: 1, hunter: 0, fisher: 0, farmer: 0, miller: 0, baker: 0 }, logs: 0, meat: 0, fish: 0, veg: 0, milk: 0, eggs: 0, grain: 0, flour: 0, bread: 0, fields: [], hutGoods: [], hutInp: [], paths: [], terrain: [], terrainN: 0, millSite: null, day: 0, meals: [], offer: null, foodHints: {}, weather: 'heiter', weatherLocked: false, ts: Date.now() };
 let loaded = null;
 { try { loaded = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { loaded = null; } }
 if (loaded && typeof loaded === 'object') {
@@ -15,7 +15,7 @@ if (loaded && typeof loaded === 'object') {
   if (!loaded.gender && loaded.name === 'Ruun') S.name = 'Fenja'; // alter Standardname: die Kreatur heißt jetzt zu Beginn Fenja
   if (S.gender !== 'm') S.gender = 'w';
   if (typeof S.hour !== 'number' || !isFinite(S.hour)) S.hour = 8;
-}
+} else Object.assign(S, { bread: 12, fish: 10, veg: 8 }); // Startvorrat nur für neue Spiele: 30 Portionen in drei Sorten (nahrung.md 1)
 // Speichern: jeder Bereich trägt seinen Teil über einen Hook bei (onSave), dann wird S als Ganzes geschrieben
 const saveHooks = [];
 const onSave = fn => saveHooks.push(fn);
@@ -62,6 +62,12 @@ if (typeof S.logs !== 'number' || !isFinite(S.logs) || S.logs < 0) S.logs = 0;
 if (!Array.isArray(S.fields)) S.fields = [];
 if (!Array.isArray(S.hutGoods)) S.hutGoods = [];
 if (!Array.isArray(S.hutInp)) S.hutInp = [];
+// Nahrung: Spieltag, gegessene Sorten der letzten Tage, letzte Gabe am Schrein, schon gezeigte Hinweise
+if (typeof S.day !== 'number' || !isFinite(S.day) || S.day < 0) S.day = 0;
+if (!Array.isArray(S.meals)) S.meals = [];
+S.meals = S.meals.filter(m => m && typeof m.d === 'number' && Array.isArray(m.k));
+if (!S.offer || typeof S.offer.d !== 'number' || typeof S.offer.k !== 'string') S.offer = null;
+if (!S.foodHints || typeof S.foodHints !== 'object') S.foodHints = {};
 // Waren: Name im Spielstand (S[key]) und Bezeichnung (Einzahl, Mehrzahl); carry = was ein Bewohner davon trägt
 const RES = { logs: ['Stamm', 'Stämme', 1, 2], meat: ['Fleisch', 'Fleisch', 3, 3], fish: ['Fisch', 'Fisch', 4, 4], veg: ['Gemüse', 'Gemüse', 5, 6], milk: ['Milch', 'Milch', 6, 4], eggs: ['Ei', 'Eier', 7, 6], grain: ['Korn', 'Korn', 8, 6], flour: ['Mehl', 'Mehl', 9, 4], bread: ['Brot', 'Brote', 10, 6] };
 // Verarbeitung: Träger bringen `inp` aus dem Lager in den Vorrat der Werkstatt (bis `buf`), der Arbeiter macht aus `n` davon `m` Stück `out`

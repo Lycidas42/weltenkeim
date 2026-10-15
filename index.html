@@ -69,6 +69,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .store .bread{color:#d9944a}.store .bread .cut{stroke:#7a4a1e}
 .store .sitem[hidden]{display:none}
 .store small{font-size:11.5px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.store small.low{color:#f2a088;font-weight:700}
 .store:active{transform:scale(.98)}
 .stat{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:5px 11px 6px;display:grid;line-height:1.1;min-width:64px}
 .stat .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
@@ -150,6 +151,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .ftag.ripe i{background:radial-gradient(circle,#fff3c8 40%,#2a1d08 42%,#2a1d08 52%,transparent 54%)}
 .ftag.ripe small{color:#4a3510}
 .ftag.empty{opacity:.75}
+#foodSign{z-index:2;padding:4px 11px;border-color:#f2a088;color:#f6c9b8}
+#foodSign[hidden]{display:none}
 @keyframes ftagPulse{50%{box-shadow:0 0 0 4px rgba(231,181,74,.35)}}
 #wish,#forestAlert{position:absolute;left:0;top:0;z-index:3;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 9px;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--glaube);border-radius:12px;padding:7px 12px 9px 9px;font:inherit;color:var(--ink);text-align:left;box-shadow:0 0 0 0 rgba(243,192,77,.6);animation:pulse 1.6s ease-out infinite;max-width:240px}
 #wish::after,#forestAlert::after{content:"";position:absolute;left:50%;bottom:-7px;width:12px;height:12px;margin-left:-6px;background:var(--panel-solid);border-right:1px solid var(--glaube);border-bottom:1px solid var(--glaube);transform:rotate(45deg)}
@@ -203,6 +206,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .buy{background:var(--glaube);color:#2a1d05;border:0;border-radius:10px;padding:8px 12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
 .wfree{margin:0 0 8px;font-size:14px}
 .wfree b{color:var(--soul)}
+.wfood{margin:0 0 10px;font-size:13px;color:var(--ink-dim);line-height:1.4}
+.wfood b{color:var(--ink)}.wfood .low{color:#f2a088}
 .work{border-top:1px solid var(--line);padding-top:9px}
 .work.off .roles,.work.off .wdesc{opacity:.55}
 .whead{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -266,6 +271,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
   <div id="fx"></div>
   <!-- Reifegrad der Felder (nur mit der Hand sichtbar) -->
   <div id="fieldTags" aria-hidden="true"></div>
+  <div id="foodSign" class="ftag hungry" hidden aria-hidden="true"><span>Wartet auf Nahrung</span></div>
   <div id="handTip" aria-hidden="true" hidden></div>
   <button id="forestAlert" class="wish forest" hidden aria-label="Wald geht zur Neige: Tippen, um Regen zu wirken"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l5 7h-3l4 6h-5v5h-2v-5H6l4-6H7z"/><path d="M4 20l16-16" class="x"/></svg></span><span class="tx"><b>Wald geht zur Neige</b><small>Tippen, um dort Regen zu wirken</small></span></button>
   <button id="wish" class="wish" hidden><span class="ic" id="wishIc" aria-hidden="true"></span><span class="tx"><b id="wishT"></b><small>Tippen, um das Wunder zu wählen</small></span><i class="bar"><u id="wishBar"></u></i></button>
@@ -302,6 +308,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
        <span class="sitem flour" title="Mehl"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3h6l-1 2.2c2.6 1.3 4 3.9 4 7.1 0 3.4-2.6 5.7-6 5.7s-6-2.3-6-5.7c0-3.2 1.4-5.8 4-7.1z"/></svg><b id="sFlour">0</b><span class="nm">Mehl</span></span>
        <span class="sitem bread" title="Brot"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 12c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6c0 1.6-1 2.5-2.4 2.5H4.9c-1.4 0-2.4-.9-2.4-2.5z"/><path class="cut" d="M6.5 8.5l1.3 2.4M9.6 8l1.1 2.6M12.6 8.5l.9 2.4" stroke-width="1.1" fill="none"/></svg><b id="sBread">0</b><span class="nm">Brot</span></span>
        <small id="sBuild">Haus ab 0</small>
+       <small id="sFood" class="food">Vorrat reicht für etwa 0 Tage</small>
+       <small id="sGrow" class="food">Wachstum: Das Dorf wächst</small>
      </button>
     </div>
     <div class="top-actions">
@@ -333,6 +341,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <header><h2>Arbeit</h2><button class="x" data-close aria-label="Schließen">×</button></header>
     <p class="sub">Weise einer Arbeitsstätte Bewohner zu, sie werden dort zu Spezialisten und ziehen in die passende Hütte. Wer frei bleibt, trägt Stämme und Bretter zwischen Lager und Sägemühle und betet sonst am Schrein.</p>
     <p class="wfree" id="workFree"></p>
+    <p class="wfood" id="workFood"></p>
     <div class="items" id="workItems"></div>
     <p class="later">Später kommen weitere Rohstoffe dazu, etwa Stein und Erz.</p>
   </section>

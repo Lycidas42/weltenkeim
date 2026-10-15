@@ -1,4 +1,4 @@
-// Anzeige: Kopfleiste, Lager, Uhr, Wetter, Schilder über Feldern und Wald
+// Anzeige: Kopfleiste, Lager, Uhr, Wetter, Schilder über Feldern, Wald und Häusern
 
 import { $, clamp, fmt, fmt1 } from '../core/util.js';
 import { MIRACLES, S, cap } from '../core/state.js';
@@ -15,7 +15,8 @@ import { CROPS, fields } from '../farm/farm.js';
 import { villagers } from '../village/villagers.js';
 import { nextBuild } from '../village/economy.js';
 import { alertRing, forestAlert } from '../village/forest-alert.js';
-import { SHRINE, WX_ICON, renderFox, renderWork, windWord } from './sheets.js';
+import { GROW_TEXT, SHRINE, WX_ICON, foodDays, renderFox, renderShrine, renderWork, windWord } from './sheets.js';
+import { food } from '../village/food.js';
 
 // Reifegrad über den Feldern, solange die Hand gewählt ist: Frucht und Fortschrittsring, reife Felder golden
 const fieldTagEls = [];
@@ -35,6 +36,15 @@ function placeFieldTags() {
     }
     el.style.transform = `translate(${Math.round(tA.x - r.left - el.offsetWidth / 2)}px, ${Math.round(tA.y - r.top - el.offsetHeight)}px)`;
   });
+}
+// Schild „Wartet auf Nahrung“ über dem neuesten Haus, solange freier Platz wegen Nahrungsmangel leer bleibt
+function placeFoodSign() {
+  const el = $('foodSign'), hs = houses[houses.length - 1];
+  const on = food.growth === 'food' && !!hs && !$('app').classList.contains('sheet-open');
+  if (!on) { el.hidden = true; return; }
+  const r = canvas.getBoundingClientRect(), y = heightAt(hs.x, hs.z) + 1.8; toScreen(hs.x, y, hs.z, tA);
+  el.hidden = !(tmpV.set(hs.x, y, hs.z).project(camera).z < 1 && tA.x > r.left && tA.x < r.right && tA.y > r.top + 150 && tA.y < r.bottom - 120);
+  if (!el.hidden) el.style.transform = `translate(${Math.round(tA.x - r.left - el.offsetWidth / 2)}px, ${Math.round(tA.y - r.top - el.offsetHeight)}px)`;
 }
 function placeForestUI() {
   const B = $('forestAlert'), A = forestAlert;
@@ -57,6 +67,8 @@ function updateHud(dt, t) {
     $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish); $('sVeg').textContent = fmt(S.veg); $('sMilk').textContent = fmt(S.milk); $('sEggs').textContent = fmt(S.eggs); $('sGrain').textContent = fmt(S.grain); $('sFlour').textContent = fmt(S.flour); $('sBread').textContent = fmt(S.bread);
     for (const [id, k, r] of [['sMeat', 'meat', 'hunter'], ['sFish', 'fish', 'fisher'], ['sVeg', 'veg', 'farmer'], ['sMilk', 'milk', 'farmer'], ['sEggs', 'eggs', 'farmer'], ['sGrain', 'grain', 'farmer'], ['sFlour', 'flour', 'miller'], ['sBread', 'bread', 'baker']]) $(id).parentElement.hidden = !S[k] && !S.huts[r] && !(r === 'hunter' && S.huts.farmer);
     { const nb = build.construction ? null : nextBuild(); $('sBuild').textContent = build.construction ? `${build.construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
+    { const fd = foodDays(); $('sFood').textContent = fd.text; $('sFood').classList.toggle('low', fd.low);
+      $('sGrow').textContent = GROW_TEXT[food.growth].replace(/ \(.*\)$/, ''); $('sGrow').classList.toggle('low', food.growth === 'food'); }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);
@@ -71,10 +83,11 @@ function updateHud(dt, t) {
       $('btnWx').setAttribute('aria-label', `Wetter: ${$('vW').textContent}, ${$('vWs').textContent}. Tippen für Wettermenü`); }
     $('vP').textContent = `${villagers.length}/${cap()}`; $('vPh').textContent = `${houses.length} ${houses.length === 1 ? 'Haus' : 'Häuser'}`;
     document.querySelectorAll('#ctxMiracle button').forEach(b => b.classList.toggle('poor', S.glaube < MIRACLES[b.dataset.m].cost));
+    if (!$('sheetShrine').hidden && $('sheetShrine').dataset.grow !== food.growth) renderShrine(); // Text zu „Seele rufen“
     if (!$('sheetShrine').hidden) { const bs = $('shrineItems').querySelectorAll('[data-buy]'); bs.forEach(b => { const it = SHRINE.find(x => x.id === b.dataset.buy); b.disabled = !(S.glaube >= it.cost() && (!it.ok || it.ok())); }); }
     if (!$('sheetFox').hidden) renderFox();
     if (fox.last && t - fox.lastT > 25) { fox.last = null; $('btnFox').classList.remove('pulse'); }
   }
 }
 
-export { placeFieldTags, placeForestUI, updateHud };
+export { placeFieldTags, placeFoodSign, placeForestUI, updateHud };

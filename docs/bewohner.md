@@ -28,8 +28,9 @@ Stand der Features: siehe `README.md`.
   vor einem fallenden Baum (`flee`), „Uff!“ und Schwindel nach hartem Wurf (`dizzy`), Laterne ab der Dämmerung,
   Schwebetexte wie „Treffer!“ oder „Weizen geerntet“.
 - **Ton:** Das Spiel hat bisher **keinerlei Ton**.
-- **Bedürfnisse:** keine. Die Mittagspause ist eine feste Uhrzeit, kein Hunger; das Brot wird nicht verbraucht
-  (`nahrung.md`).
+- **Bedürfnisse:** nur ein einfacher Hunger als Tageswert: Wer mittags eine Portion aus dem Lager isst, ist satt, sonst
+  hungrig (`nahrung.md` 1, `src/village/food.js`). Gut versorgte Bewohner bringen nachmittags ab und zu eine Gabe zum
+  Schrein.
 
 ## 2. Leitbild
 
@@ -66,7 +67,9 @@ Leitlinien:
 
 ### 3.2 Bedürfnisse
 
-**Stand:** 🔵 geplant
+**Stand:** 🟡 teilweise – Hunger als einfacher Tageswert (satt oder hungrig nach der Mittagspause, wirkt auf Gebet und
+Arbeitstempo, `nahrung.md` 1, [#8](https://github.com/Lycidas42/weltenkeim/issues/8)); noch keine Werte von 0 bis 1,
+keine Müdigkeit, Freude und Laune
 
 Drei Werte von 0 bis 1, bewusst wenige:
 
@@ -165,7 +168,7 @@ Drei Werte von 0 bis 1, bewusst wenige:
 
 | Pause | Wann | Was | Stand |
 |---|---|---|---|
-| Mittagspause | feste Zeit (`LUNCH`) | sitzen auf dem Dorfplatz, essen | 🟡 teilweise – feste Zeit vorhanden, echtes Essen fehlt (`nahrung.md`) |
+| Mittagspause | feste Zeit (`LUNCH`) | sitzen auf dem Dorfplatz, essen | ✅ vorhanden – essen eine Portion aus dem Lager (`nahrung.md` 1) |
 | Verschnaufen | Müdigkeit hoch | stehen bleiben, Schweiß abwischen, strecken, auf einen Baumstumpf setzen | 🔵 geplant |
 | Trinken | ab und zu, im Sommer öfter | zum Brunnen, Schöpfen, trinken | 🔵 geplant |
 | Plausch | zwei Bewohner begegnen sich, einer davon gesellig | stehen bleiben, Sprechblasen hin und her, lachen | 🔵 geplant |

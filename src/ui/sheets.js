@@ -19,6 +19,7 @@ import { showPortrait } from './portrait.js';
 import { fish, wild } from '../wildlife/land.js';
 import { effJobs, reconcileJobs, roleCount } from '../village/jobs.js';
 import { reinforce } from '../creature/ai.js';
+import { GROW_DAYS, days, food, portions } from '../village/food.js';
 
 let creatureLoading = null;
 async function setCreature(id) {
@@ -59,10 +60,17 @@ $('workItems').addEventListener('click', e => {
   else k = k - 1 < W.min ? 0 : k - 1;
   S.jobs[id] = k; reconcileJobs(); renderWork(); save();
 });
+// Nahrung im Lager: wie lange der Vorrat reicht und ob das Dorf von selbst wächst
+// (unter 10 Tagen auf eine Stelle abgerundet, damit „etwa 2 Tage“ nicht neben „weniger als 2 Tage“ steht)
+function foodDays() { const d = days(), r = d < 10 ? Math.floor(d * 10) / 10 : Math.floor(d); return { low: d < 1, text: d < 1 ? 'Vorrat reicht für weniger als einen Tag' : `Vorrat reicht für etwa ${fmt1(r)} ${r === 1 ? 'Tag' : 'Tage'}` }; }
+const GROW_TEXT = { ok: 'Wachstum: Das Dorf wächst', food: `Wachstum stockt: zu wenig Nahrung (Vorrat reicht für weniger als ${GROW_DAYS} Tage)`, full: 'Kein Platz in den Häusern' };
 function renderWork() {
   const eff = effJobs(); let used = 0; for (const id in eff) used += eff[id];
   const free = villagers.length - used, carriers = villagers.filter(v => !v.role && v.haul).length;
   $('workFree').innerHTML = `<b>${free}</b> von ${villagers.length} Bewohnern sind frei${carriers ? ` · ${carriers} ${carriers === 1 ? 'trägt' : 'tragen'} gerade` : ''}`;
+  { const fd = foodDays(), hungry = villagers.filter(v => v.food === 'hungrig').length;
+    const care = hungry ? `${hungry} ${hungry === 1 ? 'Bewohner hatte' : 'Bewohner hatten'} mittags nichts zu essen und ${hungry === 1 ? 'betet' : 'beten'} weniger.` : food.varied ? 'Abwechslungsreich versorgt: Die Bewohner arbeiten schneller und beten mehr.' : 'Für den Bonus braucht das Dorf mindestens drei Sorten in drei Tagen.';
+    $('workFood').innerHTML = `<b class="${fd.low ? 'low' : ''}">${fd.text}</b> (${fmt(portions())} Portionen). ${GROW_TEXT[food.growth]}. ${care}`; }
   const alive = trees.filter(t => t.alive && !t.gone), young = alive.filter(t => t.g < .7).length;
   for (const el of $('workItems').children) {
     const id = el.dataset.work, W = WORKS[id], k = eff[id], sp = W.split(k);
@@ -168,10 +176,11 @@ for (const id of ['btnTerrainReset', 'btnTerrainReset2']) {
 
 const SHRINE = [
   { id: 'temple', title: () => `Schrein weihen (Stufe ${S.temple + 1})`, desc: () => `Gebete bringen ${fmt1(prayYield() + .6)} statt ${fmt1(prayYield())} Glaube, der Schrein strahlt ${fmt1(passive() + .06)}/s aus.`, cost: templeCost, buy: () => { S.temple++; } },
-  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? 'Ein neuer Bewohner erscheint sofort am Schrein.' : cap() >= MAX_POP ? `Das Dorf hat seine volle Größe von ${MAX_POP} Seelen erreicht.` : 'Kein Platz. Aus Brettern entstehen neue Häuser, sobald genug im Lager sind.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
+  { id: 'soul', title: () => 'Seele rufen', desc: () => villagers.length < cap() ? (food.growth === 'food' ? 'Das Dorf wächst gerade nicht von selbst, es fehlt Nahrung. Eine gerufene Seele kommt trotzdem.' : 'Ein neuer Bewohner erscheint sofort am Schrein.') : cap() >= MAX_POP ? `Das Dorf hat seine volle Größe von ${MAX_POP} Seelen erreicht.` : 'Kein Platz. Aus Brettern entstehen neue Häuser, sobald genug im Lager sind.', cost: () => SOUL_COST, ok: () => villagers.length < cap(), buy: () => { const v = spawnVillager(PRAY.x, PRAY.z + .5); if (v) floatText(v.x, 1.8, v.z, 'Neue Seele', 's'); } },
   { id: 'hand', title: () => `Hand stärken (Stufe ${S.hand + 1})`, desc: () => 'Formen wirkt 35 % weiter und kräftiger.', cost: handCost, buy: () => { S.hand++; } }
 ];
 function renderShrine() {
+  $('sheetShrine').dataset.grow = food.growth;
   $('shrineItems').innerHTML = SHRINE.map(it => { const c = it.cost(), ok = S.glaube >= c && (!it.ok || it.ok());
     return `<div class="item"><div><h3>${it.title()}</h3><p>${it.desc()}</p></div><button class="buy" data-buy="${it.id}" ${ok ? '' : 'disabled'}>${fmt(c)} ✦</button></div>`; }).join('');
   $('shrineItems').querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => { const it = SHRINE.find(x => x.id === b.dataset.buy), c = it.cost();
@@ -231,4 +240,4 @@ function renderForms() {
 }
 $('foxForms').addEventListener('click', e => { const b = e.target.closest('[data-form]'); if (b) setCreature(b.dataset.form); });
 
-export { HINTS, SHRINE, WX_ICON, closeSheets, follow, foxDoing, openSheet, renderFox, renderName, renderWork, setCreature, setFollow, updateCamera, windWord };
+export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

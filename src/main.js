@@ -1,7 +1,7 @@
 // Start: Hauptschleife und Debug-Zugang
 
 import { $ } from './core/util.js';
-import { PROC, S, save } from './core/state.js';
+import { PROC, S, loaded, save } from './core/state.js';
 import './core/noise.js';
 import { camera, clock, controls, renderer, scene, sun, toScreen } from './core/render.js';
 import { updateFloats, updateIncome } from './ui/feedback.js';
@@ -38,6 +38,7 @@ import { fish, updateWild, wild } from './wildlife/land.js';
 import { sharks, updateFish, updateSharks } from './wildlife/sea.js';
 import { birds, updateBirds } from './wildlife/birds.js';
 import { updateTracks } from './wildlife/tracks.js';
+import { FOOD_COL, MEAL, days, eatLunch, food, growthState, pickMeal, portions, prayMul, takePortions, updateFood, workMul } from './village/food.js';
 import { arrows, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish } from './village/ai.js';
 import { reconcileJobs } from './village/jobs.js';
 import { placeWishUI, startWish, updateWish } from './village/wishes.js';
@@ -50,7 +51,7 @@ import { throwTree, updateTrees, uprootTree } from './hand/grab.js';
 import { closeSheets, openSheet, renderName, setCreature, updateCamera } from './ui/sheets.js';
 import { placeFoxUI } from './ui/ring.js';
 import { carryGrabbed, handHelp, harvestByHand, helpAt, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
-import { placeFieldTags, placeForestUI, updateHud } from './ui/hud.js';
+import { placeFieldTags, placeFoodSign, placeForestUI, updateHud } from './ui/hud.js';
 import { SLOTS, setSlot, slotState } from './core/colors.js';
 
 setInterval(save, 5000);
@@ -76,7 +77,7 @@ function tick(dt, t) {
   updateIncome(dt); updateVillage(dt);
   updateNav(dt);
 
-  updateDay(dt, t);
+  updateDay(dt, t); updateFood(dt);
   updateWish(dt); updateForestAlert(dt, t);
   updateSleepers(dt);
 
@@ -107,7 +108,7 @@ function tick(dt, t) {
   updateCamera(dt);
 
   placeFoxUI(dt);
-  placeWishUI(); placeForestUI(); placeFieldTags(); updateHandHover(dt);
+  placeWishUI(); placeForestUI(); placeFieldTags(); placeFoodSign(); updateHandHover(dt);
 
   updateFloats(dt);
   updateHud(dt, t);
@@ -120,7 +121,10 @@ $('loading').classList.add('gone');
 setTimeout(() => $('loading').remove(), 800);
 // Debug-Zugang für Tests in der Konsole bzw. im Browser-Werkzeug (bewusst dauerhaft drin)
 window.__wk = {
-  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte
-  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || i === n - 1; clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
-  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+  // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab); draw = false zeichnet nur das letzte,
+  // draw = null gar keines (schnell: Software-WebGL übersetzt beim ersten Zeichnen neuer Dinge sekundenlang Shader)
+  step: (n = 60, dt = 1 / 60, draw = true) => { for (let i = 0; i < n; i++) { drawFrames = draw || (draw !== null && i === n - 1); clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } drawFrames = true; },
+  setSlot, slotState, SLOTS, setTerrainColor, terrainColorOf, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear,
+  // Nahrung: Versorgung je Bewohner (satt/hungrig), Dorf (abwechslungsreich), Vorrat und Wachstumszustand
+  food: { state: food, start: { fresh: !loaded, bread: S.bread, fish: S.fish, veg: S.veg, meat: S.meat, milk: S.milk, eggs: S.eggs }, MEAL, FOOD_COL, portions, days, pickMeal, takePortions, eatLunch, growthState, workMul, prayMul, villagers: () => villagers.map(v => ({ food: v.food || null, meal: v.meal || null, ateDay: v.ateDay ?? null, work: workMul(v), pray: prayMul(v) })) } };
 requestAnimationFrame(frame);
