@@ -49,6 +49,7 @@ import { closeSheets, openSheet, renderName, setCreature, updateCamera } from '.
 import { placeFoxUI } from './ui/ring.js';
 import { carryGrabbed, handHelp, harvestByHand, helpAt, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
 import { placeFieldTags, placeForestUI, updateHud } from './ui/hud.js';
+import { SLOTS, setSlot, slotState } from './core/colors.js';
 
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
@@ -116,5 +117,5 @@ setTimeout(() => $('loading').remove(), 800);
 window.__wk = {
   // n Bilder ohne den Takt des Browsers durchrechnen (Tests, auch bei verborgenem Tab)
   step: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) { clock.elapsedTime += dt; tick(dt, clock.elapsedTime); } },
-  input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
+  setSlot, slotState, SLOTS, input, S, tryMiracle, castRain, castHaste, sculpt, reinforce, setCreature, openSheet, closeSheets, uprootTree, throwTree, heldTree, startFishing, helpAt, toggleDayNight, clouds, sun, lightDir, lightRaw, PROC, puffs, handHelp, foxHaul, toScreen, birds, sharks, fields, stock, farms, farmSites, harvestByHand, nearBuilding, villagers, trees, fox, setTool, jetties, fisherSites, arrows, STREAM, wild, fish, forestAlert, depData, snowU, wish, startWish, shrine, weather, setWeather, camera, controls, huts, houses, lager, rocks, bushes, cover, navV, navF, findPath, buildNav, waterU, heightAt, reconcileJobs, addWear };
 requestAnimationFrame(frame);

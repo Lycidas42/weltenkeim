@@ -11,6 +11,7 @@ const APP = [
   './src/main.js',
   './src/assets/models.js',
   './src/assets/theme.js',
+  './src/core/colors.js',
   './src/core/noise.js',
   './src/core/render.js',
   './src/core/state.js',

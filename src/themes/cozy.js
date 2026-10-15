@@ -75,6 +75,21 @@ export default {
     },
     // Gelände: Ufer (tief, nass, Sand), Gras (zwei Töne), trocken, kahl, Fels, Schnee
     terrain: { deep: 0xb7a06a, wet: 0xc8ad74, sand: 0xecd9a0, g1: 0x82b047, g2: 0x5a8d36, dry: 0xa6ad52, bare: 0x8f7a54, rock: 0x8e8476, snow: 0xf2f1ea },
+    // Farbrollen der im Code gebauten Pflanzen und Felsen (src/core/colors.js): je Rolle eine Farbe oder eine Liste
+    // (Verlauf dunkel → hell bzw. Auswahl). Zur Laufzeit lässt sich jede Rolle umfärben (Jahreszeiten).
+    nature: {
+      'leaf.spruce': [0x275a2e, 0x579b45], 'leaf.fir': [0x22503e, 0x4d8a68], 'leaf.oak': [0x3a7a2c, 0x8dc24f],
+      'leaf.birch': [0x5f9a35, 0xb8da6c], 'leaf.fruit': [0x3f7f30, 0x86bd4c],
+      'bark': [0x4a3322, 0x6a4a30], 'bark.spruce': [0x4f3420, 0x6b4a2c], 'bark.fruit': [0x4e3524, 0x6e4c32],
+      'bark.birch': [0xebe7dc, 0x3d3832], // weiße Rinde, dunkle Streifen
+      'fruit': [0xc8322a, 0xe2a12f], // Äpfel rot und gelb
+      'rock': [0x76706a, 0xa29c90], 'moss': 0x5f7d3c,
+      'bush': [0x2f6a2a, 0x6fa648], 'bush.dark': [0x2a5c27, 0x5e9443],
+      'blossom': [0xf2a5c6, 0xffffff], 'berry': [0xc0302b, 0x3b3f8f],
+      'grass': [0x86b54b, 0x76a842, 0x9cbc55, 0x6e9e3e], 'stem': [0x4c8a35, 0x5c9a40], 'fern': [0x2f6b2c, 0x6aa84a],
+      'flower': [0xf6f3e8, 0xf2cf3a, 0xec86ad, 0x9c82dc, 0xdc4a3c, 0x75a6e6, 0xf09a3e], 'flower.eye': 0xf5c542,
+      'shell': [0xfff6ec, 0xf6d3c6, 0xe9c9a0, 0xffe4ef], 'driftwood': [0x8f8576, 0xb3aa9a],
+    },
     // Bewohner: Hautfarben, Haarfarben, Gewänder, Hosen
     villagers: {
       skins: [0xf7d9bf, 0xefc6a0, 0xe0ac82, 0xc98f60, 0xa8724a, 0x845535, 0x5f3b22],

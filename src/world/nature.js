@@ -13,6 +13,7 @@ import { LAGER, MILL_POS, SHRINE_POS, ST, onSacred } from '../village/layout.js'
 import { addTree, stumpSwarm, treeMeshes, treeNear, trees } from './trees.js';
 import { sites } from '../village/houses.js';
 import { hutSites, onFarm } from '../village/huts.js';
+import { natureColor as nc, natureColors, slotId, slotMaterial } from '../core/colors.js';
 
 for (let tries = 0; tries < 4000 && trees.length < 165; tries++) {
   const x = rnd(HALF * .9), z = rnd(HALF * .9), h = heightAt(x, z);
@@ -52,7 +53,8 @@ function tuftGeo() {
     pos.push(x + oz * w, 0, z - ox * w, x - oz * w, 0, z + ox * w, x + ox * lean, h, z + oz * lean);
     col.push(.5, .56, .42, .5, .56, .42, 1.06, 1.1, .92); nor.push(0, 1, 0, 0, 1, 0, 0, 1, 0); // Normalen nach oben: Halme hell wie der Boden
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return g;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('slot', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3).fill(slotId('grass')), 1)); return g;
 }
 const grassMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
 grassMat.onBeforeCompile = sh => { // Wind: Halmspitzen wiegen sich, in Wellen über die Wiese
@@ -63,21 +65,22 @@ grassMat.onBeforeCompile = sh => { // Wind: Halmspitzen wiegen sich, in Wellen �
   // beide Seiten der Halme wie der Boden beleuchten (sonst ist die Rückseite schwarz)
   sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize((viewMatrix * vec4(0., 1., 0., 0.)).xyz);');
 };
+slotMaterial(grassMat);
 const flowerGeo = mergeGeometries([
-  paint(new THREE.BoxGeometry(.005, .1, .005).translate(0, .05, 0), (x, y, z, ny, c) => c.set(0x4c8a35)),
-  paint(new THREE.CircleGeometry(.026, 5).rotateX(-Math.PI / 2).translate(0, .1, 0), (x, y, z, ny, c) => c.set(0xffffff)),
-  paint(new THREE.IcosahedronGeometry(.009, 0).translate(0, .104, 0), (x, y, z, ny, c) => c.set(0xf5c542)),
+  paint(new THREE.BoxGeometry(.005, .1, .005).translate(0, .05, 0), (x, y, z, ny, c) => c.set(nc('stem', 0)), false, 'stem'),
+  paint(new THREE.CircleGeometry(.026, 5).rotateX(-Math.PI / 2).translate(0, .1, 0), (x, y, z, ny, c) => c.set(0xffffff)), // Blüte: Farbe je Blume
+  paint(new THREE.IcosahedronGeometry(.009, 0).translate(0, .104, 0), (x, y, z, ny, c) => c.set(nc('flower.eye')), false, 'flower.eye'),
 ]);
 // zweite Blütenform: Kelch (Tulpe/Glocke) mit Blatt
 const bellGeo = mergeGeometries([
-  paint(new THREE.BoxGeometry(.005, .11, .005).translate(0, .055, 0), (x, y, z, ny, c) => c.set(0x4c8a35)),
-  paint(new THREE.ConeGeometry(.012, .05, 3).rotateZ(.9).translate(.018, .035, 0), (x, y, z, ny, c) => c.set(0x5c9a40)),
+  paint(new THREE.BoxGeometry(.005, .11, .005).translate(0, .055, 0), (x, y, z, ny, c) => c.set(nc('stem', 0)), false, 'stem'),
+  paint(new THREE.ConeGeometry(.012, .05, 3).rotateZ(.9).translate(.018, .035, 0), (x, y, z, ny, c) => c.set(nc('stem', 1)), false, 'stem'),
   paint(new THREE.CylinderGeometry(.022, .01, .045, 6, 1, true).translate(0, .125, 0), (x, y, z, ny, c) => c.set(0xffffff).multiplyScalar(.8 + .2 * smooth(.1, .15, y))),
 ]);
-const fernGeo = mergeGeometries([0, 1, 2, 3, 4, 5].map(k => paint(new THREE.ConeGeometry(.02, .17, 3).rotateX(Math.PI / 2).translate(0, 0, .085).rotateX(-.55).rotateY(k * 1.05 + rnd(.2)), fol(-.02, .1, 0x2f6b2c, 0x6aa84a))));
+const fernGeo = mergeGeometries([0, 1, 2, 3, 4, 5].map(k => paint(new THREE.ConeGeometry(.02, .17, 3).rotateX(Math.PI / 2).translate(0, 0, .085).rotateX(-.55).rotateY(k * 1.05 + rnd(.2)), fol(-.02, .1, nc('fern', 0), nc('fern', 1)), false, 'fern')));
 const pebbleGeos = [5, 11].map(sd => rockGeo(sd, 0));
 const shellGeo = paint(new THREE.SphereGeometry(.024, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .55, 1.25), (x, y, z, ny, c) => c.set(0xffffff).multiplyScalar(.8 + .25 * Math.abs(Math.sin(Math.atan2(z, x) * 5))));
-const driftGeo = mergeGeometries([paint(new THREE.CylinderGeometry(.028, .036, .5, 6).rotateZ(Math.PI / 2), bark(.1, 0x8f8576, 0xb3aa9a)), paint(new THREE.CylinderGeometry(.012, .018, .2, 5).translate(0, .1, 0).rotateZ(-.9).translate(.08, 0, 0), bark(.1, 0x8f8576, 0xb3aa9a))]);
+const driftGeo = mergeGeometries([paint(new THREE.CylinderGeometry(.028, .036, .5, 6).rotateZ(Math.PI / 2), bark(.1, 'driftwood'), false, 'driftwood'), paint(new THREE.CylinderGeometry(.012, .018, .2, 5).translate(0, .1, 0).rotateZ(-.9).translate(.08, 0, 0), bark(.1, 'driftwood'), false, 'driftwood')]);
 const cover = [];
 function coverKind(geo, mat, items, o) {
   const m = new THREE.InstancedMesh(geo, mat, Math.max(1, items.length)); m.frustumCulled = false; m.receiveShadow = true; m.castShadow = !!o.shadow; m.count = items.length;
@@ -86,17 +89,17 @@ function coverKind(geo, mat, items, o) {
 }
 {
   const BARE_AT = (x, z) => { const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL); return i < 0 || j < 0 || i >= N || j >= N ? 0 : BARE[j * N + i]; };
-  const grassC = [0x86b54b, 0x76a842, 0x9cbc55, 0x6e9e3e];
+  const grassC = natureColors('grass');
   const grass = [];
   for (let tries = 0; tries < 120000 && grass.length < 12500; tries++) {
     const x = rnd(HALF * .92), z = rnd(HALF * .92), h = heightAt(x, z);
     if (h < .42 || h > 2.8) continue;
     const dens = (.3 + .7 * smooth(-.35, .45, noise(x * .22 + 5, z * .22))) * (1 - smooth(.3, .42, BARE_AT(x, z)));
     if (Math.random() > dens) continue;
-    grass.push({ x, z, r: Math.random() * 6.28, s: .9 + Math.random() * .8, c: grassC[Math.floor(Math.random() * 4)] });
+    grass.push({ x, z, r: Math.random() * 6.28, s: .9 + Math.random() * .8, c: grassC[Math.floor(Math.random() * grassC.length)] });
   }
   coverKind(tuftGeo(), grassMat, grass, { hmin: .38, hmax: 2.9 });
-  const PAL = [0xf6f3e8, 0xf2cf3a, 0xec86ad, 0x9c82dc, 0xdc4a3c, 0x75a6e6, 0xf09a3e];
+  const PAL = natureColors('flower');
   const flowers = [];
   for (let c = 0; c < 140; c++) {
     let cx = 0, cz = 0, ok = false;
@@ -131,8 +134,8 @@ function coverKind(geo, mat, items, o) {
     pebbles[k % 2].push({ x, z, r: Math.random() * 6.28, s: .05 + Math.random() * .08, c: COL.setScalar(.85 + Math.random() * .3).getHex() });
   }
   pebbles.forEach((pb, k) => coverKind(pebbleGeos[k], plantMat, pb, { hmin: -.08, hmax: 4.5, sink: .25 }));
-  const shells = [], drift = [], SH = [0xfff6ec, 0xf6d3c6, 0xe9c9a0, 0xffe4ef];
-  for (let tries = 0; tries < 8000 && shells.length < 170; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > -.04 && h < .3) shells.push({ x, z, r: Math.random() * 6.28, s: .7 + Math.random() * .6, c: SH[Math.floor(Math.random() * 4)] }); }
+  const shells = [], drift = [], SH = natureColors('shell');
+  for (let tries = 0; tries < 8000 && shells.length < 170; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > -.04 && h < .3) shells.push({ x, z, r: Math.random() * 6.28, s: .7 + Math.random() * .6, c: SH[Math.floor(Math.random() * SH.length)] }); }
   for (let tries = 0; tries < 8000 && drift.length < 18; tries++) { const x = rnd(HALF * .95), z = rnd(HALF * .95), h = heightAt(x, z); if (h > .02 && h < .22) drift.push({ x, z, r: Math.random() * 6.28, s: 1 + Math.random() * .7, c: 0xffffff }); }
   coverKind(shellGeo, plantMat, shells, { hmin: -.06, hmax: .4 });
   coverKind(driftGeo, plantMat, drift, { hmin: -.02, hmax: .35, sink: -.03, shadow: true });

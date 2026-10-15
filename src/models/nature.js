@@ -6,25 +6,28 @@ import { clamp, rnd, smooth } from '../core/util.js';
 import { noise } from '../core/noise.js';
 import { isMobile, scene } from '../core/render.js';
 import { heightAt } from '../world/terrain.js';
+import { natureColor as nc, slotId, slotMaterial } from '../core/colors.js';
 
 // Hilfen: Geometrie ohne Index mit einer Farbe je Dreieck (Verläufe, dunklere Unterseiten, leichte Streuung), leicht verbeult
 const COL = new THREE.Color(), COL2 = new THREE.Color();
 const jit = (x, y, z) => .9 + .2 * (((Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453) % 1 + 1) % 1);
-function paint(geo, fn, soft = false) {
+// slot: Farbrolle der Flächen (src/core/colors.js), als Name oder Funktion (x, y, z, ny) → Name; ohne = keine Rolle
+function paint(geo, fn, soft = false, slot = null) {
   const g = geo.index ? geo.toNonIndexed() : geo; if (g.attributes.uv) g.deleteAttribute('uv');
-  const p = g.attributes.position, col = new Float32Array(p.count * 3);
+  const p = g.attributes.position, col = new Float32Array(p.count * 3), sl = new Float32Array(p.count);
+  const role = (x, y, z, ny) => !slot ? 0 : slotId(typeof slot === 'function' ? slot(x, y, z, ny) : slot);
   if (soft) { // weich: Normalen der Grundform behalten (rund schattiert), Farbe je Ecke
     const n = g.attributes.normal;
-    for (let i = 0; i < p.count; i++) { fn(p.getX(i), p.getY(i), p.getZ(i), n.getY(i), COL); col.set([COL.r, COL.g, COL.b], i * 3); }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+    for (let i = 0; i < p.count; i++) { fn(p.getX(i), p.getY(i), p.getZ(i), n.getY(i), COL); col.set([COL.r, COL.g, COL.b], i * 3); sl[i] = role(p.getX(i), p.getY(i), p.getZ(i), n.getY(i)); }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('slot', new THREE.BufferAttribute(sl, 1)); return g;
   }
   g.computeVertexNormals(); const n = g.attributes.normal;
   for (let i = 0; i + 2 < p.count; i += 3) {
-    const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
-    fn(x, y, z, (n.getY(i) + n.getY(i + 1) + n.getY(i + 2)) / 3, COL);
-    for (let k = 0; k < 3; k++) col.set([COL.r, COL.g, COL.b], (i + k) * 3);
+    const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3, ny = (n.getY(i) + n.getY(i + 1) + n.getY(i + 2)) / 3;
+    fn(x, y, z, ny, COL); const r = role(x, y, z, ny);
+    for (let k = 0; k < 3; k++) { col.set([COL.r, COL.g, COL.b], (i + k) * 3); sl[i + k] = r; }
   }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('slot', new THREE.BufferAttribute(sl, 1)); return g;
 }
 function lumpy(geo, amt, f = 2.2, seed = Math.random() * 50) {
   const p = geo.attributes.position;
@@ -36,40 +39,42 @@ const fol = (y0, y1, dark, light) => (x, y, z, ny, c) => { c.set(dark).lerp(COL2
 // Laub weich: Helligkeit folgt der Normalen stufenlos (Unterseite dunkler), leichte Streuung
 const folS = (y0, y1, dark, light) => (x, y, z, ny, c) => { c.set(dark).lerp(COL2.set(light), clamp(smooth(y0, y1, y) * .75 + smooth(.2, .9, ny) * .3, 0, 1)); c.multiplyScalar((.62 + .38 * smooth(-.8, .3, ny)) * (.95 + .1 * (jit(x, y, z) - .9) * 5)); };
 const CROWN_DET = isMobile ? 1 : 2; // feinere Kronen am Desktop
-const bark = (h, c0, c1) => (x, y, z, ny, c) => c.set(c0).lerp(COL2.set(c1), clamp(y / h, 0, 1)).multiplyScalar(jit(x, y, z));
-const trunkGeo = (h, r0, r1, c0, c1, seg = 8) => paint(new THREE.CylinderGeometry(r1, r0, h, seg, 2).translate(0, h / 2, 0), bark(h, c0, c1));
+const bark = (h, role) => (x, y, z, ny, c) => c.set(nc(role, 0)).lerp(COL2.set(nc(role, 1)), clamp(y / h, 0, 1)).multiplyScalar(jit(x, y, z));
+const trunkGeo = (h, r0, r1, role, seg = 8) => paint(new THREE.CylinderGeometry(r1, r0, h, seg, 2).translate(0, h / 2, 0), bark(h, role), false, role);
+// Laub einer Rolle: Verlauf von ihrer dunklen zur hellen Grundfarbe
+const leaves = (y0, y1, role) => folS(y0, y1, nc(role, 0), nc(role, 1));
 const blob = (x, y, z, r, sy = 1, amt = .25, det = 1) => lumpy(new THREE.IcosahedronGeometry(r, det), amt, 3).scale(1, sy, 1).translate(x, y, z);
 // Kanten bleiben trotzdem sichtbar, wo die Normalen je Dreieck berechnet sind (Felsen, Stämme); Laub ist weich schattiert
-const plantMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .88 });
+const plantMat = slotMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .88 }));
 const kindOf = (name, parts) => { const geo = mergeGeometries(parts), sc = new THREE.Group(); sc.add(new THREE.Mesh(geo, plantMat)); return { name, geo, scene: sc }; };
 // Baumarten (Höhe etwa 1,1 im Modellraum, wie zuvor die KayKit-Bäume)
 function spruce(slim) {
-  const parts = [trunkGeo(.32, .055, .035, 0x4f3420, 0x6b4a2c)], n = slim ? 5 : 4;
+  const parts = [trunkGeo(.32, .055, .035, 'bark.spruce')], n = slim ? 5 : 4, role = slim ? 'leaf.fir' : 'leaf.spruce';
   for (let k = 0; k < n; k++) {
     const r = (slim ? .27 : .37) * (1 - k / (n + .7)), h = slim ? .3 : .38, y = .15 + k * (slim ? .165 : .2);
-    parts.push(paint(lumpy(new THREE.ConeGeometry(r, h, isMobile ? 9 : 14, 3), .07, 4).rotateY(k * .7).translate(rnd(.015), y + h / 2, rnd(.015)), folS(.1, 1.1, slim ? 0x22503e : 0x275a2e, slim ? 0x4d8a68 : 0x579b45), true));
+    parts.push(paint(lumpy(new THREE.ConeGeometry(r, h, isMobile ? 9 : 14, 3), .07, 4).rotateY(k * .7).translate(rnd(.015), y + h / 2, rnd(.015)), leaves(.1, 1.1, role), true, role));
   }
   return parts;
 }
 function oak() {
-  const parts = [trunkGeo(.52, .075, .045, 0x4a3322, 0x6a4a30)];
-  for (const [rz, ry] of [[.8, 0], [-.7, 1.4]]) parts.push(paint(new THREE.CylinderGeometry(.018, .03, .28, 5).translate(0, .14, 0).rotateZ(rz).rotateY(ry).translate(0, .36, 0), bark(.6, 0x4a3322, 0x6a4a30)));
+  const parts = [trunkGeo(.52, .075, .045, 'bark')];
+  for (const [rz, ry] of [[.8, 0], [-.7, 1.4]]) parts.push(paint(new THREE.CylinderGeometry(.018, .03, .28, 5).translate(0, .14, 0).rotateZ(rz).rotateY(ry).translate(0, .36, 0), bark(.6, 'bark'), false, 'bark'));
   for (const [x, y, z, r] of [[0, .8, 0, .3], [.2, .7, .1, .22], [-.2, .72, -.06, .23], [.04, .96, -.1, .2], [-.06, .68, .2, .2], [.12, .84, -.18, .18]])
-    parts.push(paint(blob(x, y, z, r, .9, .2, CROWN_DET), folS(.5, 1.12, 0x3a7a2c, 0x8dc24f), true));
+    parts.push(paint(blob(x, y, z, r, .9, .2, CROWN_DET), leaves(.5, 1.12, 'leaf.oak'), true, 'leaf.oak'));
   return parts;
 }
 function birch() {
-  const h = .78, parts = [paint(new THREE.CylinderGeometry(.027, .042, h, 6, 6).translate(0, h / 2, 0), (x, y, z, ny, c) => c.set(Math.sin(y * 52 + x * 40) > .72 ? 0x3d3832 : 0xebe7dc).multiplyScalar(jit(x, y, z)))];
+  const h = .78, parts = [paint(new THREE.CylinderGeometry(.027, .042, h, 6, 6).translate(0, h / 2, 0), (x, y, z, ny, c) => c.set(nc('bark.birch', Math.sin(y * 52 + x * 40) > .72 ? 1 : 0)).multiplyScalar(jit(x, y, z)), false, 'bark.birch')];
   for (const [x, y, z, r, sy] of [[0, .88, 0, .16, 1.5], [.1, .72, .05, .13, 1.3], [-.09, .78, -.05, .14, 1.4], [0, 1.02, .03, .11, 1.3]])
-    parts.push(paint(blob(x, y, z, r, sy, .18, CROWN_DET), folS(.55, 1.15, 0x5f9a35, 0xb8da6c), true));
+    parts.push(paint(blob(x, y, z, r, sy, .18, CROWN_DET), leaves(.55, 1.15, 'leaf.birch'), true, 'leaf.birch'));
   return parts;
 }
 function fruit() {
-  const parts = [trunkGeo(.36, .065, .045, 0x4e3524, 0x6e4c32)];
-  for (const [x, y, z, r, sy] of [[0, .63, 0, .33, .8], [.18, .56, .1, .2, 1], [-.17, .6, -.08, .21, 1]]) parts.push(paint(blob(x, y, z, r, sy, .18, CROWN_DET), folS(.35, .9, 0x3f7f30, 0x86bd4c), true));
+  const parts = [trunkGeo(.36, .065, .045, 'bark.fruit')];
+  for (const [x, y, z, r, sy] of [[0, .63, 0, .33, .8], [.18, .56, .1, .2, 1], [-.17, .6, -.08, .21, 1]]) parts.push(paint(blob(x, y, z, r, sy, .18, CROWN_DET), leaves(.35, .9, 'leaf.fruit'), true, 'leaf.fruit'));
   for (let k = 0; k < 11; k++) { // Äpfel rundum, eher in der unteren Hälfte der Krone
     const a = k / 11 * Math.PI * 2 + rnd(.3), e = -.5 + Math.random() * .8, x = Math.cos(a) * Math.cos(e) * .35, y = .63 + Math.sin(e) * .28, z = Math.sin(a) * Math.cos(e) * .35;
-    const red = Math.random() < .75; parts.push(paint(new THREE.IcosahedronGeometry(.036, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(red ? 0xc8322a : 0xe2a12f).lerp(COL2.set(0xffffff), ny > .6 ? .2 : 0)));
+    const red = Math.random() < .75; parts.push(paint(new THREE.IcosahedronGeometry(.036, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(nc('fruit', red ? 0 : 1)).lerp(COL2.set(0xffffff), ny > .6 ? .2 : 0), false, 'fruit'));
   }
   return parts;
 }
@@ -84,20 +89,21 @@ function treeKindAt(x, z) {
   return Math.random() < .7 ? 2 : Math.random() < .5 ? 0 : 3;
 }
 // Felsen: verbeulte, flach gedrückte Körper, grau mit hellerer Oberseite und Moos auf flachen Stellen
+const mossy = (seed, x, z, ny) => ny > .8 && noise(x * 3 + seed, z * 3) > .05;
 const rockGeo = (seed, det = 1) => paint(lumpy(new THREE.IcosahedronGeometry(1, det), .32, 1.4, seed).scale(1, .62, 1), (x, y, z, ny, c) => {
-  c.set(0x76706a).lerp(COL2.set(0xa29c90), smooth(-.3, .6, y));
-  if (ny > .8 && noise(x * 3 + seed, z * 3) > .05) c.lerp(COL2.set(0x5f7d3c), .4);
+  c.set(nc('rock', 0)).lerp(COL2.set(nc('rock', 1)), smooth(-.3, .6, y));
+  if (mossy(seed, x, z, ny)) c.lerp(COL2.set(nc('moss')), .4);
   c.multiplyScalar((ny < -.2 ? .7 : 1) * jit(x, y, z));
-});
+}, false, (x, y, z, ny) => mossy(seed, x, z, ny) ? 'moss' : 'rock');
 const ROCK_GEOS = [3, 17, 29, 41].map(sd => rockGeo(sd));
 // Büsche: drei Sorten (schlicht, blühend, mit Beeren)
 function bushGeo(v) {
   const parts = [], n = 4 + v;
-  for (let k = 0; k < n; k++) parts.push(paint(blob(rnd(.13), .1 + Math.random() * .1, rnd(.13), .11 + Math.random() * .06, .85, .22, 1), folS(0, .32, v === 2 ? 0x2a5c27 : 0x2f6a2a, v === 2 ? 0x5e9443 : 0x6fa648), true));
+  for (let k = 0; k < n; k++) parts.push(paint(blob(rnd(.13), .1 + Math.random() * .1, rnd(.13), .11 + Math.random() * .06, .85, .22, 1), leaves(0, .32, v === 2 ? 'bush.dark' : 'bush'), true, v === 2 ? 'bush.dark' : 'bush'));
   if (v) for (let k = 0; k < 12; k++) {
     const a = Math.random() * 6.28, e = Math.random() * 1.2, x = Math.cos(a) * Math.cos(e) * .2, y = .14 + Math.sin(e) * .14, z = Math.sin(a) * Math.cos(e) * .2;
-    const c0 = v === 1 ? (k % 3 ? 0xf2a5c6 : 0xffffff) : (k % 2 ? 0xc0302b : 0x3b3f8f);
-    parts.push(paint(new THREE.IcosahedronGeometry(v === 1 ? .022 : .018, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(c0)));
+    const role = v === 1 ? 'blossom' : 'berry', c0 = nc(role, v === 1 ? (k % 3 ? 0 : 1) : (k % 2 ? 0 : 1));
+    parts.push(paint(new THREE.IcosahedronGeometry(v === 1 ? .022 : .018, 0).translate(x, y, z), (px, py, pz, ny, c) => c.set(c0), false, role));
   }
   return mergeGeometries(parts);
 }
