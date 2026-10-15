@@ -1,4 +1,4 @@
-// Wohnhäuser, Brunnen, Windmühle, Baugerüst
+// Wohnhäuser, Brunnen, Wassermühle, Baugerüst
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -9,12 +9,13 @@ import { GARDEN_R, HOUSE_R, heightAt, streamDist } from '../world/terrain.js';
 import { flattenAt } from '../world/sculpt.js';
 import { findPart, modelInfo } from '../assets/models.js';
 import { COL2, paint, plantMat } from '../models/nature.js';
-import { LAGER, MILL_POS, SB, SHRINE_POS, WELL, onSacred, place, statics } from './layout.js';
+import { LAGER, MILL, MILL_POS, SB, SHRINE_POS, WELL, onSacred, place, statics } from './layout.js';
 
 place('well', WELL.x, WELL.z, 0.4, 1.3);
-flattenAt(MILL_POS.x, MILL_POS.z, 1.8);
-const mill = place('hut.miller', MILL_POS.x, MILL_POS.z, Math.atan2(-MILL_POS.x, -MILL_POS.z), 1.6); // Windmühle draußen am Feldrand
-const millFan = findPart(mill.o, 'hut.miller', 'fan');
+flattenAt(MILL_POS.x, MILL_POS.z, 1.3, MILL.y); // Ufer unter dem Haus eben, knapp über dem Wasser (der Bach gräbt sein Bett gleich wieder frei)
+const mill = place('hut.watermill', MILL.x, MILL.z, MILL.ry, MILL.k); // Wassermühle am Bach, Rad im Wasser
+mill.gx = MILL_POS.x; mill.gz = MILL_POS.z; // Höhe vom Ufer unter dem Haus, nicht vom Bachbett
+const millWheel = findPart(mill.o, 'hut.watermill', 'wheel');
 
 const sites = [];
 // 20 Plätze im Abstand von 18° auf dem Hauskreis; Schreinweg und Lager bleiben frei. Gebaut wird von Süden (Kameraseite)
@@ -70,4 +71,4 @@ S.houses = houses.length;
 const build = { construction: null };
 const scaff = place('scaffold', 0, 0, 0, 0.95); scaff.o.visible = false;
 
-export { addHouse, build, freeSite, houseDoor, houseMat, houseMats, houses, mill, millFan, scaff, sites };
+export { addHouse, build, freeSite, houseDoor, houseMat, houseMats, houses, mill, millWheel, scaff, sites };

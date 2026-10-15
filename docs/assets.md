@@ -31,7 +31,7 @@ Stand der Features: siehe `README.md`.
 | Ursprung | auf dem Boden, mittig unter dem Modell |
 | Bezugsgrößen in der Welt | Bewohner etwa 0,45 hoch; Wohnhaus etwa 1,4 hoch und 1,2 breit; Baum etwa 1,4 hoch |
 
-- Gebäude werden im Spiel mit einem festen Faktor aufgestellt (Wohnhäuser und Hütten 1,5, Säge 1,2, Windmühle 1,6).
+- Gebäude werden im Spiel mit einem festen Faktor aufgestellt (Wohnhäuser und Hütten 1,5, Säge 1,2, Wind- und Wassermühle 1,6).
   Ein Modell im KayKit-Maßstab (Haus etwa 0,93 hoch, 0,8 breit) passt ohne Anpassung.
 - Passt ein neues Modell nicht in diesen Maßstab, im Theme `scale` setzen statt das Modell umzurechnen.
 - Kreaturen werden beim Laden auf ihre Spielhöhe skaliert (`h` in `src/creature/kinds.js`). Die Kopfrichtung
@@ -45,7 +45,8 @@ Stand der Features: siehe `README.md`.
 | `scale` | Anpassung an den Maßstab (Standard 1) |
 | `anchors` | Punkte im Modellraum `{ x, z }`: `door` (vor der Tür, dorthin gehen Bewohner), `work` (Arbeitsplatz neben dem Gebäude, dort liegen Waren) |
 | `foot` | Grundriss für die Wegfindung im Modellraum: `[Mitte x, Mitte z, halbe Breite, halbe Tiefe]` |
-| `parts` | Teile, die das Spiel bewegt: Knotenname (Text) oder Muster (RegExp), z. B. `saw` (Sägeblatt dreht beim Sägen), `fan` (Windrad) |
+| `parts` | Teile, die das Spiel bewegt: Knotenname (Text) oder Muster (RegExp), z. B. `saw` (Sägeblatt dreht beim Sägen), `fan` (Windrad), `wheel` (Mühlrad) |
+| `sacks` | Mehlsäcke neben einer Mühle: Liste `[x, z, Drehung]` im Modellraum |
 | Kreatur: `hd` | höher aufgelöstes Modell mit Fell fürs Porträt im Charakter-Blatt |
 | Kreatur: `head` | Name des Kopfknochens (Blickrichtung, Tragen im Maul, Augen) |
 | Kreatur: `eyes` | Augen am Kopfknochen ergänzen, falls das Modell keine hat |
@@ -79,6 +80,7 @@ Die Namen gelten fürs Grund-Theme. Ein neues Modell kann andere Namen haben; da
 |---|---|
 | Sägemühle | `building_lumbermill_saw_blue` dreht sich beim Sägen |
 | Windmühle | Knoten mit „fan“ im Namen ist das Windrad |
+| Wassermühle | `building_watermill_wheel_blue` ist das Mühlrad: an der Rückwand (−z), Achse entlang z, dreht mit der Strömung. Das Haus steht am Ufer, der Bach läuft hinter ihm entlang |
 
 ## 4. Was heute noch im Code gebaut wird
 

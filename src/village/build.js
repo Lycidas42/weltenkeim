@@ -6,7 +6,7 @@ import { RES, ROLES, S } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { heightAt } from '../world/terrain.js';
 import { flattenAt } from '../world/sculpt.js';
-import { findPart } from '../assets/models.js';
+import { findPart, modelInfo } from '../assets/models.js';
 import { TK } from '../models/nature.js';
 import { ST, place } from './layout.js';
 import { clearAround } from '../world/trees.js';
@@ -24,7 +24,7 @@ function addHut(role, site) {
   e.goods = {}; // abgelegte Waren der Spezialisten (Stämme, Fleisch, Fisch, Gemüse ...), Träger bringen sie ins Lager
   if (role === 'farmer') buildFarm(e, site.farm);
   e.inp = 0; e.busy = 0;
-  if (role === 'miller') { e.fan = findPart(e.o, e.key, 'fan'); for (const [lx, lz, ry] of [[-.42, .5, .3], [-.3, .62, -.4]]) { const q = localPt(e, lx, lz); place('prop.sack', q.x, q.z, ry, 1.8); } }
+  if (role === 'miller') { e.fan = findPart(e.o, e.key, 'fan'); for (const [lx, lz, ry] of modelInfo(e.key).sacks || []) { const q = localPt(e, lx, lz); place('prop.sack', q.x, q.z, ry, 1.8); } }
   if (role === 'baker') buildOven(e);
   if (role === 'lumber') { const p = localPt(e, .62, -.12); place('prop.logs', p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
   if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(TK[Math.random() < .5 ? 0 : 2], p.x, p.z, Math.random() * 6, ST * .2); }

@@ -7,7 +7,8 @@
 //   scale    Anpassung, falls das Modell nicht im Maßstab der Vorgaben gebaut ist (Standard 1)
 //   anchors  Punkte im Modellraum { x, z }: door = vor der Tür, work = Arbeitsplatz neben dem Gebäude
 //   foot     Grundriss für die Wegfindung im Modellraum: [Mitte x, Mitte z, halbe Breite, halbe Tiefe]
-//   parts    Teile, die das Spiel bewegt: Knotenname oder RegExp (z. B. Säge, Windrad)
+//   parts    Teile, die das Spiel bewegt: Knotenname oder RegExp (z. B. Säge, Windrad, Mühlrad)
+//   sacks    Mehlsäcke neben der Mühle: [x, z, Drehung] im Modellraum
 //   Kreaturen: hd = Fell-Modell fürs Porträt, head = Kopfknochen, eyes = Augen am Kopfknochen ergänzen,
 //   rest = Liegepose (nur Quaternius-Skelett „AnimalArmature“), react = eigene Lob-/Tadel-Animationen (Fuchs),
 //   ws = Tempo der Laufanimation
@@ -29,7 +30,9 @@ export default {
     'hut.hunter': { file: 'building_home_A_yellow.gltf', anchors: { door: { x: 0, z: .32 }, work: { x: -.5, z: .5 } }, foot: HOME_A },
     'hut.fisher': { file: 'building_home_B_yellow.gltf', anchors: { door: { x: .14, z: .32 }, work: { x: -.45, z: .6 } }, foot: HOME_B },
     'hut.farmer': { file: 'building_home_B_red.gltf', anchors: { door: { x: .14, z: .32 }, work: { x: .55, z: .62 } }, foot: HOME_B },
-    'hut.miller': { file: 'building_windmill_blue.gltf', anchors: { door: { x: 0, z: .44 }, work: { x: .42, z: .62 } }, foot: [0, .015, .57, .4], parts: { fan: /fan/i } },
+    'hut.miller': { file: 'building_windmill_blue.gltf', anchors: { door: { x: 0, z: .44 }, work: { x: .42, z: .62 } }, foot: [0, .015, .57, .4], parts: { fan: /fan/i }, sacks: [[-.42, .5, .3], [-.3, .62, -.4]] },
+    // Wassermühle am Bach (erste Mühle): Rad an der Rückwand (−z), Achse quer zur Wand; der Bach läuft hinter dem Haus entlang
+    'hut.watermill': { file: 'building_watermill_blue.gltf', anchors: { door: { x: .12, z: 1 }, work: { x: .8, z: .6 } }, foot: [0, .47, .56, .44], parts: { wheel: 'building_watermill_wheel_blue' }, sacks: [[.68, .32, .3], [.8, .45, -.4]] },
     'hut.baker': { file: 'building_home_B_green.gltf', anchors: { door: { x: .14, z: .32 }, work: { x: -.52, z: .56 } }, foot: HOME_B },
     'prop.logs': { file: 'resource_lumber.gltf' },
     'prop.crate': { file: 'crate_A_big.gltf' },

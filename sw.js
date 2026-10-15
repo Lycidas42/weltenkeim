@@ -118,6 +118,8 @@ const APP = [
   './assets/models/building_home_B_yellow.gltf',
   './assets/models/building_home_A_yellow.bin',
   './assets/models/building_home_A_yellow.gltf',
+  './assets/models/building_watermill_blue.bin',
+  './assets/models/building_watermill_blue.gltf',
   './assets/models/building_windmill_blue.bin',
   './assets/models/building_windmill_blue.gltf',
   './assets/models/hexagons_medieval.png',

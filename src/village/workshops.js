@@ -5,11 +5,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rnd } from '../core/util.js';
 import { renderer, scene } from '../core/render.js';
 import { sky, weather } from '../world/sky.js';
-import { heightAt } from '../world/terrain.js';
+import { heightAt, streamU } from '../world/terrain.js';
 import { waterU } from '../world/water.js';
 import { jit, paint, plantMat } from '../models/nature.js';
-import { SB, statics } from './layout.js';
-import { mill, millFan } from './houses.js';
+import { MILL, SB, statics } from './layout.js';
+import { mill, millWheel } from './houses.js';
 import { huts, localPt } from './huts.js';
 
 // Bäckerei: gemauerter Backofen mit Kuppel neben dem Haus, Glut im Ofenloch, Schornstein; dazu ein Tisch mit Broten
@@ -44,7 +44,7 @@ function updateWorkshops(dt, t) {
       if (hs.busy > 0 && Math.random() < dt * 5) { if (puffs.length >= PUFF_N) puffs.shift(); puffs.push({ x: O.chim.x + rnd(.03), y: heightAt(O.x, O.z) + .68, z: O.chim.z + rnd(.03), t: 0, life: 2.2 + Math.random() }); }
     }
   }
-  if (millFan && !mill.role) millFan.rotation.z += dt * 1.4; // Windmühle, solange sie noch keine Mühle ist
+  if (millWheel) millWheel.rotation.z += dt * MILL.dir * (1.1 + 1.8 * streamU.uSwell.value); // Mühlrad dreht mit der Strömung, bei Hochwasser schneller
   const wx = Math.cos(weather.dir) * waterU.uWind.value * .5, wz = Math.sin(weather.dir) * waterU.uWind.value * .5;
   for (let i = puffs.length - 1; i >= 0; i--) { const q = puffs[i]; q.t += dt; if (q.t > q.life) { puffs.splice(i, 1); continue; } q.y += dt * .35; q.x += wx * dt * q.t; q.z += wz * dt * q.t; }
   for (let i = 0; i < PUFF_N; i++) { const q = puffs[i]; if (!q) { puffA[i * 2] = 0; continue; } puffPos.set([q.x, q.y, q.z], i * 3); const u = q.t / q.life; puffA[i * 2] = Math.min(1, u * 6) * (1 - u); puffA[i * 2 + 1] = .12 + u * .35; }

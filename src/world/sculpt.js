@@ -17,9 +17,8 @@ function sculpt(px, pz, dir, dt) {
   }
   tPos.needsUpdate = true; tCol.needsUpdate = true; markTerrainDirty(); followStream(px, pz, R);
 }
-// Bauplatz einebnen: innen ganz auf die Höhe der Mitte, zum Rand hin weich auslaufend
-function flattenAt(px, pz, R) {
-  const target = heightAt(px, pz);
+// Bauplatz einebnen: innen ganz auf die Höhe der Mitte (oder eine vorgegebene Höhe), zum Rand hin weich auslaufend
+function flattenAt(px, pz, R, target = heightAt(px, pz)) {
   const i0 = Math.max(1, Math.floor((px - R + HALF) / CELL)), i1 = Math.min(SEG - 1, Math.ceil((px + R + HALF) / CELL));
   const j0 = Math.max(1, Math.floor((pz - R + HALF) / CELL)), j1 = Math.min(SEG - 1, Math.ceil((pz + R + HALF) / CELL));
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
