@@ -25,6 +25,7 @@ import { tryMiracle } from './miracles.js';
 import { throwTree, treeAt } from './grab.js';
 import { HINTS, closeSheets, setFollow } from '../ui/sheets.js';
 import { closeRing, foxUnder, hoverFox, openRing, ringOpen } from '../ui/ring.js';
+import { reinforce } from '../creature/ai.js';
 
 // Ernte mit der Hand Gottes: das Gemüse geht gleich ins Lager
 function harvestByHand(f) {
@@ -138,8 +139,11 @@ function updateHandHover(dt) {
 // gleitet bei Kamerabewegung mit über die Welt. Ein Tipp (bzw. Klick) ohne Ziehen setzt ab.
 // Packen: Drücken und kurz halten (GRAB_T) oder gleich ziehen; ein kurzer Tipp packt nicht (später: Auswählen).
 const TAP_PX = 10, TAP_T = .3, THROW_PX = 700, GRAB_T = .25; // Tipp: kaum bewegt und kurz; Wurf: Wischen schneller als 700 px/s
-// mode: 'move' (mit voller Hand angesetzt) oder 'direct'; cand: Bewohner unter dem Finger, der gleich gepackt wird
-const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, trail: [], cand: null };
+// mode: 'move' (mit voller Hand angesetzt) oder 'direct'; cand: Bewohner unter dem Finger, der gleich gepackt wird;
+// fox: Druck begann auf der Kreatur (Weg in px, Anteil der Bewegungen über ihr) – Geste wird beim Loslassen erkannt
+const press = { mode: null, x0: 0, y0: 0, t: 0, moved: false, trail: [], cand: null, fox: null };
+// Gesten an der Kreatur (kreatur.md 3.11 B): Tipp = Kreismenü, langsam darüberstreichen = Lob, schnell wischen = Tadel
+const PET_T = .4, PET_PX = 40, PET_ON = .6;
 const carrying = () => heldKind() && (input.tool === 'hand' || input.tool === 'blick');
 function updatePointer(dt) {
   if (input.primary !== null) { // Spur des Fingers in Spielzeit, für Tipp und Wischgeschwindigkeit
@@ -218,7 +222,7 @@ function onToolDown(cx, cy) {
   press.mode = 'direct';
   pick(cx, cy); input.handShown = hitOk;
   if (input.tool === 'hand') {
-    if (foxUnder(cx, cy)) { openRing(); input.pressing = false; return; }
+    if (foxUnder(cx, cy)) { press.fox = { dist: 0, n: 1, on: 1, x: cx, y: cy }; input.pressing = false; return; }
     let best = null, bd = 40;
     for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) press.cand = best; // gepackt wird nach kurzem Halten oder beim Ziehen (updatePointer)
@@ -228,6 +232,13 @@ function onToolDown(cx, cy) {
 }
 // Finger angehoben: kurzer Tipp mit voller Hand setzt dort ab, schnelles Wischen wirft, sonst hält die Hand weiter
 function onToolUp() {
+  if (press.fox) { // Druck auf der Kreatur: Wischen tadelt, Streichen lobt, Tippen öffnet das Kreismenü
+    const F = press.fox; press.fox = null; input.pressing = false; press.mode = null;
+    if (swipeSpeed() > THROW_PX) reinforce('slap');
+    else if (F.dist >= PET_PX && press.t >= PET_T && F.on / F.n >= PET_ON) reinforce('pet');
+    else if (F.dist < TAP_PX * 2) openRing();
+    return;
+  }
   if (input.treeGrab) input.treeGrab = null; // losgelassen, bevor der Baum nachgab
   if (press.cand) { const v = press.cand; press.cand = null; floatText(v.x, v.y + .75, v.z, 'Halten zum Aufnehmen', 's'); } // kurzer Tipp auf einen Bewohner
   if (input.tool === 'hand' && heldKind() && press.mode) {
@@ -238,7 +249,7 @@ function onToolUp() {
 }
 // Zweiter Finger (Zoomen, Verschieben): der Druck endet, ohne dass etwas fällt
 function cancelPress() {
-  if (input.treeGrab) input.treeGrab = null; press.cand = null;
+  if (input.treeGrab) input.treeGrab = null; press.cand = null; press.fox = null;
   input.pressing = false; press.mode = null;
 }
 function swipeSpeed() {
@@ -314,13 +325,14 @@ canvas.addEventListener('pointerdown', e => {
   closeSheets();
   if (input.drop) return; // die Hand setzt gerade ab
   input.primary = e.pointerId; input.ptrType = e.pointerType; pointerXY.x = e.clientX; pointerXY.y = e.clientY;
-  Object.assign(press, { x0: e.clientX, y0: e.clientY, t: 0, moved: false, trail: [] });
+  Object.assign(press, { x0: e.clientX, y0: e.clientY, t: 0, moved: false, trail: [], fox: null });
   onToolDown(e.clientX, e.clientY);
 });
 canvas.addEventListener('pointermove', e => {
   if (e.pointerType === 'mouse' && input.tool !== 'blick') { pointerXY.x = e.clientX; pointerXY.y = e.clientY; input.handShown = true; if (input.primary === null) input.ptrType = 'mouse'; }
   if (e.pointerId === input.primary) {
     pointerXY.x = e.clientX; pointerXY.y = e.clientY;
+    if (press.fox) { const F = press.fox; F.dist += Math.hypot(e.clientX - F.x, e.clientY - F.y); F.x = e.clientX; F.y = e.clientY; F.n++; F.on += foxUnder(e.clientX, e.clientY); }
     if (!press.moved && Math.hypot(e.clientX - press.x0, e.clientY - press.y0) > TAP_PX) press.moved = true;
   }
 });
