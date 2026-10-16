@@ -488,6 +488,16 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
      entfernt ab (kostet 15 Glaube; Felsen werden nicht gespeichert).
    - **Testleiste:** Charakterbogen → „Testen“: alle Animationen einzeln, zwölf Handlungen nach Stufen, Ausrüstung
      zum An- und Ablegen.
+   - **Fähigkeiten je Gestalt** in `kinds.js` (`acts`): wie sie einen Baum bringt, ob sie selbst auflädt, Tragkraft
+     allein und beladen, Plätze für Reiter, Geste beim Ritual, welche Rituale und eigene Hilfen. Die Testleiste zeigt
+     nur, was die gewählte Gestalt kann.
+   - **Stier zum Vergleich (rohe Kraft):** rammt den Baum mit dem Kopf um und schiebt ihn quer vor den Hörnern zum
+     Lager; kann nichts selbst aufladen, lässt sich aber mit 8 Waren beladen (mit Karren 13); trägt zwei Reiter;
+     **pflügt** die leeren Felder eines Hofs (Pflug am Geschirr, gepflügte Felder wachsen bis zur Ernte 35 % schneller,
+     dunklere Erde); **schiebt Felsen** mit dem Kopf ein Stück vom Dorf weg (Kraft statt Lichtranken). Ritual: lädt
+     stehend auf, scharrt mit dem Huf und schnaubt; steigt vorn hoch und stampft auf, eine Stoßwelle und eine Welle
+     über den Boden laufen zum Ziel und steigen dort auf (Regen, Eile). Keine Fuchs-Hilfen (Fegen, Graben, Pilze,
+     Hasen).
    - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste (im
      normalen Verhalten erst mit dem Lernen, 3.9), Pflug, Lernen nach Tierart (E), andere Rassen.
 2. Ankerpunkte und Verben für die übrigen Rassen.

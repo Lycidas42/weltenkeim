@@ -66,6 +66,8 @@ const SACK = 1.9, CRATE = .95;
 const backItems = BACK_SLOTS.map((_, i) => { const o = shadowify(model(i === 4 ? 'prop.crate' : 'prop.sack').scene.clone(true)); o.visible = false; scene.add(o); return o; });
 const back = { n: 0, shake: 0 };
 const bp = new THREE.Vector3(), bq = new THREE.Quaternion(), bTilt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
+// Sitzplatz Nummer i für einen Reiter (bei zwei Plätzen vorn und hinten auf dem Rücken)
+function seat(i, n, out) { anchor('back', out); if (n > 1) out.add(off.set(0, 0, (i ? -.13 : .1) * CREATURES[fox.kind].h).applyQuaternion(foxPivot.quaternion)); out.y += .03; return out; }
 function backSlot(i, out) {
   const C = CREATURES[fox.kind];
   if (gear.cart && cart.visible) { const c = CART_SLOTS[i]; return out.set(c[0], c[1], c[2]).multiplyScalar(C.h * .95).applyAxisAngle(Y, cartH).add(cart.position); } // im Karren
@@ -212,6 +214,12 @@ for (const sz of [-1, 1]) mk(new THREE.BoxGeometry(.5, .12, .03), woodM, 0, .3, 
 const wheels = [-1, 1].map(sx => { const w = mk(new THREE.CylinderGeometry(.16, .16, .03, 14), woodM, sx * .29, .16, 0, cart); w.rotation.z = Math.PI / 2; mk(new THREE.CylinderGeometry(.04, .04, .035, 8), metal, 0, 0, 0, w); return w; });
 const shafts = [-1, 1].map(sx => { const s = mk(new THREE.CylinderGeometry(.012, .012, 1, 5), woodM, 0, 0, 0); s.userData.sx = sx; scene.add(s); s.visible = false; return s; });
 cart.visible = false; scene.add(cart);
+// Pflug (Stier): Grindel mit Schar und zwei Sterzen; hängt wie der Karren am Geschirr
+const plow = new THREE.Group();
+mk(new THREE.BoxGeometry(.05, .05, .62), woodM, 0, .2, .02, plow).rotation.x = -.18;
+mk(new THREE.BoxGeometry(.035, .2, .14), metal, 0, .08, -.2, plow).rotation.x = .55;
+for (const sx of [-1, 1]) { const h = mk(new THREE.CylinderGeometry(.012, .012, .36, 5), woodM, sx * .08, .3, -.34, plow); h.rotation.x = -.9; h.rotation.z = sx * .15; }
+plow.visible = false; scene.add(plow);
 const CART_SLOTS = [[-.12, .3, .12], [.12, .3, .12], [-.12, .3, -.12], [.12, .3, -.12], [0, .42, 0]];
 // Korb mit Henkel im Maul; darin Pilze
 const basket = new THREE.Group();
@@ -227,7 +235,7 @@ const log = new THREE.Group(), logRoll = new THREE.Group(); log.add(logRoll);
 mk(new THREE.CylinderGeometry(.07, .075, .62, 9), barkM, 0, 0, 0, logRoll).rotation.z = Math.PI / 2;
 for (const sx of [-1, 1]) mk(new THREE.CircleGeometry(.07, 9), cutM, sx * .311, 0, 0, logRoll).rotation.y = sx * Math.PI / 2;
 log.visible = false; scene.add(log);
-const gear = { cart: false, basket: 0, log: false, roll: 0 }; // was gerade benutzt wird (ai.js setzt es)
+const gear = { cart: false, plow: false, basket: 0, log: false, roll: 0 }; // was gerade benutzt wird (ai.js setzt es)
 const gp = new THREE.Vector3(), gq = new THREE.Quaternion(), cartPos = new THREE.Vector3(), cartFwd = new THREE.Vector3(), lastLog = new THREE.Vector3();
 let cartH = 0, cartInit = false;
 function updateGear(dt) {
@@ -235,10 +243,11 @@ function updateGear(dt) {
   // Satteltaschen sitzen am Rückenanker
   bags.visible = on && !!G.bags;
   if (bags.visible) { anchor('back', gp); bags.position.copy(gp); bags.quaternion.copy(foxPivot.quaternion); bags.scale.setScalar(k); }
-  // Geschirr und Karren nur, wenn sie ihn gerade zieht
-  harness.visible = cart.visible = on && gear.cart;
-  for (const s of shafts) s.visible = cart.visible;
-  if (cart.visible) {
+  // Geschirr und Karren bzw. Pflug nur, wenn sie ihn gerade zieht
+  const towed = on && (gear.cart ? cart : gear.plow ? plow : null);
+  cart.visible = towed === cart; plow.visible = towed === plow; harness.visible = !!towed;
+  for (const s of shafts) s.visible = !!towed;
+  if (towed) {
     anchor('chest', gp); harness.position.copy(gp); harness.quaternion.copy(foxPivot.quaternion); harness.scale.setScalar(k);
     // der Karren folgt wie ein Anhänger: Er bleibt im festen Abstand hinter dem Geschirr und dreht sich zur Zugrichtung
     const len = k * 1.15, fx = Math.sin(fox.vh), fz = Math.cos(fox.vh);
@@ -247,10 +256,11 @@ function updateGear(dt) {
     const before = cartPos.clone(); cartPos.set(gp.x - cartFwd.x * len, 0, gp.z - cartFwd.z * len);
     const moved = Math.hypot(cartPos.x - before.x, cartPos.z - before.z) * Math.sign(cartFwd.x * (cartPos.x - before.x) + cartFwd.z * (cartPos.z - before.z) || 1);
     cartH = Math.atan2(cartFwd.x, cartFwd.z); const gy = surfaceAt(cartPos.x, cartPos.z);
-    cart.position.set(cartPos.x, gy, cartPos.z); cart.rotation.set(0, cartH, 0); cart.scale.setScalar(k * .95);
-    for (const w of wheels) w.rotation.x += moved / (.16 * k * .95);
+    towed.position.set(cartPos.x, gy, cartPos.z); towed.rotation.set(0, cartH, 0); towed.scale.setScalar(k * .95);
+    if (towed === cart) for (const w of wheels) w.rotation.x += moved / (.16 * k * .95);
+    gear.towX = cartPos.x; gear.towZ = cartPos.z; // wo der Pflug gerade furcht (ai.js)
     for (const s of shafts) { // Deichsel vom Karren zum Geschirr
-      const a = new THREE.Vector3(s.userData.sx * .2 * k, .3 * k, .26 * k).applyAxisAngle(Y, cartH).add(cart.position);
+      const a = (towed === cart ? new THREE.Vector3(s.userData.sx * .2, .3, .26) : new THREE.Vector3(s.userData.sx * .03, .24, .3)).multiplyScalar(k * .95).applyAxisAngle(Y, cartH).add(towed.position);
       const b = new THREE.Vector3(s.userData.sx * .13, -.02, 0).multiplyScalar(k).applyQuaternion(foxPivot.quaternion).add(gp);
       s.position.copy(a).add(b).multiplyScalar(.5); s.quaternion.setFromUnitVectors(Y, b.sub(a).normalize()); s.scale.set(k, a.distanceTo(s.position) * 2, k);
     }
@@ -274,4 +284,4 @@ function updateBody(dt, t) {
   updateCloud(DUST, dt, vh, true); updateCloud(SPARK, dt, vh, false);
 }
 
-export { anchor, back, backItems, bone, dust, footExtra, gear, over, overOff, resetOver, setGlow, shakeOff, spark, tossOnBack, updateBody };
+export { anchor, back, backItems, bone, dust, footExtra, gear, seat, over, overOff, resetOver, setGlow, shakeOff, spark, tossOnBack, updateBody };

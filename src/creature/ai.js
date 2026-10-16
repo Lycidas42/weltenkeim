@@ -9,10 +9,10 @@ import { streamDist, surfaceAt } from '../world/terrain.js';
 import { CREATURES, fox } from './kinds.js';
 import { CENTER, LAGER, PLAZA, SHRINE_POS, shrinePt } from '../village/layout.js';
 import { FALL_T, addTree, chopTree, fallTree, treeNear, trees } from '../world/trees.js';
-import { huts, lager, lagerDrop, localPt } from '../village/huts.js';
+import { FARM, farmPt, huts, lager, lagerDrop, localPt } from '../village/huts.js';
 import { hutWork } from '../village/build.js';
 import { blockedAt, buildNav, followPath, moveFree, navF, navReady, navV, nearBuilding, setGoal } from '../world/nav.js';
-import { bushes } from '../world/nature.js';
+import { bushes, rocks } from '../world/nature.js';
 import { fields } from '../farm/farm.js';
 import { scareAway, wild } from '../wildlife/land.js';
 import { villagers } from '../village/villagers.js';
@@ -20,7 +20,7 @@ import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, gro
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, dropLoad, dropRide, hauling, helpLoad, startRide } from '../village/ai.js';
 import { addWear } from '../world/paths.js';
-import { anchor, back, dust, footExtra, gear, over, overOff, shakeOff, tossOnBack, updateBody } from './body.js';
+import { anchor, back, dust, footExtra, gear, over, overOff, seat, shakeOff, tossOnBack, updateBody } from './body.js';
 import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
 
 function foxIdle(t) { dismount(); fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
@@ -34,7 +34,7 @@ function foxFinish(a, kind) {
   emit('fox');
 }
 function foxChoose() {
-  gear.basket = 0; gear.log = false; gear.cart = false; fox.forage = null; fox.dig = null; fox.mouthSack = false; // Reste einer unterbrochenen Tätigkeit
+  gear.basket = 0; gear.log = false; gear.cart = false; gear.plow = false; fox.forage = null; fox.dig = null; fox.mouthSack = false; // Reste einer unterbrochenen Tätigkeit
   if (fox.haul || fox.carryGoods) { if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k]; fox.haul = null; fox.carryGoods = null; back.n = 0; fox.mouthSack = false; } // abgebrochenes Tragen: Waren gehen ins Lager
   // ab und zu hinlegen und ausruhen
   if (foxActs.lie && Math.random() < .25) { // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
@@ -46,13 +46,15 @@ function foxChoose() {
   const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
   let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
   const why = leanReasons(a);
-  if (a === 'help') { // Hilfen mit dem eigenen Körper (kreatur.md 3.13 A, D)
-    const hare = wild.find(h => h.state === 'nibble');
+  if (a === 'help') { // Hilfen mit dem eigenen Körper, je nach Gestalt (kreatur.md 3.13 A, D)
+    const H = CREATURES[fox.kind].acts.help, can = k => H.includes(k), r2 = Math.random();
+    const hare = can('pest') && wild.find(h => h.state === 'nibble');
     if (hare && Math.random() < .8) { foxChaseGo(hare, why); return; } // ein Hase knabbert am Feld: verscheuchen
-    const r2 = Math.random();
-    if (r2 < .1) { foxSweepGo(why); return; } // den Platz am Schrein fegen
-    if (r2 < .22 && foxPlantGo(why)) return; // einen Setzling eingraben
-    if (r2 < .36 && foxForageGo(why)) return; // Pilze suchen
+    if (can('sweep') && r2 < .1) { foxSweepGo(why); return; } // den Platz am Schrein fegen
+    if (can('plant') && r2 < .22 && foxPlantGo(why)) return; // einen Setzling eingraben
+    if (can('forage') && r2 < .36 && foxForageGo(why)) return; // Pilze suchen
+    if (can('plow') && r2 < .3 && foxPlowGo(why)) return; // leere Felder pflügen
+    if (can('rock') && r2 > .9 && foxRockGo(why)) return; // einen Felsen wegschieben
   }
   if (a === 'help' && Math.random() < .55 && foxHaul()) { // Waren von einer Hütte ins Lager tragen
     const H = fox.haul, hut = ROLES[H.hut.role].hut;
@@ -72,9 +74,10 @@ function foxChoose() {
 }
 // Tragen: Hütte mit wartenden Waren suchen, bis zu 3 Stück auf einmal (die meisten zuerst), ins Lager bringen
 // Allein trägt sie 3 Stück (eins nach dem anderen ins Maul und auf den Rücken geworfen), belädt sie ein Bewohner, 5.
-const FOX_CARRY = 3, LOADED_CARRY = 5, CART_CARRY = 10;
-const selfCap = () => S.cGear.bags ? 5 : FOX_CARRY;              // mit Satteltaschen passen 5 auf den Rücken
-const loadCap = () => S.cGear.cart ? CART_CARRY : LOADED_CARRY;  // mit Karren lädt der Bewohner 10 auf
+// Wie viel sie trägt, steht je Gestalt in kinds.js (acts.self, acts.load); Satteltaschen +2, Karren +5
+const FOX_CARRY = 3;
+const selfCap = () => { const A = CREATURES[fox.kind].acts; return A.toss ? A.self + (S.cGear.bags ? 2 : 0) : 0; };
+const loadCap = () => { const A = CREATURES[fox.kind].acts; return A.load + (S.cGear.cart ? 5 : 0); };
 function foxHaul() {
   let best = null, bs = 0;
   for (const h of huts) {
@@ -89,6 +92,7 @@ function foxHaul() {
   for (const h of huts) {
     const P = PROC[h.role], res = h.role === 'sawyer' ? 'logs' : P && P.inp; if (!res) continue;
     const have = h.role === 'sawyer' ? h.logs : h.inp, room = (h.role === 'sawyer' ? MILL_BUF : P.buf) - have - hauling(h, h.role === 'sawyer' ? 'in' : 'feed');
+    if (res !== 'logs' && !CREATURES[fox.kind].acts.toss) continue; // Säcke kann sie nicht selbst aufladen
     const n = Math.min(FOX_CARRY, room, Math.floor(S[res])); if (n < 2) continue;
     const score = n * 10 + (have === 0 ? 15 : 0) - Math.hypot(h.x - LAGER.x, h.z - LAGER.z) * .5; if (score > ss || !sup) { ss = score; sup = { hut: h, res, n }; }
   }
@@ -167,14 +171,36 @@ function foxChaseGo(h, why = []) {
   noteChoice('help', 'pest', 'den Hasen vom Feld jagen', [...why, { key: 'pest', label: 'ein Hase knabbert am Feld', weight: 1 }]);
 }
 // Reiten: ein freier Bewohner in der Nähe steigt beim Spielen auf den Rücken
+// so viele, wie Plätze da sind (Stier: zwei)
 function mount(force) {
-  let best = null, bd = force ? 40 : 10;
-  for (const v of villagers) { if (v.carry || v.load || v.haul || !(v.state === 'idle' || v.state === 'walk' || (force && !['sleep', 'grabbed', 'falling'].includes(v.state)))) continue; const d = Math.hypot(v.x - fox.x, v.z - fox.z); if (d < bd) { bd = d; best = v; } }
-  if (!best) return; fox.rider = best;
-  startRide(best, out => { anchor('back', out); out.y += .03; return fox.vh; });
+  const n = CREATURES[fox.kind].acts.riders, list = villagers.filter(v => !v.carry && !v.load && !v.haul && (v.state === 'idle' || v.state === 'walk' || (force && !['sleep', 'grabbed', 'falling', 'ride'].includes(v.state))))
+    .map(v => ({ v, d: Math.hypot(v.x - fox.x, v.z - fox.z) })).filter(e => e.d < (force ? 40 : 10)).sort((a, b) => a.d - b.d).slice(0, n);
+  if (!list.length) return; fox.riders = list.map(e => e.v); fox.rider = fox.riders[0];
+  fox.riders.forEach((v, i) => startRide(v, out => { seat(i, n, out); return fox.vh; }));
   floatText(fox.x, foxPivot.position.y + CREATURES[fox.kind].h + .3, fox.z, 'Juhu!', 's');
 }
-function dismount() { const v = fox.rider; if (!v) return; fox.rider = null; dropRide(v, fox.x + Math.cos(fox.vh || 0) * .7, fox.z - Math.sin(fox.vh || 0) * .7); }
+function dismount() {
+  if (!fox.riders) return; const L = fox.riders; fox.riders = null; fox.rider = null;
+  L.forEach((v, i) => { const s = i ? -1 : 1; dropRide(v, fox.x + Math.cos(fox.vh || 0) * .8 * s, fox.z - Math.sin(fox.vh || 0) * .8 * s); });
+}
+// Pflügen (Stier): einmal die Reihe der Felder eines Hofs entlang, der Pflug furcht die leeren Felder
+function foxPlowGo(why = []) {
+  const free = fields.filter(f => f.state === 'leer' && !f.plowed); if (!free.length) return false;
+  const f0 = free.sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0], F = f0.F;
+  const xs = F.fields.map(f => f.lx), x0 = Math.min(...xs) - FARM.fw / 2 - .4, x1 = Math.max(...xs) + FARM.fw / 2 + .4;
+  fox.plowRun = { F, x0, x1, lz: FARM.fz, n: 0 }; const p = farmPt(F, x0, FARM.fz); fox.act = 'help'; foxWalk(p.x, p.z, 'plow');
+  noteChoice('help', 'plow', 'die Felder pflügen', [...why, { key: 'field', label: 'auf dem Hof liegen Felder brach', weight: .6 }]); return true;
+}
+// Felsen wegschieben (Stier): mit dem Kopf ein Stück vom Dorf weg
+function foxRockGo(why = []) {
+  if (!navReady) buildNav(); const C = CREATURES[fox.kind];
+  const r = rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
+  if (!r) return false;
+  let dx = r.x - CENTER.x, dz = r.z - CENTER.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+  const gap = r.s + C.h * .62; fox.rockJob = { r, dx, dz, gap, left: 3 };
+  fox.act = 'help'; foxWalk(r.x - dx * gap, r.z - dz * gap, 'shove');
+  noteChoice('help', 'rock', 'einen Felsen wegschieben', [...why, { key: 'strong', label: 'ein Stier ist stark genug dafür', weight: .5 }]); return true;
+}
 // abgeschüttelt: Waren in die Werkstatt bzw. ins Lager
 function unload() {
   gear.cart = false; gear.log = false;
@@ -210,7 +236,7 @@ function playSpot() {
 }
 function updateFox(dt, t) {
   updateMind();
-  const C = CREATURES[fox.kind], drag = fox.carry && C.carry === 'drag', spd = C.walk * (drag ? .7 : gear.log ? .75 : gear.cart ? .8 : 1);
+  const C = CREATURES[fox.kind], drag = fox.carry && C.acts.tree !== 'mouth', spd = C.walk * (drag ? .7 : gear.log ? .75 : gear.cart ? .8 : 1);
   // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
   if (fox.once > 0) fox.once -= dt;
@@ -234,7 +260,7 @@ function updateFox(dt, t) {
         if (!H || !huts.includes(H.hut)) { fox.haul = null; foxIdle(1); }
         else {
           fox.h = Math.atan2(H.hut.x - fox.x, H.hut.z - fox.z);
-          const helper = fox.haulMode === 'self' ? null : loadHelper(H.hut, fox.haulMode === 'any'), cap = helper ? loadCap() : selfCap(), units = [];
+          const helper = fox.haulMode === 'self' ? null : loadHelper(H.hut, fox.haulMode === 'any' || !CREATURES[fox.kind].acts.toss), cap = helper ? loadCap() : selfCap(), units = [];
           for (const k in H.take) for (let i = 0; i < H.take[k] && units.length < cap; i++) units.push(k);
           const take = k => { if ((H.hut.goods[k] || 0) < 1) return false; H.hut.goods[k]--; return true; };
           fox.carryGoods = {}; fox.haulMode = null;
@@ -250,6 +276,8 @@ function updateFox(dt, t) {
       else if (fox.next === 'haulDeliver' && gear.log) { fox.state = 'nudge'; fox.timer = .8; fox.unload = fox.next; } // den Stamm an die Säge stupsen
       else if (fox.next === 'haulDeliver' || fox.next === 'haulStore') { fox.state = 'shake'; fox.timer = 1.1; fox.unload = fox.next; shakeOff(); } // abschütteln bzw. Karren auskippen, dann abrechnen
       else if (fox.next === 'sweep') { fox.state = 'sweep'; fox.timer = 4.5; fox.sweepT = 0; }
+      else if (fox.next === 'plow') { if (fox.plowRun) { fox.state = 'plow'; fox.plowRun.x = fox.plowRun.x0; gear.plow = true; } else foxIdle(1); }
+      else if (fox.next === 'shove') { const J = fox.rockJob; if (J) { fox.state = 'shove'; fox.h = Math.atan2(J.dx, J.dz); fox.timer = .6; } else foxIdle(1); }
       else if (fox.next === 'dig') { if (fox.dig) { fox.state = 'dig'; fox.timer = 2.8; fox.h = Math.atan2(fox.dig.x - fox.x, fox.dig.z - fox.z); } else foxIdle(1); }
       else if (fox.next === 'sniff') { fox.state = 'sniff'; fox.timer = 1.8; if (fox.bush) fox.h = Math.atan2(fox.bush.x - fox.x, fox.bush.z - fox.z); }
       else if (fox.next === 'forageStore') {
@@ -275,6 +303,27 @@ function updateFox(dt, t) {
       anim(gear.cart ? 'idle' : 'lie'); fox.timer -= dt;
       if (fox.loadDone || fox.timer <= 0) { if (fox.loader) dropLoad(fox.loader); fox.loader = null; if (!gear.cart) foxOnce('standUp'); haulOn(); }
       break;
+    case 'plow': { // die Reihe entlang, der Pflug furcht hinterher
+      anim('walk'); const P = fox.plowRun, a = farmPt(P.F, P.x0, P.lz), b = farmPt(P.F, P.x1, P.lz);
+      P.x += dt * .75; const p = farmPt(P.F, P.x, P.lz); fox.x = p.x; fox.z = p.z; fox.h = Math.atan2(b.x - a.x, b.z - a.z);
+      if (gear.towX !== undefined) {
+        for (const f of P.F.fields) if (f.state === 'leer' && !f.plowed && Math.hypot(f.x - gear.towX, f.z - gear.towZ) < FARM.fw * .45) { f.plowed = true; P.n++; floatText(f.x, surfaceAt(f.x, f.z) + .6, f.z, 'gepflügt', 's'); }
+        if (Math.random() < dt * 12) dust(gear.towX, surfaceAt(gear.towX, gear.towZ) + .03, gear.towZ, 1, .35);
+      }
+      if (P.x > P.x1 + C.h * 1.3) { gear.plow = false; fox.plowRun = null; fox.desc = P.n ? `${P.n} ${P.n === 1 ? 'Feld' : 'Felder'} gepflügt` : 'den Pflug über den Hof gezogen'; foxFinish('help', 'plow'); }
+      break;
+    }
+    case 'shove': { // anlaufen, dann mit gesenktem Kopf schieben; der Felsen rutscht vor ihr her
+      const J = fox.rockJob, r = J && J.r; if (!r) { foxIdle(1); break; }
+      fox.timer -= dt; anim(fox.timer > 0 ? 'attack' : 'walk');
+      if (fox.timer <= 0) {
+        const st = Math.min(J.left, dt * .7); J.left -= st; fox.x += J.dx * st; fox.z += J.dz * st;
+        r.x = fox.x + J.dx * J.gap; r.z = fox.z + J.dz * J.gap;
+        if (Math.random() < dt * 14) dust(r.x - J.dx * r.s, surfaceAt(r.x, r.z) + .03, r.z - J.dz * r.s, 1, .45);
+        if (J.left <= 0) { buildNav(); fox.rockJob = null; floatText(r.x, surfaceAt(r.x, r.z) + 1.2, r.z, 'Felsen weggeschoben', 's'); fox.desc = 'einen Felsen weggeschoben'; foxFinish('help', 'rock'); }
+      }
+      break;
+    }
     case 'nudge': fox.timer -= dt; anim('idle'); if (fox.timer <= 0) { gear.log = false; unload(); } break; // Stamm an die Säge gestupst
     case 'dig': { // mit den Vorderpfoten ein Loch scharren, Erde fliegt; dann den Samen hineinschieben
       anim('idle'); fox.timer -= dt; const P = fox.dig;
@@ -347,7 +396,7 @@ function updateFox(dt, t) {
         if (Math.random() < .3) fox.playDir = -dir; // im Sprung herumwirbeln und andersherum weiter
       }
       if (Math.floor(fox.playT) !== Math.floor(fox.playT - dt)) addGlaube(1.5, fox.x, 1.4, fox.z);
-      if (fox.playT > 7) { if (fox.rider) fox.desc = 'einen Bewohner auf dem Rücken reiten lassen'; foxFinish('play', 'play'); }
+      if (fox.playT > 7) { if (fox.riders) fox.desc = fox.riders.length > 1 ? 'zwei Bewohner auf dem Rücken reiten lassen' : 'einen Bewohner auf dem Rücken reiten lassen'; foxFinish('play', 'play'); }
     } break;
   }
   if (fox.hop > 0) fox.hop = Math.max(0, fox.hop - dt);
@@ -368,12 +417,14 @@ function updateFox(dt, t) {
   // Bewegungen über der Animation (body.js): Kopf tief beim Schleifen, Kopfwurf, Schwanz fegt, Abschütteln
   over('drag', { Neck1: [24, 0, 0], Head: [4, 0, 0] }, drag ? 1 : 0, 4);
   over('flick', { Neck1: [-30, 0, 0], Head: [-24, 0, 0] }, fox.state === 'toss' && fox.timer < .6 && fox.timer > .2 ? 1 : 0, 16);
-  over('push', { Neck1: [26, 0, 0], Head: [-4, 0, 0] }, gear.log && fox.state === 'walk' ? 1 : 0, 5); // Kopf tief am Stamm
+  over('push', { Neck1: [26, 0, 0], Head: [-4, 0, 0] }, (gear.log && fox.state === 'walk') || (fox.state === 'shove' && fox.timer <= 0) ? 1 : 0, 5); // Kopf tief am Stamm bzw. Felsen
+  over('pull', { Neck1: [12, 0, 0], Back: [3, 0, 0] }, gear.plow || gear.cart ? 1 : 0, 4); // legt sich ins Geschirr
   over('sniff', { Neck1: [18, 0, 0], Head: [10, 0, 0], Ear1L: [14, 0, 0], Ear1R: [14, 0, 0] }, fox.state === 'sniff' ? 1 : 0, 5);
   const dg = Math.sin(t * 15), digOn = fox.state === 'dig';
   over('dig', { Back: [8, 0, 0], Neck1: [24, 0, 0], Head: [12, 0, 0] }, digOn ? 1 : 0, 6);
   if (digOn) { footExtra.IKFrontLegL = [0, .07 * Math.max(0, dg), .08 * dg]; footExtra.IKFrontLegR = [0, .07 * Math.max(0, -dg), -.08 * dg]; } // abwechselnd scharren
-  else { delete footExtra.IKFrontLegL; delete footExtra.IKFrontLegR; }
+  else if (fox.digFeet) { delete footExtra.IKFrontLegL; delete footExtra.IKFrontLegR; } // nur zurücknehmen, was das Graben gesetzt hat (das Ritual nutzt sie auch)
+  fox.digFeet = digOn;
   if ((fox.signalT = Math.max(0, (fox.signalT || 0) - dt)) > 0) { const w = Math.sin(t * 17); over('wag', { Tail1: [26, 0, 0], Tail2: [4, w * 26, 0], Tail3: [0, w * 22, 0], Tail5: [0, w * 18, 0] }, 1, 12); } else overOff('wag'); // Zeichen geben
   const sws = Math.sin(t * 6.5);
   if (fox.state === 'sweep') over('sweep', { Tail1: [-36, sws * 48, 0], Tail2: [-6, sws * 22, 0], Tail3: [0, sws * 18, 0], Tail5: [0, sws * 14, 0], Neck1: [4, -sws * 10, 0] }, 1, 8); else overOff('sweep');
@@ -461,6 +512,10 @@ function foxToShrine(id) {
 function foxDo(kind) {
   foxDrop(); fox.once = 0;
   const why = [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }];
+  const A = CREATURES[fox.kind].acts;
+  if (kind === 'self' && !A.toss) return `Ein ${CREATURES[fox.kind].label} kann Waren nicht selbst aufladen.`;
+  if (kind === 'plow') { if (!fields.some(f => f.state === 'leer' && !f.plowed)) { const f = fields.find(f => f.state !== 'leer') ; if (f) { f.state = 'leer'; f.g = 0; } } return fields.length ? (foxPlowGo(why) ? '' : 'Kein leeres Feld.') : 'Noch kein Hof mit Feldern.'; }
+  if (kind === 'rock') return foxRockGo(why) ? '' : 'Kein Felsen in der Nähe.';
   if (kind === 'sweep') { foxSweepGo(why); return ''; }
   if (kind === 'plant') return foxPlantGo(why) ? '' : 'Kein Platz am Waldrand gefunden.';
   if (kind === 'forage') return foxForageGo(why) ? '' : 'Kein Busch am Wald in der Nähe.';
@@ -484,7 +539,7 @@ function foxDo(kind) {
     foxWalk(best.x + Math.sin(ang) * .9, best.z + Math.cos(ang) * .9, 'tree'); noteChoice('help', 'tree', 'Holz fürs Dorf holen', why); return '';
   }
   // Waren: liegen nirgends welche, legt der Test an der nächsten Hütte mit Warenfach welche hin
-  if (!huts.some(h => Object.values(h.goods).some(n => n >= 2))) {
+  if (!huts.some(h => Object.keys(h.goods).some(k => h.goods[k] - hauling(h, 'pick', k) >= 2))) { // reservierte Waren der Träger zählen nicht
     const h = huts.filter(h => h.goods).sort((a, b) => (Object.keys(b.goods).length - Object.keys(a.goods).length) || Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
     if (!h) return 'Keine Hütte mit Waren.'; const k = Object.keys(h.goods)[0] || 'veg'; h.goods[k] = (h.goods[k] || 0) + 8;
   }
@@ -510,6 +565,6 @@ function foxDrop() {
   if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k];
   if (fox.loader) { dropLoad(fox.loader); fox.loader = null; }
   fox.haul = null; fox.carryGoods = null; fox.mouthSack = false; back.n = 0; fox.act = null;
-  gear.cart = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.dig = null; fox.prey = null; dismount();
+  gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
 }
 export { foxCast, foxDo, foxDrop, foxHaul, foxToShrine, foxIdle, reinforce, updateFox };

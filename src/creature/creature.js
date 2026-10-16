@@ -272,7 +272,8 @@ function updateMouthTree() {
   const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
   if (!head) return;
   const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
-  if (C.carry === 'drag') { dragTree(o, s, C); return; }
+  if (C.acts.tree === 'drag') { dragTree(o, s, C); return; }
+  if (C.acts.tree === 'push') { pushTree(o, s, C); return; }
   head.getWorldPosition(mouthV); mouthF.set(Math.sin(foxPivot.rotation.y), 0, Math.cos(foxPivot.rotation.y));
   mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
   // Krone auf die von der Kamera abgewandte Seite (mit etwas Trägheit, damit sie nicht hin und her springt)
@@ -305,6 +306,22 @@ function dragTree(o, s, C) {
   o.position.copy(mouthV).addScaledVector(dragD, -TREE_H * s * kl * .05);
   o.visible = true;
   dragTip.copy(o.position).addScaledVector(dragD, L); fox.dragTip = dragTip; // dort schleift die Krone (Spur, Staub in ai.js)
+}
+// Schieben (Stier): Der Baum liegt quer vor dem Kopf am Boden, die Hörner schieben ihn am Stamm; die Krone liegt auf der
+// von der Kamera abgewandten Seite und schleift
+const pushS = new THREE.Vector3();
+function pushTree(o, s, C) {
+  s *= growK(); const head = foxModel.userData.head; head.getWorldPosition(mouthV);
+  const fh = foxPivot.rotation.y; mouthF.set(Math.sin(fh), 0, Math.cos(fh)); pushS.set(Math.cos(fh), 0, -Math.sin(fh));
+  const dc = pushS.x * (camera.position.x - fox.x) + pushS.z * (camera.position.z - fox.z);
+  if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
+  const kw = 2.2, kl = 4.2, L = TREE_H * s * kl; // der Stier schiebt ganze Bäume
+  mouthV.addScaledVector(mouthF, C.h * .14); mouthV.y = surfaceAt(mouthV.x, mouthV.z) + TREE_H * s * kw * .22; // Stamm knapp über dem Boden
+  dragD.copy(pushS).multiplyScalar(cs); dragD.y = -.06; dragD.normalize();
+  o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
+  o.position.copy(mouthV).addScaledVector(dragD, -L * .3); // die Hörner sitzen etwa am ersten Drittel des Stamms
+  o.visible = true;
+  dragTip.copy(o.position).addScaledVector(dragD, L); fox.dragTip = dragTip;
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 

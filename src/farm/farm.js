@@ -178,8 +178,9 @@ function updateFarm(dt, t) {
   const k = (1 + .7 * weather.wet) * (1 - .9 * smooth(.2, .6, weather.snowCover)) * (sky.night > .6 ? .4 : 1);
   for (const f of fields) {
     f.water = Math.max(0, f.water - dt);
-    if (f.state === 'grow') { f.g = Math.min(1, f.g + dt / CROPS[f.c].grow * k * (f.water > 0 ? 2.2 : 1)); if (f.g >= 1) { f.state = 'reif'; if (!ripeTip) { ripeTip = true; toast('Ein Feld ist reif. Der Bauer erntet es, du kannst aber auch mit der Hand darauf tippen.', 4); } } }
-    f.mat.color.setScalar(1 - .4 * Math.max(weather.wet, smooth(0, 12, f.water)));
+    // gepflügt (Stier) wächst ein Feld schneller, bis es reif ist
+    if (f.state === 'grow') { f.g = Math.min(1, f.g + dt / CROPS[f.c].grow * k * (f.water > 0 ? 2.2 : 1) * (f.plowed ? 1.35 : 1)); if (f.g >= 1) { f.state = 'reif'; f.plowed = false; if (!ripeTip) { ripeTip = true; toast('Ein Feld ist reif. Der Bauer erntet es, du kannst aber auch mit der Hand darauf tippen.', 4); } } }
+    f.mat.color.setScalar((1 - .4 * Math.max(weather.wet, smooth(0, 12, f.water))) * (f.plowed ? .78 : 1)); // frisch gepflügt: dunkle Erde
   }
   // Erzeugnisse der Tiere sammeln sich tagsüber im Stall
   for (const F of farms) {

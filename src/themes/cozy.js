@@ -46,12 +46,13 @@ export default {
       skin: { name: 'Skin', roughness: .55, emissive: 0x3a1606, emissiveIntensity: .25 }, // warmer Schimmer, damit die Hand nicht blass wirkt
       nails: { name: 'Nails', roughness: .3 }, trim: { name: 'Trim', roughness: .35, metalness: .35 },
       sleeve: { name: 'Sleeve', roughness: .8 }, sleeveIn: { name: 'SleeveIn', roughness: 1 } } },
-    // carry: 'drag' = Baum im Maul schleifen; anchors: Ankerpunkte [Knochen, x, y, z] in Tierhöhen (kreatur.md 3.13)
-    'creature.fox': { file: 'animals/Fox.glb', hd: 'animals/Fox_HD.glb', head: 'Head', react: true, ws: 1.1, rest: 'paw', carry: 'drag',
+    // anchors: Ankerpunkte [Knochen, x, y, z] in Tierhöhen (kreatur.md 3.13): Maul, Rücken, Brust (Geschirr), Schwanzspitze
+    'creature.fox': { file: 'animals/Fox.glb', hd: 'animals/Fox_HD.glb', head: 'Head', react: true, ws: 1.1, rest: 'paw',
       anchors: { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], chest: ['Torso3', 0, -.02, .02], tail: ['Tail8', 0, -.01, -.07] } },
     'creature.wolf': { file: 'animals/Wolf.glb', head: 'Head', ws: 1, rest: 'paw' },
     'creature.stag': { file: 'animals/Stag.glb', head: 'Head', ws: .9, rest: 'hoof' },
-    'creature.bull': { file: 'animals/Bull.glb', head: 'Head', ws: .9, rest: 'hoof' },
+    'creature.bull': { file: 'animals/Bull.glb', head: 'Head', ws: .9, rest: 'hoof',
+      anchors: { mouth: ['Head', 0, -.1, .17], back: ['Torso2', 0, .2, -.05], chest: ['Torso3', 0, -.02, .06], tail: ['Tail7', 0, -.02, -.03] } },
     'creature.alpaca': { file: 'animals/Alpaca.glb', head: 'Head', ws: 1, rest: 'hoof' },
     // Katze (Quaternius Animal Pack Vol.2): nur Idle/Walk, keine Augen – Augen werden am Kopfknochen ergänzt
     'creature.cat': { file: 'animals/Cat.glb', head: 'Bone003', ws: 1.2, eyes: { fwd: .265, up: .05, side: .06, r: .034, iris: 0x8fd14f } },

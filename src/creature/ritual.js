@@ -2,6 +2,8 @@
 // leuchtet, ein Zeichen erscheint am Boden, Funken ziehen zu ihr), dann bäumt sie sich auf und zieht mit dem Schwanz
 // einen Lichtbogen. Von der Schwanzspitze fliegt das Licht zum Ziel, dort wirkt das Wunder (Regen, Eile). Für sehr große
 // Dinge (einen Felsen versetzen) wachsen stattdessen Lichtranken aus der Schwanzspitze, heben ihn an und setzen ihn ab.
+// Der Stier (acts.rite 'stomp') lädt stehend auf, scharrt mit dem Huf und schnaubt; dann steigt er vorn hoch und stampft
+// auf, eine Welle läuft über den Boden zum Ziel und steigt dort auf.
 
 import * as THREE from 'three';
 import { MIRACLES, S } from '../core/state.js';
@@ -12,7 +14,7 @@ import { fields } from '../farm/farm.js';
 import { trees } from '../world/trees.js';
 import { CREATURES, fox } from './kinds.js';
 import { foxAnim, foxOnce, foxPivot } from './creature.js';
-import { anchor, over, overOff, setGlow, spark } from './body.js';
+import { anchor, dust, footExtra, over, overOff, setGlow, spark } from './body.js';
 import { foxDrop, foxIdle } from './ai.js';
 import { castHaste, castRain } from '../hand/miracles.js';
 import { rocks } from '../world/nature.js';
@@ -69,6 +71,9 @@ function updateTrail(tip, add, dt) {
 // Licht, das zum Ziel fliegt
 const orb = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
 orb.visible = false; scene.add(orb);
+// Stoßwelle beim Aufstampfen
+const shock = new THREE.Mesh(new THREE.RingGeometry(.85, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+shock.visible = false; scene.add(shock);
 const orbFrom = new THREE.Vector3(), orbTo = new THREE.Vector3(), tip = new THREE.Vector3(), body = new THREE.Vector3();
 
 // Ziel: Regen auf ein Feld, das gerade wächst, sonst jungen Wald, sonst ein Stück vor ihr; Eile dorthin, wo die meisten
@@ -91,7 +96,9 @@ function pickTarget(kind) {
   return { x: fox.x + Math.sin(fox.h) * 6, z: fox.z + Math.cos(fox.h) * 6 };
 }
 // Ritual beginnen; liefert einen Text, wenn es nicht geht
+const C0 = () => CREATURES[fox.kind];
 function startRitual(kind = 'rain', at = null) {
+  if (!C0().acts.rites.includes(kind)) return `Das kann ein ${C0().label} nicht.`;
   if (R.phase) return 'Das Ritual läuft schon.';
   const m = RITES[kind]; if (S.glaube < m.cost) return `${m.label} kostet ${m.cost} Glaube.`;
   if (['grabbed', 'shrine'].includes(fox.state) || fox.next === 'shrine') return `${S.name} ist gerade beschäftigt.`;
@@ -99,12 +106,13 @@ function startRitual(kind = 'rain', at = null) {
   foxDrop(); S.glaube -= m.cost;
   R.x = p.x; R.z = p.z; R.kind = kind; R.rock = p.rock || null; R.move = null;
   fox.state = 'ritual'; fox.h = Math.atan2(R.x - fox.x, R.z - fox.z); fox.once = 0;
-  R.phase = 'sit'; R.t = 0; foxOnce('sitDown');
+  R.stomp = C0().acts.rite === 'stomp'; R.t = 0;
+  if (R.stomp) R.phase = 'charge'; else { R.phase = 'sit'; foxOnce('sitDown'); }
   noteChoice('help', 'miracle', kind === 'move' ? 'einen Felsen versetzen' : `${m.label} wirken`, [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }]);
   return '';
 }
 function endRitual() {
-  R.phase = null; overOff('ritual'); overOff('ritualTail'); setGlow(0); rune.visible = false; vines.forEach(v => v.visible = false);
+  R.phase = null; overOff('ritual'); overOff('ritualTail'); overOff('stomp'); delete footExtra.IKFrontLegL; delete footExtra.IKFrontLegR; shock.visible = false; setGlow(0); rune.visible = false; vines.forEach(v => v.visible = false);
   if (R.move) { R.move.rock.lift = 0; R.move = null; }
   if (fox.state === 'ritual') foxIdle(1.5);
 }
@@ -117,17 +125,49 @@ function updateRitual(dt, t) {
     if (R.t > .7) { R.phase = 'charge'; R.t = 0; foxAnim('sit'); fox.once = 0; }
   } else if (R.phase === 'charge') {
     const k = Math.min(1, R.t / CHARGE_T);
-    foxAnim('sit');
+    if (R.stomp) { // scharren mit dem rechten Vorderhuf, Kopf gesenkt, schnauben
+      foxAnim('idle'); const s = Math.sin(t * 9);
+      footExtra.IKFrontLegR = [0, .05 * Math.max(0, s), .1 * s];
+      if (Math.random() < dt * 10) dust(fox.x + Math.sin(fox.h) * C.h * .35, g + .03, fox.z + Math.cos(fox.h) * C.h * .35, 1, .4);
+      if ((R.snort = (R.snort || 0) - dt) <= 0) { R.snort = .8; anchor('mouth', body); for (let i = 0; i < 3; i++) dust(body.x, body.y - .05, body.z, 1, .25); }
+    } else foxAnim('sit');
     setGlow(.02 + .05 * k + Math.sin(t * 9) * .015 * k);
     rune.visible = true; rune.position.set(fox.x, g + .04, fox.z); rune.rotation.y = t * .6; rune.scale.setScalar(C.h * (1.2 + k * .6)); rune.material.opacity = Math.min(1, R.t * 1.5) * .85;
     // Ohren nach vorn, Blick zum Ziel hinauf; der Schwanz liegt um die Pfoten
-    over('ritual', { Ear1L: [18, 0, 0], Ear1R: [18, 0, 0], Head: [-10, 0, 0] }, 1, 4);
+    over('ritual', R.stomp ? { Neck1: [20, 0, 0], Head: [8, 0, 0] } : { Ear1L: [18, 0, 0], Ear1R: [18, 0, 0], Head: [-10, 0, 0] }, 1, 4);
     if (Math.random() < dt * 40 * k + dt * 10) { // Funken steigen am Rand des Zeichens auf und ziehen zur Kreatur
       const a = Math.random() * Math.PI * 2, r = C.h * (.6 + k * .3);
       anchor('back', body);
       spark(fox.x + Math.cos(a) * r, g + .1, fox.z + Math.sin(a) * r, { vy: .6, life: 1.1, s: .1 + Math.random() * .06, to: body, pull: 6, drag: 2 });
     }
-    if (R.t >= CHARGE_T) { R.phase = 'gesture'; R.t = 0; R.fired = false; foxOnce('cast'); trailPts.length = 0; }
+    if (R.t >= CHARGE_T) { R.phase = 'gesture'; R.t = 0; R.fired = false; trailPts.length = 0; if (R.stomp) delete footExtra.IKFrontLegR; else foxOnce('cast'); }
+  } else if (R.phase === 'gesture' && R.stomp) { // vorn hochsteigen, aufstampfen, eine Welle läuft zum Ziel
+    const up = R.t < .55 ? Math.sin(R.t / .55 * Math.PI / 2) : 0;
+    footExtra.IKFrontLegL = footExtra.IKFrontLegR = [0, .22 * up, .04 * up];
+    over('stomp', { Back: [-14 * up, 0, 0], Neck1: [-10 * up, 0, 0] }, 1, 20);
+    setGlow(.08 + Math.sin(t * 14) * .02); rune.material.opacity = .85 * Math.max(0, 1 - R.t / 1.2);
+    if (!R.fired && R.t >= .55) { // Aufprall
+      R.fired = true; R.fly = 0; overOff('ritual'); anchor('mouth', orbFrom); orbFrom.y = g;
+      shock.visible = true; shock.position.set(fox.x, g + .05, fox.z); R.shockT = 0;
+      for (let i = 0; i < 28; i++) { const a = Math.random() * 6.28; dust(fox.x + Math.cos(a) * C.h * .5, g + .03, fox.z + Math.sin(a) * C.h * .5, 1, .55); }
+      orbTo.set(R.x, surfaceAt(R.x, R.z), R.z); orb.visible = true;
+    }
+    if (R.fired) {
+      R.shockT += dt; shock.scale.setScalar(.3 + R.shockT * 5 * C.h); shock.material.opacity = Math.max(0, .9 - R.shockT * 1.2); if (R.shockT > .8) shock.visible = false;
+      R.fly += dt; const k = Math.min(1, R.fly / (FLY_T * 1.3)), run = Math.min(1, k / .75), rise = Math.max(0, (k - .75) / .25);
+      orb.position.lerpVectors(orbFrom, orbTo, run); orb.position.y = surfaceAt(orb.position.x, orb.position.z) + .3 + rise * rise * (R.kind === 'haste' ? 2 : 5);
+      orb.scale.setScalar(1 + Math.sin(t * 20) * .15);
+      if (run < 1 && Math.random() < dt * 40) dust(orb.position.x, orb.position.y - .25, orb.position.z, 1, .5); // die Welle wirft Erde auf
+      if (Math.random() < dt * 50) spark(orb.position.x, orb.position.y, orb.position.z, { vx: (Math.random() - .5) * .6, vy: Math.random() * .8, vz: (Math.random() - .5) * .6, life: .7, s: .11 });
+      if (k >= 1) {
+        orb.visible = false; for (let i = 0; i < 30; i++) { const a = Math.random() * Math.PI * 2, e = Math.random() * 2; spark(orb.position.x, orb.position.y, orb.position.z, { vx: Math.cos(a) * e, vy: (Math.random() - .3) * e, vz: Math.sin(a) * e, life: 1, s: .13 }); }
+        if (R.kind === 'rain') castRain(R.x, R.z); else if (R.kind === 'haste') castHaste(R.x, R.z);
+        floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, `${S.name} wirkt ${RITES[R.kind].label}`, 's');
+        noteDone('miracle', `${RITES[R.kind].label} gewirkt`); toast(`${S.name} hat ${RITES[R.kind].label} gewirkt.`);
+        endRitual();
+      }
+    }
+    if (R.t > 4) endRitual();
   } else if (R.phase === 'gesture') { // aufbäumen, Schwanz zieht von einer Seite über oben zur anderen
     const u = Math.min(1, R.t / (GESTURE_T * .75)), arc = Math.sin(u * Math.PI), sw = Math.cos(u * Math.PI); // sw: +1 … -1
     over('ritualTail', { Tail1: [95 * arc + 15, 75 * sw, 0], Tail2: [25 * arc, 25 * sw, 0], Tail3: [15 * arc, 20 * sw, 0], Tail5: [8 * arc, 15 * sw, 0], Tail7: [0, 10 * sw, 0] }, 1, 12);
