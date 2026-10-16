@@ -55,7 +55,8 @@ Strand, Kleidung je Jahreszeit). Stand der Features: siehe `README.md`.
 **Stand:** 🔵 geplant
 
 1. **Kalender:** Spieltag und Jahreszeit im Spielstand (z. B. `S.day`); Länge eines Jahres festlegen (etwa 4 × 7
-   Spieltage). Anzeige in der Uhrzeit-Kachel.
+   Spieltage). Anzeige in der Uhrzeit-Kachel (✅ der Spieltag steht dort schon als „Tag 3“, aus `S.day`; die Jahreszeit
+   kommt dazu).
 2. **Überblenden:** Ein Modul `src/world/seasons.js` berechnet aus Tag und Uhrzeit die Mischung der Jahreszeiten und
    setzt Farbrollen und Geländefarben, z. B. mehrmals pro Spielstunde, damit es fließend wirkt.
 3. **Laub lichten:**

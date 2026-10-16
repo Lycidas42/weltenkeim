@@ -92,12 +92,13 @@ function updateHud(dt, t) {
       $('sGrow').textContent = GROW_TEXT[food.growth].replace(/ \(.*\)$/, ''); $('sGrow').classList.toggle('low', food.growth === 'food'); }
     updateLagerStock();
     if (!$('sheetWork').hidden) renderWork();
+    $('vD').textContent = `Tag ${fmt(S.day + 1)}`; // Spieltage seit Beginn, wie im Charakterbogen gezählt
     $('vT').textContent = `${Math.floor(S.hour)}:${String(Math.floor(S.hour % 1 * 6) * 10).padStart(2, '0')}`; $('vTs').textContent = S.timePaused && skipTo === null ? 'angehalten' : dayPhase(S.hour); $('btnTime').classList.toggle('paused', !!S.timePaused);
     { // Sonne bzw. Mond auf dem kleinen Himmelsbogen in der Uhrzeit-Kachel
       const sunUp = sunDir.y >= moonDir.y, a = sunUp ? (S.hour - 6.2) / 13.6 * Math.PI : ((S.hour - 19.6 + 24) % 24) / 10.8 * Math.PI, k = clamp(a, 0, Math.PI);
       const dial = $('tDial'); dial.dataset.body = sunUp ? 'sun' : 'moon';
       $('tBody').setAttribute('transform', `translate(${(18 - 14 * Math.cos(k)).toFixed(1)} ${(17 - 13 * Math.sin(k)).toFixed(1)})`);
-      $('btnTime').setAttribute('aria-label', `Uhrzeit ${$('vT').textContent}, ${$('vTs').textContent}. ${S.timePaused ? 'angehalten' : 'läuft'}. Tippen für Zeitmenü`);
+      $('btnTime').setAttribute('aria-label', `${$('vD').textContent}, ${$('vT').textContent} Uhr, ${$('vTs').textContent}. ${S.timePaused ? 'angehalten' : 'läuft'}. Tippen für Zeitmenü`);
     }
     { const k = S.weather; if ($('btnWx').dataset.wx !== k) { $('btnWx').dataset.wx = k; $('wxIc').innerHTML = WX_ICON[k]; $('vW').textContent = WEATHER[k].label[0].toUpperCase() + WEATHER[k].label.slice(1); }
       $('vWs').textContent = S.weatherLocked ? 'festgehalten' : windWord(waterU.uWind.value); $('btnWx').classList.toggle('paused', !!S.weatherLocked);
