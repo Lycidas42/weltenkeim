@@ -34,6 +34,7 @@ const APP = [
   './src/ui/hud.js',
   './src/ui/ring.js',
   './src/ui/sheets.js',
+  './src/village/roads.js',
   './src/village/ai.js',
   './src/village/build.js',
   './src/village/economy.js',

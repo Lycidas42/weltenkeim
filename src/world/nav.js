@@ -3,6 +3,7 @@
 import { clamp } from '../core/util.js';
 import { S } from '../core/state.js';
 import { HALF, SIZE, seaAt } from './terrain.js';
+import { pavedAt } from './paths.js';
 import { CREATURES, fox } from '../creature/kinds.js';
 import { modelInfo } from '../assets/models.js';
 import { LAGER, MILL_POS, PLAZA, SB, SHRINE_POS, WELL } from '../village/layout.js';
@@ -18,7 +19,8 @@ import { bushes, rocks } from './nature.js';
 // Das Raster wird jede Sekunde neu gestempelt (Bäume wachsen und fallen, Häuser entstehen, das Gelände wird geformt).
 const NAV_C = .25, NAV_N = Math.round(SIZE / NAV_C), NAV_SZ = NAV_N * NAV_N;
 const navV = { m: .12, g: new Uint8Array(NAV_SZ) }, navF = { m: .3, g: new Uint8Array(NAV_SZ) };
-const navWater = new Uint8Array(NAV_SZ);
+const navWater = new Uint8Array(NAV_SZ), navRoad = new Uint8Array(NAV_SZ); // navRoad: gepflastert (Bewohner gehen lieber dort)
+const ROAD_COST = .55;
 const navCell = (x, z) => { const i = Math.floor((x + HALF) / NAV_C), j = Math.floor((z + HALF) / NAV_C); return i < 0 || j < 0 || i >= NAV_N || j >= NAV_N ? -1 : j * NAV_N + i; };
 const cellX = c => -HALF + (c % NAV_N + .5) * NAV_C, cellZ = c => -HALF + (Math.floor(c / NAV_N) + .5) * NAV_C;
 // Grundrisse im Modellraum: Mitte (cx, cz) und halbe Ausdehnung (hx, hz)
@@ -77,16 +79,16 @@ function updateNav(dt) {
   navBudget = 30000;
 }
 function buildNav() {
-  for (let c = 0; c < NAV_SZ; c++) navWater[c] = seaAt(cellX(c), cellZ(c)) ? 1 : 0;
+  for (let c = 0; c < NAV_SZ; c++) { const x = cellX(c), z = cellZ(c); navWater[c] = seaAt(x, z) ? 1 : 0; navRoad[c] = pavedAt(x, z) ? 1 : 0; }
   const obs = navObstacles();
   navF.m = clamp(CREATURES[fox.kind || S.creature].h * .15, .22, .42); // großer Hirsch braucht mehr Platz als die Katze
   stampNav(navV, obs); stampNav(navF, obs); navReady = true;
 }
 const blockedAt = (nav, x, z) => { const c = navCell(x, z); return c < 0 || nav.g[c] === 1; };
-// freie Sicht auf dem Raster (Strecke in kleinen Schritten abtasten)
-function navLos(g, ax, az, bx, bz) {
+// freie Sicht auf dem Raster (Strecke in kleinen Schritten abtasten); road: die Strecke muss ganz auf Pflaster liegen
+function navLos(g, ax, az, bx, bz, road = false) {
   const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / (NAV_C * .45));
-  for (let k = 1; k < n; k++) { const c = navCell(ax + (bx - ax) * k / n, az + (bz - az) * k / n); if (c < 0 || g[c]) return false; }
+  for (let k = 1; k < n; k++) { const c = navCell(ax + (bx - ax) * k / n, az + (bz - az) * k / n); if (c < 0 || g[c] || (road && !navRoad[c])) return false; }
   return true;
 }
 // nächstes freies Feld (ringförmig suchen)
@@ -117,7 +119,7 @@ function findPath(nav, sx, sz, tx, tz) {
   if (s === t || navLos(g, ox, oz, cellX(t), cellZ(t))) { if (t !== t0) pts.push({ x: cellX(t), z: cellZ(t) }); pts.push(end); return pts; }
   if (++aStamp > 4e9) { aStamp = 1; aSeen.fill(0); aShut.fill(0); }
   const st = aStamp, ti = t % NAV_N, tj = Math.floor(t / NAV_N);
-  const hEst = c => { const dx = Math.abs(c % NAV_N - ti), dz = Math.abs(Math.floor(c / NAV_N) - tj); return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz); };
+  const hEst = c => { const dx = Math.abs(c % NAV_N - ti), dz = Math.abs(Math.floor(c / NAV_N) - tj); return (Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz)) * .8; }; // etwas unterschätzt: Pflaster ist billiger
   let hn = 0;
   const push = (c, f) => { let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (hF[p] <= f) break; hIdx[k] = hIdx[p]; hF[k] = hF[p]; k = p; } hIdx[k] = c; hF[k] = f; };
   const pop = () => {
@@ -136,7 +138,7 @@ function findPath(nav, sx, sz, tx, tz) {
       const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= NAV_N || j >= NAV_N) continue;
       const k = j * NAV_N + i; if (g[k] || aShut[k] === st) continue;
       if (di && dj && (g[cj * NAV_N + i] || g[j * NAV_N + ci])) continue;
-      const ng = aG[c] + w;
+      const ng = aG[c] + w * (navRoad[k] ? ROAD_COST : 1); // auf Pflaster geht es leichter
       if (aSeen[k] !== st || ng < aG[k]) { aSeen[k] = st; aG[k] = ng; aFrom[k] = c; push(k, ng + hEst(k)); }
     }
   }
@@ -146,7 +148,8 @@ function findPath(nav, sx, sz, tx, tz) {
   // glätten: vom aktuellen Punkt aus so weit wie möglich geradeaus
   let cx = ox, cz = oz, i = 0;
   while (i < cells.length - 1) {
-    let j = i + 1; while (j + 1 < cells.length && navLos(g, cx, cz, cellX(cells[j + 1]), cellZ(cells[j + 1]))) j++;
+    // Abkürzungen nur geradeaus, solange sie nicht von einer gepflasterten Strecke aufs Gras führen
+    let j = i + 1; while (j + 1 < cells.length && navLos(g, cx, cz, cellX(cells[j + 1]), cellZ(cells[j + 1]), navRoad[cells[i]] && navRoad[cells[j + 1]])) j++;
     cx = cellX(cells[j]); cz = cellZ(cells[j]); pts.push({ x: cx, z: cz }); i = j;
   }
   pts.push(end); return pts;

@@ -9,6 +9,7 @@ import { addGlaube, addHolz, addLogs, floatText } from '../ui/feedback.js';
 import { BED, LUNCH, WAKE } from '../world/sky.js';
 import { HALF, heightAt, seaAt, streamDist, surfaceAt } from '../world/terrain.js';
 import { addWear, paveAt, paveSpot, pavedAt } from '../world/paths.js';
+import { onRoad, roadSpot } from './roads.js';
 import { spawnChips } from '../world/particles.js';
 import { fox } from '../creature/kinds.js';
 import { treeKindAt } from '../models/nature.js';
@@ -108,8 +109,8 @@ function haulJob(v) {
   // Wird ein Steinhaus gebraucht (Platz knapp), bleiben die Steine dafür im Lager
   const keep = villagers.length >= cap() - 3 && houses.some(h => !h.stone) ? STONE_HOUSE.stone : 0;
   if (Math.random() < .4 && Math.floor(S.stone) - keep - villagers.filter(x => x.haul && x.haul.kind === 'pave' && !x.carry).length >= 1) {
-    const sp = paveSpot(villagers.filter(x => x.haul && x.haul.kind === 'pave').map(x => x.haul));
-    if (sp) { v.haul = { kind: 'pave', res: 'stone', n: 1, x: sp.x, z: sp.z }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickStone'); return true; }
+    const busy = villagers.filter(x => x.haul && x.haul.kind === 'pave').map(x => x.haul), sp = roadSpot(busy) || paveSpot(busy); // zuerst die Straßen zu den Werkstätten
+    if (sp) { v.haul = { kind: 'pave', res: 'stone', n: 1, x: sp.x, z: sp.z, plan: !!sp.plan }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickStone'); return true; }
   }
   // Waren an den Hütten abholen: die größte, nächste Menge zuerst
   let best = null, bd = 1e9;
@@ -395,7 +396,7 @@ function updateVillager(v, dt, t) {
     case 'pave': { // kniet und klopft den Stein ins Pflaster
       const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v); v.timer -= k; v.cp += k / DIG_T;
       if (Math.random() < dt * 3) spawnChips(v.x + Math.sin(v.h) * .15, surfaceAt(v.x, v.z) + .05, v.z + Math.cos(v.h) * .15, v.h, 0xa7a29a);
-      if (v.timer <= 0) { const H = v.haul; v.haul = null; const n = H ? paveAt(H.x, H.z) : 0; if (!n && H) S.stone += 1; else floatText(v.x, v.y + .6, v.z, 'Weg gepflastert', 'h'); idle(v, .5); }
+      if (v.timer <= 0) { const H = v.haul; v.haul = null; const n = H ? paveAt(H.x, H.z, .6, H.plan ? onRoad : null) : 0; if (!n && H) S.stone += 1; else floatText(v.x, v.y + .6, v.z, 'Weg gepflastert', 'h'); idle(v, .5); }
       break;
     }
     case 'quarry': { // mit der Spitzhacke auf den Felsen, Splitter fliegen; jede Runde ein Stein, der Felsen wird kleiner

@@ -59,13 +59,17 @@ const pavedAt = (x, z) => { const k = vtx(x, z); return k >= 0 && PAVE[k] === 1;
 // Straßen bleiben schmal: Ein Punkt wird nur gepflastert, wenn im 5×5-Feld um ihn herum höchstens ROAD_FILL Punkte
 // gepflastert sind. Eine Straße von zwei bis drei Punkten Breite (knapp 1 Einheit) passt, eine ganze Fläche nicht.
 const ROAD_FILL = 11;
-function roomForRoad(k) { let n = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) n += PAVE[k + dj * N + di] || 0; return n < ROAD_FILL; }
-// Ein Stein pflastert die ausgetretenen Punkte im Umkreis r (folgt so der Form des Pfads); liefert die Anzahl
-function paveAt(x, z, r = .6) {
+function paveFill(k) { let n = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) n += PAVE[k + dj * N + di] || 0; return n; }
+const roomForRoad = k => paveFill(k) < ROAD_FILL;
+// Pflaster wieder entfernen (zu breite Flächen, village/roads.js): der Pfad bleibt ausgetreten
+function unpave(k) { if (!PAVE[k]) return; PAVE[k] = 0; WEAR[k] = 25; wearDirty.add(k); stonesDirty = true; }
+// Ein Stein pflastert die ausgetretenen Punkte im Umkreis r (folgt so der Form des Pfads); liefert die Anzahl.
+// pick: eigene Auswahl der Punkte (geplante Straßen, village/roads.js) statt Abnutzung und Breitengrenze
+function paveAt(x, z, r = .6, pick = null) {
   let n = 0; const i0 = Math.floor((x - r + HALF) / CELL), i1 = Math.ceil((x + r + HALF) / CELL), j0 = Math.floor((z - r + HALF) / CELL), j1 = Math.ceil((z + r + HALF) / CELL);
   for (let j = Math.max(1, j0); j <= Math.min(SEG - 1, j1); j++) for (let i = Math.max(1, i0); i <= Math.min(SEG - 1, i1); i++) {
     const k = j * N + i, px = -HALF + i * CELL, pz = -HALF + j * CELL;
-    if (PAVE[k] || WEAR[k] < 12 || Math.hypot(px - x, pz - z) > r || H[k] < .1 || !roomForRoad(k)) continue;
+    if (PAVE[k] || Math.hypot(px - x, pz - z) > r || H[k] < .1 || (pick ? !pick(k) : WEAR[k] < 12 || !roomForRoad(k))) continue;
     PAVE[k] = 1; WEAR[k] = WEAR_MAX; wearDirty.add(k); n++;
   }
   if (n) stonesDirty = true;
@@ -110,4 +114,4 @@ const pavedCount = () => { let n = 0; for (let k = 0; k < PAVE.length; k++) n +=
 for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
 tCol.needsUpdate = true;
 
-export { PAVE, WEAR, addWear, paveAt, paveSpot, pavedAt, pavedCount, setTerrainColor, terrainColorOf, updateWear, vertexColor };
+export { PAVE, ROAD_FILL, WEAR, addWear, paveAt, paveFill, unpave, paveSpot, pavedAt, pavedCount, setTerrainColor, terrainColorOf, updateWear, vertexColor };
