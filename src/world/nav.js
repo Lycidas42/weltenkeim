@@ -48,7 +48,7 @@ function nearBuilding(x, z, m = .5) {
 }
 function navObstacles() {
   const { rects, circles } = buildingObstacles();
-  for (const r of rocks) circles.push({ x: r.x, z: r.z, r: r.s * .95 });
+  for (const r of rocks) if (!r.moving) circles.push({ x: r.x, z: r.z, r: r.s * .95 }); // ein gerade geschobener Felsen bewegt sich mit der Kreatur
   for (const b of bushes) circles.push({ x: b.x, z: b.z, r: .17 * b.s });
   for (const t of trees) if (t.alive && !t.gone && t.g > .25) circles.push({ x: t.x, z: t.z, r: .12 });
   return { rects, circles };

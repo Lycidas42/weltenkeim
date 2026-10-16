@@ -6,7 +6,7 @@ Kreatur steht in `kreatur.md` 3.13 B, die Kreatur selbst in `kreatur.md`.
 
 ## 1. Steinbruch, Steinmine und Steine
 
-**Stand:** 🟡 teilweise – Steinbruch, Mine und Ware Steine umgesetzt; die Kreatur bringt noch keine Felsen
+**Stand:** ✅ vorhanden – Steinbruch, Mine, Ware Steine; die Kreatur bringt Felsen zum Steinmetz
 
 ### A. Warum
 
@@ -38,9 +38,20 @@ Kreatur steht in `kreatur.md` 3.13 B, die Kreatur selbst in `kreatur.md`.
 - `S.stone`, im Lager angezeigt (eigenes Symbol, sichtbar ab Steinbruch oder Mine), hinter der Lagerhalle wachsen
   Steinstapel mit dem Vorrat. Bewohner tragen Steine in den Armen (`carry` 11).
 
-### E. Offen
+### E. Die Kreatur bringt Felsen ✅
 
-- Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken), siehe Reihenfolge.
+- Gibt es eine Steinmetzhütte, liegt neben ihr ein **Ablageplatz** für Felsen (`masonYard` in `village/ai.js`, vier
+  Plätze seitlich der Hütte).
+- **Stier:** Felsenschieben ist dann öfter seine Hilfe aus eigenem Antrieb. Er sucht einen mittelgroßen Felsen (bis
+  18 Einheiten entfernt, höchstens 24 vom Ablageplatz), stellt sich dahinter und schiebt ihn mit gesenktem Kopf den
+  **ganzen Weg** bis zur Hütte: Er folgt der Wegfindung um Häuser und Bäume herum, der Felsen bleibt vor seiner Stirn,
+  rollt ein wenig und wirbelt Staub auf („Felsen beim Steinmetz“). Bleibt er hängen, lässt er den Felsen liegen.
+- **Fuchs:** Das Ritual „Felsen versetzen“ trägt den Felsen mit Lichtranken zum Ablageplatz statt nur ein Stück vom
+  Dorf weg; die Flugzeit wächst mit der Entfernung.
+- So gebrachte Felsen merkt sich der Spielstand (`S.rocks`, neuntes Feld), und der Steinmetz baut sie **zuerst** ab.
+
+### F. Offen
+
 - Neue Felsen: ob sie auftauchen (z. B. wenn die Hand tief gräbt oder Berge anhebt) oder knapp bleiben.
 - Weitere Verwendungen: Brunnen, Ausbau des Schreins, Steinbrücke über den Bach.
 
@@ -88,5 +99,5 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
 
 1. ✅ Steinbruch, Steinmine und Ware Steine (1).
 2. ✅ Verwendung: gepflasterte Wege (3) und Steinhäuser (4).
-3. Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken).
+3. ✅ Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken).
 4. Felsen auf späteren Bauplätzen, Freiräumen durch die Kreatur (2).

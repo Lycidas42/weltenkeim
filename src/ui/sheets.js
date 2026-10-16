@@ -296,7 +296,7 @@ function foxDoing() {
       if (fox.next === 'shrine' && fox.morph) return `läuft zum Schrein, um die Gestalt ${CREATURES[fox.morph].label} anzunehmen`;
       if (fox.next === 'store') { const T = CREATURES[fox.kind].acts.tree; return T === 'drag' ? 'schleift einen Baum im Maul zum Lager' : T === 'push' ? 'schiebt einen Baum mit den Hörnern zum Lager' : T === 'horns' ? 'trägt einen Baum auf den Hörnern zum Lager' : 'trägt einen Baum im Maul zum Lager'; }
       if (fox.next === 'plow') return 'läuft zum Hof, um ein neues Feld zu pflügen';
-      if (fox.next === 'shove') return 'läuft zu einem Felsen, um ihn wegzuschieben';
+      if (fox.next === 'shove') return fox.rockJob && fox.rockJob.to ? 'läuft zu einem Felsen, um ihn zum Steinmetz zu schieben' : 'läuft zu einem Felsen, um ihn wegzuschieben';
       if (fox.next === 'uproot') return 'läuft zu einem jungen Baum, der zu dicht steht';
       if (fox.next === 'replant') return 'trägt einen jungen Baum im Geweih an eine freie Stelle';
       if (fox.next === 'patrolPt') return 'läuft Wache um das Dorf';
@@ -317,6 +317,7 @@ function foxDoing() {
     case 'escort': return 'begleitet einen Bewohner auf seinem Weg';
     case 'plow': return 'pflügt ein neues Feld für den Hof';
     case 'shove': return 'schiebt einen Felsen mit dem Kopf beiseite';
+    case 'shoveTo': return 'schiebt einen Felsen zur Steinmetzhütte';
     case 'play': return fox.riders && fox.riders.length > 1 ? 'tollt mit zwei Bewohnern auf dem Rücken über den Dorfplatz' : fox.rider ? 'tollt mit einem Bewohner auf dem Rücken über den Dorfplatz' : 'tollt über den Dorfplatz';
     case 'rest': return 'hat sich hingelegt und döst';
     case 'toss': return 'nimmt Waren ins Maul und wirft sie sich auf den Rücken';

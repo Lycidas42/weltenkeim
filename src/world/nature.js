@@ -30,7 +30,7 @@ function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x,
 // verschobene Felsen (Kreatur, kreatur.md 3.13) nach dem Neuladen am neuen Platz liegen
 const okRock = a => Array.isArray(a) && a.length >= 8 && a.every(n => typeof n === 'number' && isFinite(n));
 if (Array.isArray(S.rocks) && S.rocks.length && S.rocks.every(okRock)) {
-  for (const a of S.rocks) if (rocks.length < 84) rocks.push({ x: a[0], z: a[1], v: Math.abs(a[2] | 0) % ROCK_GEOS.length, s: a[3], r: a[4], tx: a[5], tz: a[6], tint: a[7] });
+  for (const a of S.rocks) if (rocks.length < 84) rocks.push({ x: a[0], z: a[1], v: Math.abs(a[2] | 0) % ROCK_GEOS.length, s: a[3], r: a[4], tx: a[5], tz: a[6], tint: a[7], atMason: a[8] === 1 });
 } else {
   for (let tries = 0; tries < 3000 && rocks.length < 24; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
   for (let tries = 0; tries < 3000 && rocks.length < 84; tries++) { // mittlere Felsen, gern in Gruppen um die großen
@@ -44,7 +44,7 @@ recolorRocks();
 // Felsen ganz abgebaut (Steinmetz, werkstaetten.md 1)
 function removeRock(r) { const i = rocks.indexOf(r); if (i < 0) return; rocks.splice(i, 1); recolorRocks(); }
 const r3 = n => Math.round(n * 1000) / 1000;
-onSave(() => { S.rocks = rocks.map(r => [r3(r.x), r3(r.z), r.v, r3(r.s), r3(r.r), r3(r.tx), r3(r.tz), r3(r.tint)]); });
+onSave(() => { S.rocks = rocks.map(r => [r3(r.x), r3(r.z), r.v, r3(r.s), r3(r.r), r3(r.tx), r3(r.tz), r3(r.tint), r.atMason ? 1 : 0]); }); // atMason: von der Kreatur zum Steinmetz gebracht
 // Büsche: gern am Waldrand, seltener auf offener Wiese
 const bushes = [];
 // kleine Büsche ohne eigenen Schatten (spart Rechenzeit)

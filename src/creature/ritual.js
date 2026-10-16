@@ -16,6 +16,7 @@ import { CREATURES, fox } from './kinds.js';
 import { foxAnim, foxOnce, foxPivot } from './creature.js';
 import { anchor, dust, footExtra, over, overOff, setGlow, spark } from './body.js';
 import { foxDrop, foxIdle, restSpot } from './ai.js';
+import { masonYard } from '../village/ai.js';
 import { followPath, navF, setGoal } from '../world/nav.js';
 import { castHaste, castRain } from '../hand/miracles.js';
 import { rocks } from '../world/nature.js';
@@ -114,7 +115,8 @@ function pickTarget(kind) {
   }
   if (kind === 'move') {
     let best = null, bd = 1e9;
-    for (const r of rocks) { if (r.s < .25 || r.s > .8) continue; const d = Math.hypot(r.x - fox.x, r.z - fox.z); if (d < bd && d < 16) { bd = d; best = r; } }
+    const yard = masonYard(); // mit Steinmetz: Felsen, die noch nicht bei ihm liegen
+    for (const r of rocks) { if (r.s < .25 || r.s > .8 || r.moving || (yard && r.atMason)) continue; const d = Math.hypot(r.x - fox.x, r.z - fox.z); if (d < bd && d < 16) { bd = d; best = r; } }
     return best ? { x: best.x, z: best.z, rock: best } : null;
   }
   let best = null, bd = 1e9;
@@ -245,17 +247,18 @@ const vineMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true
 const vines = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), vineMat); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
 const MOVE_T = { grow: .6, up: 1.1, go: 1.6, down: .7 }, rockTop = new THREE.Vector3();
 function startMove() {
-  const r = R.rock, dx = r.x - CENTER.x, dz = r.z - CENTER.z, l = Math.hypot(dx, dz) || 1;
+  const r = R.rock, dx = r.x - CENTER.x, dz = r.z - CENTER.z, l = Math.hypot(dx, dz) || 1, Y = masonYard(r.s);
+  if (Y && Math.hypot(Y.x - r.x, Y.z - r.z) < 26) { const d = Math.hypot(Y.x - r.x, Y.z - r.z); R.move = { rock: r, from: { x: r.x, z: r.z }, to: { x: Y.x, z: Y.z }, t: 0, go: Math.max(MOVE_T.go, d * .2), yard: true }; return; } // zum Steinmetz schweben
   let to = null; // ein Stück vom Dorf weg, auf festem Boden, nicht in Gebäuden
   for (let d = 3.5; d < 7 && !to; d += .5) for (const a of [0, .4, -.4, .8, -.8]) { const c = Math.cos(a), s = Math.sin(a), x = r.x + (dx / l * c - dz / l * s) * d, z = r.z + (dx / l * s + dz / l * c) * d, h = heightAt(x, z); if (h > .3 && h < 3.2 && !nearBuilding(x, z, r.s + .3)) { to = { x, z }; break; } }
   if (!to) to = { x: r.x + dx / l * 3, z: r.z + dz / l * 3 };
-  R.move = { rock: r, from: { x: r.x, z: r.z }, to, t: 0 };
+  R.move = { rock: r, from: { x: r.x, z: r.z }, to, t: 0, go: MOVE_T.go };
 }
 function updateMove(dt, t, C) {
-  const M = R.move, r = M.rock; M.t += dt; const T = MOVE_T, t1 = T.grow, t2 = t1 + T.up, t3 = t2 + T.go, t4 = t3 + T.down;
+  const M = R.move, r = M.rock; M.t += dt; const T = MOVE_T, t1 = T.grow, t2 = t1 + T.up, t3 = t2 + M.go, t4 = t3 + T.down;
   const sm = x => x * x * (3 - 2 * x), up = 1.6 + r.s;
   if (M.t > t1 && M.t <= t2) r.lift = sm((M.t - t1) / T.up) * up;
-  else if (M.t > t2 && M.t <= t3) { const k = sm((M.t - t2) / T.go); r.x = M.from.x + (M.to.x - M.from.x) * k; r.z = M.from.z + (M.to.z - M.from.z) * k; r.lift = up + Math.sin(k * Math.PI) * .4; }
+  else if (M.t > t2 && M.t <= t3) { const k = sm((M.t - t2) / M.go); r.x = M.from.x + (M.to.x - M.from.x) * k; r.z = M.from.z + (M.to.z - M.from.z) * k; r.lift = up + Math.sin(k * Math.PI) * .4; }
   else if (M.t > t3) r.lift = (1 - sm(Math.min(1, (M.t - t3) / T.down))) * up;
   anchor('tail', tip); rockTop.set(r.x, heightAt(r.x, r.z) + (r.lift || 0) + r.s * .45, r.z);
   const grow = Math.min(1, M.t / T.grow), fade = M.t > t3 ? 1 - Math.min(1, (M.t - t3) / T.down) : 1;
@@ -269,8 +272,9 @@ function updateMove(dt, t, C) {
   if (M.t >= t4) {
     r.lift = 0; vines.forEach(v => v.visible = false); buildNav();
     for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28; spark(r.x + Math.cos(a) * r.s, heightAt(r.x, r.z) + .1, r.z + Math.sin(a) * r.s, { vx: Math.cos(a) * 1.2, vy: .5, vz: Math.sin(a) * 1.2, life: .8, s: .12 }); }
-    floatText(r.x, heightAt(r.x, r.z) + 1.4, r.z, 'Felsen versetzt', 's');
-    noteDone('miracle', 'einen Felsen mit Lichtranken versetzt'); toast(`${S.name} hat einen Felsen versetzt.`);
+    if (M.yard) r.atMason = true;
+    floatText(r.x, heightAt(r.x, r.z) + 1.4, r.z, M.yard ? 'Felsen beim Steinmetz' : 'Felsen versetzt', 's');
+    noteDone('miracle', M.yard ? 'einen Felsen mit Lichtranken zum Steinmetz gebracht' : 'einen Felsen mit Lichtranken versetzt'); toast(`${S.name} hat einen Felsen ${M.yard ? 'zum Steinmetz gebracht' : 'versetzt'}.`);
     R.move = null; return true;
   }
   return false;

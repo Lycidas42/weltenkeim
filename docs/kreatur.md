@@ -502,7 +502,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
      **pflügt neue Felder:** hinter der ersten Feldreihe eines Hofs eine zweite, höchstens 8 Felder je Hof; er
      pflügt von außen zum Hof hin, das Feld entsteht hinter dem Pflug, Bäume auf dem Platz verschwinden, der Boden wird
      eingeebnet; gespeichert in `S.newFields`. Liegt ein Felsen auf dem Platz, **schiebt er ihn zuerst weg** (mit Stirn
-     und Hörnern, Kraft statt Lichtranken). So hat das Felsenschieben einen Zweck (`werkstaetten.md` 2). Ritual: lädt
+     und Hörnern, Kraft statt Lichtranken). So hat das Felsenschieben einen Zweck (`werkstaetten.md` 2). Gibt es einen Steinmetz, schiebt er Felsen den ganzen Weg bis neben dessen Hütte, der Fuchs bringt sie per Lichtranken dorthin (`werkstaetten.md` 1 E). Ritual: lädt
      stehend auf, scharrt mit dem Huf und schnaubt; steigt vorn hoch und stampft auf, eine Stoßwelle und eine Welle
      über den Boden laufen zum Ziel und steigen dort auf (Regen, Eile). Keine Fuchs-Hilfen (Fegen, Graben, Pilze,
      Hasen).
@@ -518,7 +518,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
    - **Katze und Alpaka** vorerst nicht wählbar.
    - **Felsen im Spielstand** (`S.rocks`): beim ersten Start zufällig verteilt, danach gespeichert; verschobene Felsen
      bleiben am neuen Platz. Bäume (auch eingegrabene Setzlinge) werden bisher nicht gespeichert.
-   - **Zweck des Felsenschiebens fehlt noch:** Felsen liegen nur außerhalb des Dorfes und stören nichts.
+   - **Zweck des Felsenschiebens:** Felsen gehen zum Steinmetz und werden zu Steinen (`werkstaetten.md` 1).
    - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste bzw. auf `develop` über die Konsole (`__wk.startRitual`; im
      normalen Verhalten erst mit dem Lernen, 3.9), Pflug, Lernen nach Tierart (E), andere Rassen.
 2. Ankerpunkte und Verben für die übrigen Rassen.

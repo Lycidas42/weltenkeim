@@ -19,7 +19,7 @@ import { villagers } from '../village/villagers.js';
 import { sites } from '../village/houses.js';
 import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, growK, updateMouthTree } from './creature.js';
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
-import { MILL_BUF, dropLoad, dropRide, hauling, helpLoad, startRide } from '../village/ai.js';
+import { MILL_BUF, dropLoad, dropRide, hauling, helpLoad, masonYard, startRide } from '../village/ai.js';
 import { addWear } from '../world/paths.js';
 import { anchor, back, dust, footExtra, gear, over, overOff, seat, shakeOff, tossOnBack, updateBody } from './body.js';
 import { leanReasons, noteChoice, noteDone, noteLearn, pickDrive, train, updateMind } from './mind.js';
@@ -61,7 +61,7 @@ function foxChoose() {
     const night = S.hour >= 20 || S.hour < 6;
     if (can('patrol') && (night ? r2 < .6 : r2 > .9) && foxPatrolGo(why)) return; // Wache um das Dorf
     if (can('escort') && r2 > .6 && r2 < .8 && foxEscortGo(why)) return; // einen Bewohner begleiten
-    if (can('rock') && r2 > .9 && foxRockGo(why)) return; // einen Felsen wegschieben
+    if (can('rock') && (r2 > .9 || (r2 > .72 && masonYard())) && foxRockGo(why)) return; // einen Felsen wegschieben, mit Steinmetz öfter (er braucht Felsen)
   }
   if (a === 'help' && Math.random() < .55 && foxHaul()) { // Waren von einer Hütte ins Lager tragen
     const H = fox.haul, hut = ROLES[H.hut.role].hut;
@@ -236,6 +236,7 @@ function foxPlowGo(why = []) {
 // Felsen wegschieben (Stier): mit dem Kopf ein Stück vom Dorf weg
 function foxRockGo(why = [], only = null, from = null) {
   if (!navReady) buildNav(); const C = CREATURES[fox.kind];
+  if (!only && foxRockToMason(why)) return true;
   // Felsen mittlerer Größe in der Nähe, nächster zuerst; schieben vom Dorf weg. Der Platz dahinter muss erreichbar sein
   const list = only ? [only] : rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z));
   let r = null, dx = 0, dz = 0, gap = 0;
@@ -249,6 +250,23 @@ function foxRockGo(why = [], only = null, from = null) {
   fox.rockJob = { r, dx, dz, gap, left: only ? Math.max(1.5, 1.8 + r.s - Math.hypot(r.x - from.x, r.z - from.z)) : 3 }; // vom Feldplatz: bis er ihn frei gibt
   fox.act = 'help'; foxWalk(r.x - dx * gap, r.z - dz * gap, 'shove');
   noteChoice('help', 'rock', 'einen Felsen wegschieben', [...why, { key: 'strong', label: 'ein Stier ist stark genug dafür', weight: .5 }]); return true;
+}
+// Gibt es eine Steinmetzhütte, schiebt der Stier einen Felsen den ganzen Weg bis neben die Hütte (werkstaetten.md 1 E):
+// erst hinter den Felsen, dann folgt er dem Weg, der Felsen bleibt vor der Stirn
+function foxRockToMason(why) {
+  const C = CREATURES[fox.kind], list = rocks.filter(r => r.s > .25 && r.s < .8 && !r.atMason && !r.moving && !(r.by && villagers.includes(r.by) && r.by.rock === r) && Math.hypot(r.x - fox.x, r.z - fox.z) < 18)
+    .sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z));
+  for (const r of list) {
+    const Y = masonYard(r.s); if (!Y || Math.hypot(Y.x - r.x, Y.z - r.z) > 24 || Math.hypot(Y.x - r.x, Y.z - r.z) < 1.5) continue;
+    let ux = Y.x - r.x, uz = Y.z - r.z; const l = Math.hypot(ux, uz); ux /= l; uz /= l;
+    const g = r.s * .85 + C.h * .48, bx = r.x - ux * g, bz = r.z - uz * g;
+    if (blockedAt(navF, bx, bz)) continue;
+    fox.rockJob = { r, dx: ux, dz: uz, gap: g, left: 0, to: { x: Y.x, z: Y.z }, hut: Y.hut, stuck: 0 };
+    fox.act = 'help'; foxWalk(bx, bz, 'shove');
+    noteChoice('help', 'rock', 'einen Felsen zum Steinmetz schieben', [...why, { key: 'mason', label: 'der Steinmetz braucht Felsen', weight: .6 }, { key: 'strong', label: 'ein Stier ist stark genug dafür', weight: .5 }]);
+    return true;
+  }
+  return false;
 }
 // abgeschüttelt: Waren in die Werkstatt bzw. ins Lager
 function unload() {
@@ -386,11 +404,25 @@ function updateFox(dt, t) {
     case 'shove': { // anlaufen, dann mit gesenktem Kopf schieben; der Felsen rutscht vor ihr her
       const J = fox.rockJob, r = J && J.r; if (!r) { foxIdle(1); break; }
       fox.timer -= dt; anim(fox.timer > 0 ? 'attack' : 'walk');
+      if (fox.timer <= 0 && J.to) { fox.state = 'shoveTo'; r.moving = true; buildNav(); setGoal(fox, J.to.x - J.dx * J.gap * .3, J.to.z - J.dz * J.gap * .3, navF); break; }
       if (fox.timer <= 0) {
         const st = Math.min(J.left, dt * .7); J.left -= st; fox.x += J.dx * st; fox.z += J.dz * st;
         r.x = fox.x + J.dx * J.gap; r.z = fox.z + J.dz * J.gap;
         if (Math.random() < dt * 14) dust(r.x - J.dx * r.s, surfaceAt(r.x, r.z) + .03, r.z - J.dz * r.s, 1, .45);
         if (J.left <= 0) { buildNav(); fox.rockJob = null; floatText(r.x, surfaceAt(r.x, r.z) + 1.2, r.z, 'Felsen weggeschoben', 's'); fox.desc = 'einen Felsen weggeschoben'; foxFinish('help', 'rock'); }
+      }
+      break;
+    }
+    case 'shoveTo': { // den Felsen vor der Stirn den Weg entlang zum Steinmetz schieben
+      const J = fox.rockJob, r = J && J.r; if (!r || !rocks.includes(r)) { if (r) r.moving = false; fox.rockJob = null; foxIdle(1); break; }
+      anim('walk'); const x0 = fox.x, z0 = fox.z, done = followPath(fox, C.walk * .55 * dt);
+      const vh = fox.vh ?? fox.h; r.x = fox.x + Math.sin(vh) * J.gap; r.z = fox.z + Math.cos(vh) * J.gap; r.r += (Math.hypot(fox.x - x0, fox.z - z0) / Math.max(.2, r.s)) * .6; // er rollt ein wenig
+      if (Math.random() < dt * 14) dust(r.x - Math.sin(vh) * r.s, surfaceAt(r.x, r.z) + .03, r.z - Math.cos(vh) * r.s, 1, .45);
+      J.stuck = Math.hypot(fox.x - x0, fox.z - z0) < dt * .05 ? J.stuck + dt : 0;
+      if (done || Math.hypot(r.x - J.to.x, r.z - J.to.z) < .45 || J.stuck > 4) {
+        r.moving = false; const there = Math.hypot(r.x - J.to.x, r.z - J.to.z) < 1.6; r.atMason = there; fox.rockJob = null; buildNav();
+        floatText(r.x, surfaceAt(r.x, r.z) + 1.2, r.z, there ? 'Felsen beim Steinmetz' : 'Felsen weggeschoben', 's');
+        fox.desc = there ? 'einen Felsen zum Steinmetz geschoben' : 'einen Felsen weggeschoben'; foxFinish('help', 'rock');
       }
       break;
     }
@@ -517,7 +549,7 @@ function updateFox(dt, t) {
   over('drag', { Neck1: [24, 0, 0], Head: [4, 0, 0] }, drag ? 1 : 0, 4);
   over('flick', { Neck1: [-30, 0, 0], Head: [-24, 0, 0] }, fox.state === 'toss' && fox.timer < .6 && fox.timer > .2 ? 1 : 0, 16);
   over('push', { Neck1: [26, 0, 0], Head: [-4, 0, 0] }, gear.log && fox.state === 'walk' ? 1 : 0, 5); // Kopf tief am Stamm
-  over('horns', { Neck1: [32, 0, 0], Head: [38, 0, 0] }, fox.state === 'shove' && fox.timer <= 0 ? 1 : 0, 6); // Kopf eingezogen, Stirn und Hörner gegen den Felsen
+  over('horns', { Neck1: [32, 0, 0], Head: [38, 0, 0] }, (fox.state === 'shove' && fox.timer <= 0) || fox.state === 'shoveTo' ? 1 : 0, 6); // Kopf eingezogen, Stirn und Hörner gegen den Felsen
   over('pull', { Neck1: [12, 0, 0], Back: [3, 0, 0] }, gear.plow || gear.cart ? 1 : 0, 4); // legt sich ins Geschirr
   over('sniff', { Neck1: [18, 0, 0], Head: [10, 0, 0], Ear1L: [14, 0, 0], Ear1R: [14, 0, 0] }, fox.state === 'sniff' ? 1 : 0, 5);
   const dg = Math.sin(t * 15), digOn = fox.state === 'dig';
@@ -668,6 +700,6 @@ function foxDrop() {
   if (fox.plowRun && fox.plowRun.field) { fox.plowRun.field.reveal = 1; setReveal(fox.plowRun.field); } // abgebrochen: das angefangene Feld bleibt fertig liegen
   if (fox.trans) { if (fox.carry && fox.carryG) { addTree(fox.x + Math.cos(fox.vh || 0) * .8, fox.z - Math.sin(fox.vh || 0) * .8, fox.carryG); fox.carry = false; } else if (fox.trans.t) fox.trans.t.reserved = null; } // umzusetzenden Baum gleich hier einsetzen
   fox.trans = null; fox.carryG = 0; fox.patrol = null; fox.esc = null;
-  gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
+  gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; if (fox.rockJob && fox.rockJob.r) fox.rockJob.r.moving = false; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
 }
 export { foxCast, foxDo, foxDrop, foxHaul, restSpot, foxToShrine, foxIdle, reinforce, updateFox };

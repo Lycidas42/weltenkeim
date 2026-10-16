@@ -121,10 +121,20 @@ function haulJob(v) {
 // Steinmetz: nächster freier Felsen nahe der Hütte; er steht an der Seite zur Hütte hin
 function findRock(v) {
   let best = null, bd = 22 * 22;
-  for (const r of rocks) { if (r.s < .2 || (r.by && r.by !== v && villagers.includes(r.by) && r.by.rock === r) || heightAt(r.x, r.z) < .1) continue; const d = (r.x - v.hut.x) ** 2 + (r.z - v.hut.z) ** 2; if (d < bd) { bd = d; best = r; } }
+  for (const r of rocks) { if (r.s < .2 || (r.by && r.by !== v && villagers.includes(r.by) && r.by.rock === r) || heightAt(r.x, r.z) < .1) continue; if (r.moving) continue; const d = (r.x - v.hut.x) ** 2 + (r.z - v.hut.z) ** 2 - (r.atMason ? 1e4 : 0); if (d < bd) { bd = d; best = r; } } // gebrachte Felsen zuerst
   return best;
 }
 const QUARRY_T = 2.4, ROCK_MIN = .2, ROCK_STEP = .045;
+// Platz neben der Steinmetzhütte, an dem die Kreatur Felsen ablegt (werkstaetten.md 1 E): seitlich der Hütte, frei von
+// anderen Felsen. s = Größe des Felsens, der dort hin soll
+const YARD = [[1.3, .3], [1.3, -.5], [1.3, 1.1], [-1.35, -.45]];
+function masonYard(s = .5) {
+  for (const h of huts) {
+    if (h.role !== 'mason') continue;
+    for (const [lx, lz] of YARD) { const p = localPt(h, lx, lz); if (heightAt(p.x, p.z) > .2 && !rocks.some(r => !r.moving && Math.hypot(r.x - p.x, r.z - p.z) < r.s + s + .25)) return { hut: h, x: p.x, z: p.z }; }
+  }
+  return null;
+}
 function atHut(v, next = 'rest') { const p = hutWork(v.hut); walk(v, p.x + rnd(.25), p.z + rnd(.25), next); }
 // freier Platz für einen Setzling: leerer Baumplatz oder Stumpf nahe der Hütte, sonst ein neuer Platz am Waldrand
 function plantSpot(x, z) {
@@ -500,4 +510,4 @@ const wish = { kind: null, t: 0, dur: 90, by: null, cool: 25, checkT: 0, at: SHR
 const begSpot = () => shrinePt(rnd(.25), 1.95 + Math.random() * .15);
 function goBeg(v) { const p = begSpot(); walk(v, p.x, p.z, 'beg'); }
 
-export { JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, dropRide, goBeg, hauling, helpLoad, idle, startRide, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };
+export { masonYard, JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, dropRide, goBeg, hauling, helpLoad, idle, startRide, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };
