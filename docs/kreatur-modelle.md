@@ -140,7 +140,7 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
   zwei Eckzähne (`FangL/R`).
 - **Schalenfell im Gesicht:** Fellmaske `_FUR` aus dem Bauskript (Export mit `export_attributes`): lang an den Wangen,
   mittel auf Stirn und Kehle, kurz auf der Schnauze, frei an Augen und Nase. Im Spiel (`face.js`, `FACE_FUR`) nur die
-  Dreiecke mit Fell als 6 (Handy) bzw. 10 Schichten, gekämmt nach hinten, sichtbar wenn die Kamera näher als 11 ist.
+  Dreiecke mit Fell als 7 (Handy) bzw. 14 Schichten mit gleichmäßigen, an der Wurzel dicken Strähnen, gekämmt nach hinten, sichtbar wenn die Kamera näher als 11 ist.
   Haare hängen an der Ruhelage der Haut. Auf dem Handy noch messen.
 - **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Fell auf der Stirn noch körnig,
   Geräusche.

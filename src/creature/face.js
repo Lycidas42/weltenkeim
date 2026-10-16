@@ -159,7 +159,7 @@ function updateFace(dt, t) {
 // lang an den Wangen, kurz auf der Schnauze, frei an Augen und Nase), als Schichten entlang der Normalen nach außen
 // geschoben. Die Haare hängen an der Ruhelage der Haut (Attribut position), so bleiben sie über alle Schichten Strähnen,
 // auch wenn sich der Kopf bewegt. Nur nah an der Kamera sichtbar.
-const FACE_FUR = { shells: isMobile ? 6 : 10, len: .032, den: 190, near: 11 };
+const FACE_FUR = { shells: isMobile ? 7 : 14, len: .03, den: 210, near: 11 };
 function faceFurMaterial(src, h, uni) {
   const m = src.clone();
   m.onBeforeCompile = sh => {
@@ -178,8 +178,8 @@ function faceFurMaterial(src, h, uni) {
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (vFur < 0.03) discard;
         vec3 g = vBase * uDen, id = floor(g), f = fract(g) - 0.5 + (vec3(h31(id + 1.7), h31(id + 4.3), h31(id + 8.9)) - 0.5) * 0.35;
-        float r = h31(id), len = mix(0.45, 1.0, r);
-        if (uH > len || length(f) > (1.0 - uH / len) * 0.62) discard;
+        float r = h31(id), len = mix(0.72, 1.0, r); // gleichmäßige Längen: sonst stehen einzelne Strähnen struppig ab
+        if (uH > len || length(f) > (1.0 - pow(uH / len, 1.5)) * 0.74) discard; // an der Wurzel dick, spitz zum Ende
         diffuseColor.rgb *= mix(0.74, 1.08, uH / len) * mix(0.93, 1.07, r);`);
   };
   m.customProgramCacheKey = () => 'wkFaceFur';
