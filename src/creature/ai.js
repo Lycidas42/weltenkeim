@@ -244,13 +244,14 @@ function updateFox(dt, t) {
     foxGlow.intensity = a * 6; foxRing.material.opacity = a * .7; foxRing.scale.setScalar(.4 + k * 1.6 * C.h);
     foxRing.position.set(fox.x, surfaceAt(fox.x, fox.z) + .08, fox.z);
   }
-  foxPivot.position.set(fox.x, surfaceAt(fox.x, fox.z) + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
+  const gy = groundFit(dt, C);
+  foxPivot.position.set(fox.x, gy + Math.sin(Math.min(1, fox.hop / .5) * Math.PI) * .7, fox.z);
   // Das Modell dreht sich weich in die Laufrichtung (gleich schnell bei jeder Bildrate, höchstens etwa 260° pro Sekunde),
   // statt an jeder Ecke des Weges sprunghaft umzuschwenken
   if (fox.vh === undefined) fox.vh = fox.h;
   const dvh = Math.atan2(Math.sin(fox.h - fox.vh), Math.cos(fox.h - fox.vh));
   fox.vh += Math.sign(dvh) * Math.min(Math.abs(dvh) * (1 - Math.exp(-dt * 7)), dt * 4.5);
-  foxPivot.rotation.y = fox.vh;
+  foxPivot.rotation.set(fox.pitch, fox.vh, fox.roll, 'YXZ'); // erst drehen, dann am Hang neigen
   foxMixer.update(dt);
   // Bewegungen über der Animation (body.js): Kopf tief beim Schleifen, Kopfwurf, Schwanz fegt, Abschütteln
   over('drag', { Neck1: [24, 0, 0], Head: [4, 0, 0] }, drag ? 1 : 0, 4);
@@ -265,6 +266,17 @@ function updateFox(dt, t) {
     addWear(fox.dragTip.x, fox.dragTip.z, dt * .5);
     if (Math.random() < dt * 9) dust(fox.dragTip.x, surfaceAt(fox.dragTip.x, fox.dragTip.z) + .05, fox.dragTip.z, 1, .45);
   }
+}
+// Am Hang (z. B. auf dem Hügel des Schreins) dem Boden folgen: Höhe unter Brust und Hüfte bzw. links und rechts messen,
+// das Tier danach neigen (weich, höchstens etwa 25°) und so hoch setzen, dass weder Kopf noch Hinterteil im Boden stecken
+function groundFit(dt, C) {
+  const fx = Math.sin(fox.vh ?? fox.h), fz = Math.cos(fox.vh ?? fox.h), lf = C.h * .55, lb = C.h * .45, w = C.h * .18;
+  const hc = surfaceAt(fox.x, fox.z), hf = surfaceAt(fox.x + fx * lf, fox.z + fz * lf), hb = surfaceAt(fox.x - fx * lb, fox.z - fz * lb);
+  const hl = surfaceAt(fox.x + fz * w, fox.z - fx * w), hr = surfaceAt(fox.x - fz * w, fox.z + fx * w);
+  const lim = .45, k = 1 - Math.exp(-dt * 8);
+  const pitch = clamp(-Math.atan2(hf - hb, lf + lb), -lim, lim), roll = clamp(Math.atan2(hl - hr, 2 * w) * .6, -.25, .25);
+  fox.pitch = (fox.pitch || 0) + (pitch - (fox.pitch || 0)) * k; fox.roll = (fox.roll || 0) + (roll - (fox.roll || 0)) * k;
+  return Math.max(hc, hb + (hf - hb) * lb / (lf + lb)); // Höhe der Linie Hüfte–Brust über dem Mittelpunkt
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)
 const GLOW_T = 2.3; let glowT = 0;
