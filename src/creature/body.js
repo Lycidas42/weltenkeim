@@ -83,14 +83,16 @@ function itemKind(i, kind) { const o = backItems[i]; o.userData.goods.visible = 
 const back = { n: 0, shake: 0, kinds: [] };
 const bp = new THREE.Vector3(), bq = new THREE.Quaternion(), bTilt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 // Sitzplatz Nummer i für einen Reiter (bei zwei Plätzen vorn und hinten auf dem Rücken)
-function seat(i, n, out) { anchor('back', out); if (n > 1) out.add(off.set(0, 0, (i ? -.13 : .1) * CREATURES[fox.kind].h).applyQuaternion(foxPivot.quaternion)); out.y += .03; return out; }
+// Ausrüstung und Lasten richten sich nach der Körpergröße, nicht nach der Höhe (beim Hirsch zählt das Geweih mit)
+const kh = C => C.h * (C.bodyS || 1);
+function seat(i, n, out) { anchor('back', out); if (n > 1) out.add(off.set(0, 0, (i ? -.13 : .1) * kh(CREATURES[fox.kind])).applyQuaternion(foxPivot.quaternion)); out.y += .03; return out; }
 function backSlot(i, out) {
   const C = CREATURES[fox.kind];
-  if (gear.cart && cart.visible) { const c = CART_SLOTS[i]; return out.set(c[0], c[1], c[2]).multiplyScalar(C.h * .95).applyAxisAngle(Y, cartH).add(cart.position); } // im Karren
+  if (gear.cart && cart.visible) { const c = CART_SLOTS[i]; return out.set(c[0], c[1], c[2]).multiplyScalar(kh(C) * .95).applyAxisAngle(Y, cartH).add(cart.position); } // im Karren
   const s = BACK_SLOTS[i]; anchor('back', out);
-  return out.add(off.set(s[0] * (C.backW || 1), s[1], s[2]).multiplyScalar(C.h).applyQuaternion(foxPivot.quaternion));
+  return out.add(off.set(s[0] * (C.backW || 1), s[1], s[2]).multiplyScalar(kh(C)).applyQuaternion(foxPivot.quaternion));
 }
-function itemScale(i) { const C = CREATURES[fox.kind]; return (i === 4 ? CRATE : SACK) * C.h / 1.45; }
+function itemScale(i) { const C = CREATURES[fox.kind]; return (i === 4 ? CRATE : SACK) * kh(C) / 1.45; }
 // Flug einer Ware (vom Maul auf den Rücken, vom Rücken auf den Boden): { o, from, to (Funktion oder Vektor), t, dur, h, done }
 const flyers = [];
 function fly(o, from, to, dur, h, done, scale) { o.visible = true; flyers.push({ o, from: from.clone(), to, t: 0, dur, h, done, scale, spin: (Math.random() - .5) * 6 }); }
@@ -256,7 +258,7 @@ const gear = { cart: false, plow: false, basket: 0, log: false, roll: 0 }; // wa
 const gp = new THREE.Vector3(), gq = new THREE.Quaternion(), cartPos = new THREE.Vector3(), cartFwd = new THREE.Vector3(), lastLog = new THREE.Vector3();
 let cartH = 0, cartInit = false;
 function updateGear(dt) {
-  const C = CREATURES[fox.kind], k = C.h, G = S.cGear || {}, on = !!foxModel;
+  const C = CREATURES[fox.kind], k = kh(C), G = S.cGear || {}, on = !!foxModel;
   // Satteltaschen sitzen am Rückenanker
   // Satteltaschen: immer, wenn sie etwas auf dem Rücken trägt oder gerade beladen wird; gekauft trägt sie damit auch mehr
   bags.visible = on && (!!G.bags || back.n > 0 || ['toss', 'waitLoad', 'haulUp'].includes(fox.state) || (fox.state === 'walk' && !!fox.carryGoods && !gear.log && !gear.cart));

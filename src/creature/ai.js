@@ -16,6 +16,7 @@ import { bushes, rocks } from '../world/nature.js';
 import { ROW2, addNewField, farms, fields, newFieldSlot, setReveal } from '../farm/farm.js';
 import { scareAway, wild } from '../wildlife/land.js';
 import { villagers } from '../village/villagers.js';
+import { sites } from '../village/houses.js';
 import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, growK, updateMouthTree } from './creature.js';
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, dropLoad, dropRide, hauling, helpLoad, startRide } from '../village/ai.js';
@@ -54,7 +55,11 @@ function foxChoose() {
     if (can('sweep') && r2 < .1) { foxSweepGo(why); return; } // den Platz am Schrein fegen
     if (can('plant') && r2 < .22 && foxPlantGo(why)) return; // einen Setzling eingraben
     if (can('forage') && r2 < .36 && foxForageGo(why)) return; // Pilze suchen
-    if (can('plow') && r2 < .3 && foxPlowGo(why)) return; // leere Felder pflügen
+    if (can('plow') && r2 < .3 && foxPlowGo(why)) return; // ein neues Feld pflügen
+    if (can('transplant') && r2 > .22 && r2 < .4 && foxTransplantGo(why)) return; // einen jungen Baum umsetzen
+    const night = S.hour >= 20 || S.hour < 6;
+    if (can('patrol') && (night ? r2 < .6 : r2 > .9) && foxPatrolGo(why)) return; // Wache um das Dorf
+    if (can('escort') && r2 > .6 && r2 < .8 && foxEscortGo(why)) return; // einen Bewohner begleiten
     if (can('rock') && r2 > .9 && foxRockGo(why)) return; // einen Felsen wegschieben
   }
   if (a === 'help' && Math.random() < .55 && foxHaul()) { // Waren von einer Hütte ins Lager tragen
@@ -100,6 +105,33 @@ function foxHaul() {
   if (sup && (!best || ss > bs)) { fox.haul = { hut: sup.hut, supply: sup.res, n: sup.n }; const p = lagerDrop(); foxWalk(p.x, p.z, 'haulLager'); return true; }
   if (!best) return false;
   fox.haul = best; const p = hutWork(best.hut); foxWalk(p.x, p.z, 'haulPick'); return true;
+}
+// Hirsch: einen jungen Baum aus dichtem Wald ausgraben und an einer freien Stelle am Waldrand wieder einsetzen
+function foxTransplantGo(why = []) {
+  const near = (t, r) => trees.filter(o => o !== t && o.alive && !o.gone && Math.hypot(o.x - t.x, o.z - t.z) < r).length;
+  const t = trees.filter(t => t.alive && !t.gone && !t.reserved && t.g > .12 && t.g < .55 && Math.hypot(t.x - fox.x, t.z - fox.z) < 20 && near(t, 1.6) >= 2)
+    .sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
+  if (!t) return false; if (!navReady) buildNav(); const P = plantSpot(); if (!P) return false;
+  t.reserved = 'fox'; fox.trans = { t, to: P }; fox.act = 'help';
+  const a = Math.atan2(fox.x - t.x, fox.z - t.z); foxWalk(t.x + Math.sin(a) * .9, t.z + Math.cos(a) * .9, 'uproot');
+  noteChoice('help', 'transplant', 'einen jungen Baum umsetzen', [...why, { key: 'forest', label: 'im dichten Wald hat der junge Baum keinen Platz', weight: .6 }]); return true;
+}
+// Wolf: nachts eine Runde um das Dorf, an jedem Punkt wachen; Wild in der Nähe flieht
+function foxPatrolGo(why = []) {
+  if (!navReady) buildNav();
+  const pts = sites.filter(s => s.used).map(s => { const a = Math.atan2(s.z - CENTER.z, s.x - CENTER.x); return { a, x: s.x + Math.cos(a) * 2.6, z: s.z + Math.sin(a) * 2.6 }; })
+    .filter(p => !blockedAt(navF, p.x, p.z)).sort((p, q) => p.a - q.a);
+  if (pts.length < 2) return false;
+  const step = Math.max(1, Math.floor(pts.length / 4)), route = pts.filter((_, i) => i % step === 0).slice(0, 4);
+  fox.patrol = { pts: route, i: 0 }; fox.act = 'help'; foxWalk(route[0].x, route[0].z, 'patrolPt');
+  noteChoice('help', 'patrol', 'Wache um das Dorf laufen', [...why, { key: 'night', label: S.hour >= 20 || S.hour < 6 ? 'es ist Nacht, das Dorf schläft' : 'ein Wolf schaut nach dem Rechten', weight: .6 }]); return true;
+}
+// Wolf: einen Bewohner auf dem Weg begleiten; im Rudel geht es schneller (Eile)
+function foxEscortGo(why = []) {
+  const v = villagers.filter(v => v.state === 'walk' && !v.load && Math.hypot(v.x - fox.x, v.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
+  if (!v) return false;
+  fox.esc = { v, t: 10, met: false }; fox.state = 'escort'; fox.act = 'help'; fox.chaseT = 0;
+  noteChoice('help', 'escort', 'einen Bewohner begleiten', [...why, { key: 'pack', label: 'im Rudel geht es leichter', weight: .6 }]); return true;
 }
 // Wer belädt die Kreatur? Am liebsten jemand aus der Hütte, der gerade nichts trägt; sonst ein freier Bewohner in der Nähe.
 // any: im Test notfalls irgendwer, der wach ist
@@ -294,6 +326,13 @@ function updateFox(dt, t) {
       else if (fox.next === 'sweep') { fox.state = 'sweep'; fox.timer = 4.5; fox.sweepT = 0; }
       else if (fox.next === 'plow') { if (fox.plowRun) { fox.state = 'plow'; fox.plowRun.x = fox.plowRun.x0; gear.plow = true; } else foxIdle(1); }
       else if (fox.next === 'shove') { const J = fox.rockJob; if (J) { fox.state = 'shove'; fox.h = Math.atan2(J.dx, J.dz); fox.timer = .6; } else foxIdle(1); }
+      else if (fox.next === 'uproot') { const T = fox.trans; if (T && !T.t.gone && T.t.alive) { fox.state = 'uproot'; fox.timer = 1.4; fox.h = Math.atan2(T.t.x - fox.x, T.t.z - fox.z); } else { if (T) T.t.reserved = null; fox.trans = null; foxIdle(1); } }
+      else if (fox.next === 'replant') { // den Baum wieder einsetzen
+        const T = fox.trans; fox.carry = false; const g = fox.carryG || .2; fox.carryG = 0;
+        if (T) { const nt = addTree(T.to.x, T.to.z, g); for (let i = 0; i < 8; i++) dust(T.to.x, surfaceAt(T.to.x, T.to.z) + .03, T.to.z, 1, .4); if (nt) floatText(T.to.x, surfaceAt(T.to.x, T.to.z) + 1, T.to.z, 'Baum umgesetzt', 's'); }
+        fox.trans = null; fox.desc = 'einen jungen Baum umgesetzt'; foxFinish('help', 'transplant');
+      }
+      else if (fox.next === 'patrolPt') { fox.state = 'watch'; fox.timer = 1.8; }
       else if (fox.next === 'dig') { if (fox.dig) { fox.state = 'dig'; fox.timer = 2.8; fox.h = Math.atan2(fox.dig.x - fox.x, fox.dig.z - fox.z); } else foxIdle(1); }
       else if (fox.next === 'sniff') { fox.state = 'sniff'; fox.timer = 1.8; if (fox.bush) fox.h = Math.atan2(fox.bush.x - fox.x, fox.bush.z - fox.z); }
       else if (fox.next === 'forageStore') {
@@ -347,6 +386,35 @@ function updateFox(dt, t) {
         if (Math.random() < dt * 14) dust(r.x - J.dx * r.s, surfaceAt(r.x, r.z) + .03, r.z - J.dz * r.s, 1, .45);
         if (J.left <= 0) { buildNav(); fox.rockJob = null; floatText(r.x, surfaceAt(r.x, r.z) + 1.2, r.z, 'Felsen weggeschoben', 's'); fox.desc = 'einen Felsen weggeschoben'; foxFinish('help', 'rock'); }
       }
+      break;
+    }
+    case 'uproot': { // mit dem Huf lockern, dann den jungen Baum ins Geweih heben
+      anim('eat'); fox.timer -= dt; const T = fox.trans;
+      if (Math.random() < dt * 12 && T) dust(T.t.x, surfaceAt(T.t.x, T.t.z) + .03, T.t.z, 1, .35);
+      if (fox.timer <= 0) {
+        if (!T || T.t.gone) { fox.trans = null; foxIdle(1); break; }
+        fox.carryType = T.t.type; fox.carryG = Math.max(.15, T.t.g); T.t.gone = true; T.t.reserved = null; fox.carry = true;
+        const a = Math.atan2(fox.x - T.to.x, fox.z - T.to.z), C2 = CREATURES[fox.kind]; foxWalk(T.to.x + Math.sin(a) * C2.h * .35, T.to.z + Math.cos(a) * C2.h * .35, 'replant');
+      }
+      break;
+    }
+    case 'watch': { // stehen bleiben, lauschen, sich umsehen; Wild in der Nähe flieht
+      anim('idle'); fox.timer -= dt;
+      if (fox.timer <= 0) {
+        for (const a of wild) if (a.state !== 'dead' && Math.hypot(a.x - fox.x, a.z - fox.z) < 7) scareAway(a, fox.x, fox.z);
+        const P = fox.patrol; if (P && ++P.i < P.pts.length) { const p = P.pts[P.i]; foxWalk(p.x, p.z, 'patrolPt'); break; }
+        const night = S.hour >= 20 || S.hour < 6; if (night) { addGlaube(2, fox.x, 1.4, fox.z); floatText(fox.x, foxPivot.position.y + C.h + .2, fox.z, 'Das Dorf schläft ruhig', 's'); }
+        fox.patrol = null; fox.desc = 'Wache um das Dorf gelaufen'; foxFinish('help', 'patrol');
+      }
+      break;
+    }
+    case 'escort': { // neben dem Bewohner herlaufen
+      const E = fox.esc, v = E && E.v; E.t -= dt;
+      if (!v || !villagers.includes(v) || E.t <= 0 || ['sleep', 'grabbed', 'falling', 'ride'].includes(v.state)) { fox.esc = null; fox.desc = 'einen Bewohner begleitet'; foxFinish('help', 'escort'); break; }
+      const sx = Math.cos(v.vh ?? v.h), sz = -Math.sin(v.vh ?? v.h), tx = v.x + sx * .9, tz = v.z + sz * .9, d = Math.hypot(tx - fox.x, tz - fox.z);
+      if (d > .4) { anim(d > 2 ? 'run' : 'walk'); if ((fox.chaseT = (fox.chaseT || 0) - dt) <= 0) { fox.chaseT = .4; setGoal(fox, tx, tz, navF); } followPath(fox, (d > 2 ? C.run : C.walk * 1.4) * dt); }
+      else { anim(v.state === 'walk' ? 'walk' : 'idle'); fox.h = v.vh ?? v.h; }
+      if (!E.met && d < 1.6) { E.met = true; v.haste = Math.max(v.haste || 0, 20); v.cheer = 1.2; floatText(v.x, v.y + 1, v.z, 'Gemeinsam schneller', 's'); fox.signalT = 1; }
       break;
     }
     case 'nudge': fox.timer -= dt; anim('idle'); if (fox.timer <= 0) { gear.log = false; unload(); } break; // Stamm an die Säge gestupst
@@ -542,6 +610,9 @@ function foxDo(kind) {
   if (kind === 'self' && !A.toss) return `Ein ${CREATURES[fox.kind].label} kann Waren nicht selbst aufladen.`;
   if (kind === 'plow') return farms.length ? (foxPlowGo(why) ? '' : 'Kein Platz mehr für ein neues Feld (höchstens 8 je Hof, Felsen räumen).') : 'Noch kein Hof.';
   if (kind === 'rock') return foxRockGo(why) ? '' : 'Kein Felsen in der Nähe.';
+  if (kind === 'transplant') return foxTransplantGo(why) ? '' : 'Kein junger Baum in dichtem Wald.';
+  if (kind === 'patrol') return foxPatrolGo(why) ? '' : 'Noch keine Häuser.';
+  if (kind === 'escort') { if (foxEscortGo(why)) return ''; const v = villagers.find(v => v.state === 'idle'); if (v) { v.timer = 0; } return 'Gerade läuft niemand, gleich noch einmal versuchen.'; }
   if (kind === 'sweep') { foxSweepGo(why); return ''; }
   if (kind === 'plant') return foxPlantGo(why) ? '' : 'Kein Platz am Waldrand gefunden.';
   if (kind === 'forage') return foxForageGo(why) ? '' : 'Kein Busch am Wald in der Nähe.';
@@ -592,6 +663,8 @@ function foxDrop() {
   if (fox.loader) { dropLoad(fox.loader); fox.loader = null; }
   fox.haul = null; fox.carryGoods = null; fox.mouthSack = false; back.n = 0; fox.act = null;
   if (fox.plowRun && fox.plowRun.field) { fox.plowRun.field.reveal = 1; setReveal(fox.plowRun.field); } // abgebrochen: das angefangene Feld bleibt fertig liegen
+  if (fox.trans) { if (fox.carry && fox.carryG) { addTree(fox.x + Math.cos(fox.vh || 0) * .8, fox.z - Math.sin(fox.vh || 0) * .8, fox.carryG); fox.carry = false; } else if (fox.trans.t) fox.trans.t.reserved = null; } // umzusetzenden Baum gleich hier einsetzen
+  fox.trans = null; fox.carryG = 0; fox.patrol = null; fox.esc = null;
   gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
 }
 export { foxCast, foxDo, foxDrop, foxHaul, foxToShrine, foxIdle, reinforce, updateFox };

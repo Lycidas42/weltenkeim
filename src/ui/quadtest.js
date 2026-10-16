@@ -17,8 +17,8 @@ const LABEL = { idle: 'Stehen', idle2: 'Stehen 2', eat: 'Fressen', walk: 'Gehen'
 // Handlungen nach den drei Stufen (kreatur.md 3.13): Körper, Bewohner, Magie
 // Gezeigt wird nur, was die gewählte Gestalt kann (kinds.js, acts)
 const ACTS = [['tree', 'Baum bringen'], ['self', 'Selbst aufladen'], ['push', 'Stamm rollen'], ['plant', 'Graben und pflanzen'], ['sweep', 'Schwanz fegt'],
-  ['forage', 'Pilze suchen'], ['pest', 'Hasen verjagen'], ['plow', 'Pflügen'], ['rock', 'Felsen schieben'], ['villager', 'Bewohner belädt'], ['ride', 'Reiten'],
-  ['rain', 'Ritual: Regen'], ['haste', 'Ritual: Eile'], ['move', 'Lichtranken: Felsen']];
+  ['forage', 'Pilze suchen'], ['pest', 'Hasen verjagen'], ['plow', 'Pflügen'], ['rock', 'Felsen schieben'], ['transplant', 'Baum umsetzen'], ['patrol', 'Wache laufen'], ['escort', 'Bewohner begleiten'], ['villager', 'Bewohner belädt'], ['ride', 'Reiten'],
+  ['rain', 'Ritual: Regen'], ['haste', 'Ritual: Eile'], ['bloom', 'Ritual: Waldblüte'], ['move', 'Lichtranken: Felsen']];
 function canDo(k) { const A = CREATURES[fox.kind].acts; return ['tree', 'push', 'villager', 'ride'].includes(k) || (k === 'self' && A.toss) || A.help.includes(k) || A.rites.includes(k); }
 const GEAR = [['basket', 'Korb'], ['bags', 'Satteltaschen'], ['cart', 'Karren']];
 
@@ -33,7 +33,7 @@ function anim(name) {
 function act(kind) {
   if (fox.state === 'test') { foxMixer.stopAllAction(); fox.cur = null; foxIdle(0); }
   let msg;
-  if (['rain', 'haste', 'move'].includes(kind)) {
+  if (['rain', 'haste', 'move', 'bloom'].includes(kind)) {
     const fill = S.glaube < 30; if (fill) S.glaube = 30; // für den Test genug Glaube
     msg = startRitual(kind) || (fill ? 'Glaube für den Test aufgefüllt.' : '');
   } else msg = foxDo(kind);

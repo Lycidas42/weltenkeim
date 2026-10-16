@@ -503,6 +503,16 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
      stehend auf, scharrt mit dem Huf und schnaubt; steigt vorn hoch und stampft auf, eine Stoßwelle und eine Welle
      über den Boden laufen zum Ziel und steigen dort auf (Regen, Eile). Keine Fuchs-Hilfen (Fegen, Graben, Pilze,
      Hasen).
+   - **Hirsch (Wald, Wachstum):** trägt Bäume quer im Geweih; wird beladen (6), kein Selbstaufladen; gräbt Setzlinge
+     mit den Vorderhufen ein; **setzt junge Bäume um** (aus dichtem Wald, mit dem Huf gelockert, im Geweih an eine
+     freie Stelle am Waldrand). Ritual: scharrt, Licht sammelt sich im Geweih, stampft auf, das Licht fliegt im Bogen
+     aus dem Geweih. Eigenes Wunder **Waldblüte** (15 Glaube): Bäume im Umkreis wachsen nach, Stümpfe treiben aus.
+     Ausrüstung und Lasten richten sich nach der Körpergröße (`bodyS`), nicht nach der Höhe mit Geweih.
+   - **Wolf (Ausdauer, Rudel):** schleift Bäume im Maul wie der Fuchs, lädt selbst auf (4), beladen 6; jagt Hasen;
+     **Wache bei Nacht** (Runde um das Dorf, an jedem Punkt lauschen, Wild in der Nähe flieht; nachts etwas Glaube);
+     **begleitet Bewohner** auf ihrem Weg (sie werden schneller, wie Eile). Ritual: legt sich, reckt den Kopf und heult,
+     Ringe steigen auf, das Licht kommt aus dem Maul.
+   - **Katze und Alpaka** vorerst nicht wählbar.
    - **Felsen im Spielstand** (`S.rocks`): beim ersten Start zufällig verteilt, danach gespeichert; verschobene Felsen
      bleiben am neuen Platz. Bäume (auch eingegrabene Setzlinge) werden bisher nicht gespeichert.
    - **Zweck des Felsenschiebens fehlt noch:** Felsen liegen nur außerhalb des Dorfes und stören nichts.

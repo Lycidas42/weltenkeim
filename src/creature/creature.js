@@ -336,13 +336,16 @@ function pushTree(o, s, C) {
 }
 // Auf den Hörnern (Stier): Der Baum liegt quer oben auf dem Kopf, etwa im Gleichgewicht (die schwere Krone näher am
 // Kopf), und schaukelt mit dem Kopf mit. Nichts schleift am Boden.
+const hornOff = new THREE.Vector3();
 function hornTree(o, s, C) {
-  s *= growK(); const head = foxModel.userData.head; head.getWorldPosition(mouthV);
+  s *= fox.carryG ? Math.max(.3, fox.carryG) : growK(); // ein junger Baum zum Umsetzen ist kleiner
+  const hb = C.horns && (foxModel.userData.horns || (foxModel.userData.horns = foxModel.getObjectByName(C.horns[0]))), head = foxModel.userData.head;
   const fh = foxPivot.rotation.y; mouthF.set(Math.sin(fh), 0, Math.cos(fh)); pushS.set(Math.cos(fh), 0, -Math.sin(fh));
   const dc = pushS.x * (camera.position.x - fox.x) + pushS.z * (camera.position.z - fox.z);
   if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
-  const kw = 1.8, kl = 3.6, L = TREE_H * s * kl;
-  mouthV.addScaledVector(mouthF, C.h * .02).y += C.h * .1; // zwischen den Hörnern
+  const kw = fox.carryG ? 2.6 : 1.8, kl = fox.carryG ? 2.6 : 3.6, L = TREE_H * s * kl; // junger Baum: nicht gestreckt
+  if (hb) { hb.getWorldPosition(mouthV); mouthV.add(hornOff.set(C.horns[1], C.horns[2], C.horns[3]).multiplyScalar(C.h).applyQuaternion(foxPivot.quaternion)); } // zwischen Hörnern bzw. im Geweih
+  else { head.getWorldPosition(mouthV); mouthV.addScaledVector(mouthF, C.h * .02).y += C.h * .1; }
   const nk = narrowK(C); dragD.copy(pushS).multiplyScalar(cs * (1 - nk)).addScaledVector(mouthF, -nk); dragD.y = .04 * Math.sin(performance.now() * .005); dragD.normalize(); // wippt leicht; zwischen Häusern längs über den Rücken
   o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
   o.position.copy(mouthV).addScaledVector(dragD, -L * .38);
