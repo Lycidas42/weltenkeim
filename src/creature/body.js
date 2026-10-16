@@ -72,7 +72,7 @@ function backSlot(i, out) {
   const C = CREATURES[fox.kind];
   if (gear.cart && cart.visible) { const c = CART_SLOTS[i]; return out.set(c[0], c[1], c[2]).multiplyScalar(C.h * .95).applyAxisAngle(Y, cartH).add(cart.position); } // im Karren
   const s = BACK_SLOTS[i]; anchor('back', out);
-  return out.add(off.set(s[0], s[1], s[2]).multiplyScalar(C.h).applyQuaternion(foxPivot.quaternion));
+  return out.add(off.set(s[0] * (C.backW || 1), s[1], s[2]).multiplyScalar(C.h).applyQuaternion(foxPivot.quaternion));
 }
 function itemScale(i) { const C = CREATURES[fox.kind]; return (i === 4 ? CRATE : SACK) * C.h / 1.45; }
 // Flug einer Ware (vom Maul auf den Rücken, vom Rücken auf den Boden): { o, from, to (Funktion oder Vektor), t, dur, h, done }
@@ -241,8 +241,9 @@ let cartH = 0, cartInit = false;
 function updateGear(dt) {
   const C = CREATURES[fox.kind], k = C.h, G = S.cGear || {}, on = !!foxModel;
   // Satteltaschen sitzen am Rückenanker
-  bags.visible = on && !!G.bags;
-  if (bags.visible) { anchor('back', gp); bags.position.copy(gp); bags.quaternion.copy(foxPivot.quaternion); bags.scale.setScalar(k); }
+  // Satteltaschen: immer, wenn sie etwas auf dem Rücken trägt oder gerade beladen wird; gekauft trägt sie damit auch mehr
+  bags.visible = on && (!!G.bags || back.n > 0 || ['toss', 'waitLoad', 'haulUp'].includes(fox.state) || (fox.state === 'walk' && !!fox.carryGoods && !gear.log && !gear.cart));
+  if (bags.visible) { anchor('back', gp); bags.position.copy(gp); bags.quaternion.copy(foxPivot.quaternion); bags.scale.set(k * (C.backW || 1), k, k); }
   // Geschirr und Karren bzw. Pflug nur, wenn sie ihn gerade zieht
   const towed = on && (gear.cart ? cart : gear.plow ? plow : null);
   cart.visible = towed === cart; plow.visible = towed === plow; harness.visible = !!towed;

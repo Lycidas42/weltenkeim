@@ -194,10 +194,17 @@ function foxPlowGo(why = []) {
 // Felsen wegschieben (Stier): mit dem Kopf ein Stück vom Dorf weg
 function foxRockGo(why = []) {
   if (!navReady) buildNav(); const C = CREATURES[fox.kind];
-  const r = rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
+  // Felsen mittlerer Größe in der Nähe, nächster zuerst; schieben vom Dorf weg. Der Platz dahinter muss erreichbar sein
+  const list = rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z));
+  let r = null, dx = 0, dz = 0, gap = 0;
+  for (const c of list) {
+    let ux = c.x - CENTER.x, uz = c.z - CENTER.z; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
+    const g = c.s * .85 + C.h * .48, bx = c.x - ux * g, bz = c.z - uz * g; // Felsen liegt an der Stirn an (Kopf eingezogen)
+    if (blockedAt(navF, bx, bz) || blockedAt(navF, bx - ux * C.h * .5, bz - uz * C.h * .5)) continue;
+    r = c; dx = ux; dz = uz; gap = g; break;
+  }
   if (!r) return false;
-  let dx = r.x - CENTER.x, dz = r.z - CENTER.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-  const gap = r.s + C.h * .62; fox.rockJob = { r, dx, dz, gap, left: 3 };
+  fox.rockJob = { r, dx, dz, gap, left: 3 };
   fox.act = 'help'; foxWalk(r.x - dx * gap, r.z - dz * gap, 'shove');
   noteChoice('help', 'rock', 'einen Felsen wegschieben', [...why, { key: 'strong', label: 'ein Stier ist stark genug dafür', weight: .5 }]); return true;
 }
@@ -417,7 +424,8 @@ function updateFox(dt, t) {
   // Bewegungen über der Animation (body.js): Kopf tief beim Schleifen, Kopfwurf, Schwanz fegt, Abschütteln
   over('drag', { Neck1: [24, 0, 0], Head: [4, 0, 0] }, drag ? 1 : 0, 4);
   over('flick', { Neck1: [-30, 0, 0], Head: [-24, 0, 0] }, fox.state === 'toss' && fox.timer < .6 && fox.timer > .2 ? 1 : 0, 16);
-  over('push', { Neck1: [26, 0, 0], Head: [-4, 0, 0] }, (gear.log && fox.state === 'walk') || (fox.state === 'shove' && fox.timer <= 0) ? 1 : 0, 5); // Kopf tief am Stamm bzw. Felsen
+  over('push', { Neck1: [26, 0, 0], Head: [-4, 0, 0] }, gear.log && fox.state === 'walk' ? 1 : 0, 5); // Kopf tief am Stamm
+  over('horns', { Neck1: [32, 0, 0], Head: [38, 0, 0] }, fox.state === 'shove' && fox.timer <= 0 ? 1 : 0, 6); // Kopf eingezogen, Stirn und Hörner gegen den Felsen
   over('pull', { Neck1: [12, 0, 0], Back: [3, 0, 0] }, gear.plow || gear.cart ? 1 : 0, 4); // legt sich ins Geschirr
   over('sniff', { Neck1: [18, 0, 0], Head: [10, 0, 0], Ear1L: [14, 0, 0], Ear1R: [14, 0, 0] }, fox.state === 'sniff' ? 1 : 0, 5);
   const dg = Math.sin(t * 15), digOn = fox.state === 'dig';

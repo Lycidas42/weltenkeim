@@ -234,7 +234,7 @@ on('fox', () => renderFox());
 // Ausrüstung der Kreatur (kreatur.md 3.13 B): in den Werkstätten gefertigt, bezahlt mit Brettern (S.holz)
 const GEAR_SHOP = [
   { id: 'basket', title: 'Korb mit Henkel', desc: () => `Beim Pilzesuchen trägt ${S.name} einen Korb im Maul und sucht an bis zu drei Büschen.`, cost: 4 },
-  { id: 'bags', title: 'Satteltaschen', desc: () => `Allein trägt ${S.name} 5 statt 3 Waren auf dem Rücken.`, cost: 8 },
+  { id: 'bags', title: 'Große Satteltaschen', desc: () => `Allein trägt ${S.name} 2 Waren mehr auf dem Rücken, und die Taschen bleiben immer angelegt.`, cost: 8 },
   { id: 'cart', title: 'Zuggeschirr mit Karren', desc: () => `Bewohner laden 10 statt 5 Waren in den Karren, ${S.name} zieht ihn ins Lager.`, cost: 16 },
 ];
 function renderGearShop() {
