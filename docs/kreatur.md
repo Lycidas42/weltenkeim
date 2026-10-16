@@ -64,6 +64,7 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
 | Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | ✅ vorhanden |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
+| Handeln als Tier | Vierbeiner handeln mit Maul, Rücken, Schwanz; Bewohner beladen sie; Wunder als Ritual | 3.13 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -384,6 +385,70 @@ nicht als Ersatz.
 3. **Hände nutzen:** Bäume und Waren an den Händen tragen, höhere Tragkraft, Aufheben und Werfen.
 4. **Arbeiten am Boden** zusammen mit dem Lernen durch Vormachen (`kreatur-lernen.md`).
 5. **Detailmodell** in Blender für die Nahsicht (nach der Messung aus 3.11 F6).
+
+### 3.13 Handeln als Tier
+
+**Stand:** 🔵 geplant – Prototyp mit dem Fuchs auf Branch `claude/vierbeiner-test`
+
+Die Zweibeiner (3.12) wirken zu menschlich. Die Vierbeiner bleiben Tiere und bekommen eigene Wege, um Bäume zu
+tragen, Bewohnern zu helfen und Wunder zu wirken. Leitgedanke: **Das Tier tut, was ein Tier mit seinem Körper
+könnte.** Was es nicht kann, übernehmen die Bewohner oder die Magie. Drei Stufen, für alle Rassen gleich gebaut.
+
+#### A. Stufe 1: der eigene Körper
+
+- **Ankerpunkte je Rasse** im Theme: `mouth` (tragen, schleifen, aufheben), `back` (Last), `head` bzw. Geweih oder
+  Hörner (schieben, stoßen), `paw` (graben, scharren, stampfen), `tail` (fegen, Zeichen geben, Lichtbogen).
+  Spielcode fragt nur den Anker ab, keine Knochennamen.
+- **Baum tragen je Rasse:** Fuchs, Wolf, Katze schleifen den Stamm im Maul (das Ende zieht eine Spur), der Hirsch hebt
+  ihn ins Geweih, der Stier schiebt ihn mit dem Kopf, das Alpaka bekommt ihn auf den Rücken geladen.
+- Die Größe wächst mit dem Alter (3.1): anfangs Äste, später ganze Bäume.
+
+#### B. Stufe 2: die Bewohner
+
+- Bewohner haben Hände, die Kreatur hat Kraft: Bewohner beladen sie, spannen sie vor Karren oder Pflug, Kinder reiten.
+- **Ausrüstung als Fortschritt:** Werkstätten fertigen Tragegeschirr, Satteltaschen, Körbe mit Henkel fürs Maul;
+  sichtbar am Tier, erweitert, was es kann (z. B. mehr Tragkraft).
+
+#### C. Stufe 3: Magie als Ritual
+
+- Ablauf: **Pose zum Aufladen** (Fellzeichen leuchten auf) → **Geste je Rasse** → **Wirkung** geht vom Anker aus.
+- Gesten: Fuchs zieht mit dem Schwanz einen Lichtbogen, Wolf heult, Hirsch lässt das Geweih leuchten und stampft,
+  Stier stampft mit dem Huf, Katze schnurrt und ein Pfotenzeichen erscheint.
+- Für sehr große Dinge (Häuser heben, Felsen versetzen) sparsam eine Geisterkraft aus den Seelen, z. B. Lichtranken.
+
+#### D. Rassen ergänzen sich
+
+| Rasse | Stärke | typische Hilfe |
+|---|---|---|
+| Fuchs | geschickt, schlau | Dinge finden und bringen, Schädlinge vertreiben |
+| Wolf | Ausdauer, Rudel | Herde hüten, Wache bei Nacht |
+| Hirsch | Wald, Wachstum | Bäume pflanzen und umsetzen, Naturwunder |
+| Stier | rohe Kraft | pflügen, Felsen, Bäume durch Stoßen fällen |
+| Alpaka | Tragkraft, sanft | Waren tragen, Wolle, Kinder |
+| Katze | Nacht, Sinne | Vorräte schützen, Träume und Heilung |
+
+Alle können dieselben Grundverben; die Stärke bestimmt, wie gut und schnell.
+
+#### E. Lernen nach Tierart
+
+Die Kreatur schaut Bewohnern zu und übersetzt die Handlung in ihre Form (`kreatur-lernen.md`): Ein Bewohner hackt
+Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löcher.
+
+#### F. Technik
+
+- Wenige gemeinsame Verben: aufheben, tragen, schleifen, schieben, graben, stampfen, rufen, sitzen, aufbäumen.
+- Vorhandene Clips umdeuten (Fressen → aufheben, graben; Angriff → stoßen), dazu Bewegungen der Knochen im Code
+  über der laufenden Animation (Kopf senken, Schwanz schwingen), wie in `creature.js` (`POSES`).
+- Ausdruck vor allem über Ohren, Schwanz und Haltung.
+
+#### G. Reihenfolge
+
+1. **Prototyp mit dem Fuchs** (Branch `claude/vierbeiner-test`): Baum im Maul schleifen, Last auf dem Rücken,
+   Schwanz fegt; ein Bewohner belädt den Fuchs; Aufladepose und Schwanzbogen für den Regen. Dazu eine Testleiste
+   für Animationen und Handlungen im Charakterbogen.
+2. Ankerpunkte und Verben für die übrigen Rassen.
+3. Ausrüstung aus den Werkstätten.
+4. Wunder durch die Kreatur zusammen mit dem Lernen (3.9).
 
 ## 4. Spielstand (Vorschlag, abwärtskompatibel)
 
