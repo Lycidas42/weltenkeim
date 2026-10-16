@@ -601,7 +601,7 @@ Antriebe entscheiden über die Tätigkeit, Wesenszüge und die übrigen Antriebe
 
 #### E. Sichtbar machen
 
-- **Charakterbogen:** Antriebe als Balken, Wesenszüge als Schieber zwischen zwei Polen, Vertrauen als Herz, jeweils
+- **Charakterbogen:** ✅ Verlauf der Antriebe über die vergangenen Spieltage; Antriebe als Balken, Wesenszüge als Schieber zwischen zwei Polen, Vertrauen als Herz, jeweils
   mit ▲/▼ seit Tagesbeginn.
 - **Titel aus der Mischung**, z. B. „ernster Helfer“, „verspielter Helfer“, „sanfter Riese“, „Rabauke“, „Streuner“,
   „Wächter“, „Faulpelz“, „Dorfliebling“.
@@ -625,6 +625,8 @@ Antriebe entscheiden über die Tätigkeit, Wesenszüge und die übrigen Antriebe
 - ✅ Wahl (`pickDrive`): gewichtet mit den Werten, Ruhe mit `0,35 + 0,7 × max(0, 1,5 − Summe)`. Ergibt etwa:
   Fuchs 21 % Ruhe, Wolf 32 %, Stier 38 %, Hirsch 51 %.
 - ✅ `S.cDay = { day, d }` merkt sich die Antriebe zu Tagesbeginn.
+- ✅ `S.cHist = [{ day, d }]`: Antriebe zu Beginn der letzten 14 Spieltage; der Charakterbogen zeigt daraus unter
+  „Verlauf“ eine Linie je Antrieb bis zum Stand jetzt, gestrichelt den Grundtypus.
 - 🔵 Später dazu: `curious` (Neugier), `nature: { gentle, brave, social, calm }` (−1…+1), `trust` (0…1).
 
 #### H. Reihenfolge

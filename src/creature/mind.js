@@ -15,6 +15,11 @@ for (const k in XP) if (typeof S.cXp[k] !== 'number' || !isFinite(S.cXp[k]) || S
 if (!Array.isArray(S.cLearn)) S.cLearn = [];
 S.cLearn = S.cLearn.filter(e => e && (e.kind === 'pet' || e.kind === 'slap')).slice(0, LEARN_MAX);
 if (!S.cDay || typeof S.cDay.day !== 'number' || !S.cDay.d) S.cDay = null;
+// Verlauf der Antriebe: Stand zu Beginn jedes Spieltags, die letzten HIST_MAX Tage (Charakterbogen)
+const HIST_MAX = 14;
+if (!Array.isArray(S.cHist)) S.cHist = [];
+S.cHist = S.cHist.filter(e => e && typeof e.day === 'number' && e.d).slice(-HIST_MAX);
+if (!S.cHist.length && S.cDay) S.cHist.push({ day: S.cDay.day, d: { ...S.cDay.d } }); // heutiger Tagesbeginn als erster Punkt
 
 // Antriebe (kreatur.md 3.14): jeder für sich 0…1, Wert = Grundtypus der Gestalt + erzogene Abweichung (S.cTraits.dev).
 // Die Abweichung bleibt beim Gestaltwechsel und schwindet langsam (Halbwertszeit etwa zehn Spieltage Spielzeit).
@@ -83,7 +88,11 @@ function noteLearn(kind, act, desc, from, to) {
 // Antriebe zu Tagesbeginn merken (für ▲/▼ im Charakterbogen); Erzogenes schwindet langsam zum Grundtypus hin
 function updateMind(dt = 0) {
   if (dt > 0) { const f = Math.exp(-dt / DRIFT_T); for (const k of DRIVES) S.cTraits.dev[k] *= f; }
-  if (!S.cDay || S.cDay.day !== S.day) S.cDay = { day: S.day, d: Object.fromEntries(DRIVES.map(k => [k, drive(k)])) };
+  if (!S.cDay || S.cDay.day !== S.day) {
+    S.cDay = { day: S.day, d: Object.fromEntries(DRIVES.map(k => [k, drive(k)])) };
+    const last = S.cHist[S.cHist.length - 1];
+    if (!last || last.day !== S.day) { S.cHist.push({ day: S.day, d: Object.fromEntries(DRIVES.map(k => [k, Math.round(drive(k) * 1000) / 1000])) }); if (S.cHist.length > HIST_MAX) S.cHist.shift(); }
+  }
 }
 // Warum tut sie gerade, was sie tut? Erster Grund der jüngsten Entscheidung, solange sie noch nicht erledigt ist
 const why = () => { const e = mind.log[0]; return e && !e.done && e.reasons[0] ? e.reasons[0].label : ''; };

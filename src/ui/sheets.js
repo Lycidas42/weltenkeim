@@ -260,6 +260,16 @@ function renderFox() {
     const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d)}</span>` : '';
     return `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(p * 100)}%;background:${ACT_COL[k]}"></div><i class="base" style="left:${Math.round(B[k] * 100)}%"></i></div><span class="num">${Math.round(p * 100)}${delta}</span></div>`;
   }).join('') + `<p class="baseNote">Strich: Grundtypus ${CREATURES[fox.kind].label}. Ohne Erziehung kehrt ${S.name} langsam dorthin zurück.</p>`);
+  // Verlauf über die vergangenen Spieltage: Stand zu Tagesbeginn je Tag, rechts der Stand jetzt
+  const H = S.cHist.filter(e => e.day < S.day), pts = [...H.map(e => ({ d: e.d, lbl: `Tag ${e.day + 1}` })), { d: Object.fromEntries(DRIVES.map(k => [k, drive(k)])), lbl: 'jetzt' }];
+  if (pts.length < 2) setHTML('foxHist', `<p class="baseNote">Ab dem nächsten Spieltag zeigt sich hier, wie sich die Antriebe Tag für Tag verändern.</p>`);
+  else {
+    const W = 300, Ht = 96, L = 22, R = 8, T = 6, Bt = 16, X = i => L + i * (W - L - R) / (pts.length - 1), Y = v => T + (1 - v) * (Ht - T - Bt);
+    const grid = [0, .5, 1].map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="g"/><text x="${L - 4}" y="${Y(v) + 3}" text-anchor="end">${v * 100}</text>`).join('');
+    const lines = DRIVES.map(k => `<line x1="${L}" x2="${W - R}" y1="${Y(B[k]).toFixed(1)}" y2="${Y(B[k]).toFixed(1)}" stroke="${ACT_COL[k]}" class="b"/><polyline fill="none" stroke="${ACT_COL[k]}" stroke-width="2" stroke-linejoin="round" points="${pts.map((p, i) => `${X(i).toFixed(1)},${Y(p.d[k]).toFixed(1)}`).join(' ')}"/>` + pts.map((p, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.d[k]).toFixed(1)}" r="2.2" fill="${ACT_COL[k]}"/>`).join('')).join('');
+    const step = Math.ceil(pts.length / 6), lbls = pts.map((p, i) => (i % step === 0 || i === pts.length - 1) && !(i !== pts.length - 1 && pts.length - 1 - i < step) ? `<text x="${X(i).toFixed(1)}" y="${Ht - 3}" text-anchor="middle">${p.lbl}</text>` : '').join('');
+    setHTML('foxHist', `<svg viewBox="0 0 ${W} ${Ht}" class="hist">${grid}${lines}${lbls}</svg>`);
+  }
   setHTML('foxXp', Object.keys(XP).map(k => `<dt>${fmt(S.cXp[k])}</dt><dd>${XP[k]}</dd>`).join(''));
   setHTML('foxLearn', S.cLearn.length ? S.cLearn.slice(0, 12).map(e => {
     const what = e.kind === 'pet' ? '<b class="pet">Lob</b>' : '<b class="slap">Tadel</b>';
