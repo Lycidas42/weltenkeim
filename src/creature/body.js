@@ -199,7 +199,7 @@ function plantFeet() {
     (u.ftBase || (u.ftBase = new THREE.Vector3())).copy(b.position);
     b.getWorldPosition(fw);
     fl.set(fw.x, surfaceAt(fw.x, fw.z) + FOOT_LIFT, fw.z).applyMatrix4(pInv); // Boden unter der Pfote im Raum des Tiers
-    const d = Math.max(-lim, Math.min(lim, fl.y)), e = footExtra[n];
+    const d = Math.max(-lim * .3, Math.min(lim, fl.y)), e = footExtra[n]; // nach unten nur wenig: sonst zieht es am Hang die Beine lang (vor allem im Liegen)
     if (Math.abs(d) < .005 && !e) { (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position); continue; }
     fl.set(0, d, 0); if (e) fl.add(off.set(e[0], e[1], e[2]).multiplyScalar(C.h));
     fw.add(fl.applyQuaternion(foxPivot.quaternion)); // um d entlang der Hochachse des Tiers (plus Zusatz)

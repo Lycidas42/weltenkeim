@@ -54,7 +54,7 @@ export default {
     'creature.wolf': { file: 'animals/Wolf.glb', head: 'Head', ws: 1, rest: 'paw', backW: 1.1,
       anchors: { mouth: ['Head', 0, -.06, .2], back: ['Torso', 0, .12, 0], chest: ['Torso3', 0, -.02, .02], girth: ['Torso', 0, -.12, 0], tail: ['Tail8', 0, -.01, -.07] } },
     // bodyS: Körpergröße im Verhältnis zur Höhe (beim Hirsch ist ein großer Teil der Höhe Geweih); horns: wo ein Baum quer liegt
-    'creature.stag': { file: 'animals/Stag.glb', head: 'Head', ws: .9, rest: 'hoof', bodyS: .7, tow: .8, horns: ['Stag_Horns', 0, .14, -.05],
+    'creature.stag': { file: 'animals/Stag.glb', head: 'Head', ws: .9, rest: 'deer', bodyS: .7, tow: .8, horns: ['Stag_Horns', 0, .14, -.05],
       anchors: { mouth: ['Head', 0, -.03, .09], back: ['Torso2', 0, .08, -.02], chest: ['Torso3', 0, -.02, .03], girth: ['Torso2', 0, -.05, 0], tail: ['Tail3', 0, 0, -.02], antlers: ['Stag_Horns', 0, .14, 0] } },
     'creature.bull': { file: 'animals/Bull.glb', head: 'Head', ws: .9, rest: 'hoof', backW: 1.45, horns: ['Head', 0, .1, .02],
       tow: .85,

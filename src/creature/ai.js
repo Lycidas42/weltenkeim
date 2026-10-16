@@ -267,10 +267,15 @@ function unload() {
 // Liegeplatz: rundum frei im Umkreis der halben Körperlänge (Gebäude, Bäume, Felsen, Wasser)
 function restSpot(k = .5) { // k: freier Umkreis in Tierhöhen (Liegen .5, Aufladen mit erhobenem Kopf mehr)
   if (!navReady) buildNav();
+  // Platz: rundum frei (Gebäude, Bäume, Felsen, Wasser) und möglichst eben, sonst liegt das Tier schief am Hang
   const R = CREATURES[fox.kind].h * k, room = (x, z) => { if (blockedAt(navV, x, z)) return false; for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (blockedAt(navV, x + Math.cos(a) * R, z + Math.sin(a) * R) || blockedAt(navV, x + Math.cos(a) * R * .5, z + Math.sin(a) * R * .5)) return false; } return true; };
-  if (room(fox.x, fox.z)) return { x: fox.x, z: fox.z };
-  for (let r = .5; r < 8; r += .5) for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = fox.x + Math.cos(a) * r, z = fox.z + Math.sin(a) * r; if (room(x, z)) return { x, z }; }
-  return { x: fox.x, z: fox.z };
+  const slope = (x, z) => Math.abs(surfaceAt(x + R, z) - surfaceAt(x - R, z)) + Math.abs(surfaceAt(x, z + R) - surfaceAt(x, z - R));
+  let best = null, bs = 1e9;
+  for (let r = 0; r < 8 && !(best && bs < R * .25); r += .5) for (let k = 0; k < (r ? 16 : 1); k++) {
+    const a = k / 16 * Math.PI * 2, x = fox.x + Math.cos(a) * r, z = fox.z + Math.sin(a) * r; if (!room(x, z)) continue;
+    const sc = slope(x, z) + r * .05; if (sc < bs) { bs = sc; best = { x, z }; } // lieber eben, aber nicht weit weg
+  }
+  return best || { x: fox.x, z: fox.z };
 }
 // freier Spielplatz: ein Kreis (Radius 1,6) nahe der Dorfmitte, auf dem nichts im Weg steht
 // Spielen: um die Dorflinde herum

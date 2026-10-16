@@ -112,6 +112,11 @@ const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.
 // Aufladen eines Wunders (kreatur.md 3.13 C): liegen wie eine Sphinx, Kopf erhoben, Blick nach oben, Schwanz um den Körper
 // Huftiere (Stier, Hirsch, Alpaka): liegen mit untergeschlagenen Beinen und erhobenem Kopf; statt sich wie ein Hund
 // aufzubäumen steigen sie nur vorn etwas hoch (die Hundeposen ziehen bei ihren Proportionen die Beine lang)
+// Hirsch: lange Läufe, daher tiefer; Vorderläufe unter der Brust gefaltet, Hinterläufe seitlich untergeschlagen
+POSES.deer = {
+  rot: { Back: [-3, 0, 0], FrontUpperLegL: [-80, 0, 0], FrontUpperLegR: [-80, 0, 0], FrontLowerLegL: [160, 0, 0], FrontLowerLegR: [160, 0, 0], BackLegL: [-85, 0, -10], BackLegR: [-85, 0, 10], BackLowerLegL: [-80, 0, 0], BackLowerLegR: [-80, 0, 0], Neck1: [-10, 0, 0], Head: [6, 0, 0] },
+  pos: { Body: [0, -.66, 0], IKBackLegL: [.1, 0, .45], IKBackLegR: [-.1, 0, .45], IKFrontLegL: [.04, 0, -.35], IKFrontLegR: [-.04, 0, -.35] },
+};
 POSES.sitHoof = withPose(POSES.hoof, { Neck1: [-26, 0, 0], Head: [-8, 0, 0] });
 POSES.buck = {
   rot: { Back: [-16, 0, 0], FrontShoulderL: [-18, 0, 0], FrontShoulderR: [-18, 0, 0], FrontLowerLegL: [40, 0, 0], FrontLowerLegR: [40, 0, 0], Neck1: [-6, 0, 0], Head: [-12, 0, 0] },
@@ -149,7 +154,7 @@ function poseClip(model, baseClip, name, keys) {
 }
 // Hinlegen, Liegen (mit leichtem Kopfdrehen), Aufstehen und Wunderwirken für ein Tier bauen
 function buildPoseClips(model, baseClip, rest) {
-  const L = POSES[rest], hoof = rest === 'hoof', R = hoof ? POSES.buck : POSES.rear, Sit = hoof ? POSES.sitHoof : POSES.sit;
+  const L = POSES[rest], hoof = rest === 'hoof' || rest === 'deer', R = hoof ? POSES.buck : POSES.rear, Sit = hoof ? withPose(L, { Neck1: [-26, 0, 0], Head: [-8, 0, 0] }) : POSES.sit;
   return {
     lieDown: poseClip(model, baseClip, 'lieDown', [{ t: 0, pose: NO_POSE }, { t: .9, pose: L }]),
     lie: poseClip(model, baseClip, 'lie', [{ t: 0, pose: L }, { t: 2.5, pose: withPose(L, { Head: [L.rot.Head[0] + 4, 14, 0] }) }, { t: 4, pose: withPose(L, { Head: [L.rot.Head[0] - 2, -10, 0] }) }, { t: 6, pose: L }]),
