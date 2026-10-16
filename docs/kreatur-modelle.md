@@ -119,9 +119,9 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
 
 - **Form:** Kopf oben breit, läuft als Dreieck zur Schnauze; Schnauze als flacher Keil (als runder Kegel sah sie von
   oben wie ein Rohr aus); Augen in Höhlen unter einem Stirnwulst, Höhle leicht abgedunkelt; Wangenfell mit Büscheln als
-  Teil der Körperform (eigene Kegel wirkten wie Stacheln); dunkle Tränenlinie.
+  weichem Wulst (Büschel-Kegel nur ohne Schalenfell, sonst wirken sie wie Finger); dunkle Tränenlinie.
 - **Teile am Kopfknochen:** Mandelaugen (`EyeL/R`, schräg), dunkler Rand (`EyeRimL/R`), schmale Pupille (`EyePupilL/R`),
-  helle Brauenflecken (`BrowL/R`), Nase, dunkler Mundraum (`Mouth`); Unterkiefer (`Jaw`) am Knochen `jaw`.
+  Nase, dunkler Mundraum (`Mouth`); Unterkiefer (`Jaw`) am Knochen `jaw`.
 - **Ohren:** flach wie echte Ohren, innen dunkle Muschel mit hellen Haarbüscheln (`EarTuft…`, am Ohrknochen), Rücken
   dunkel; Knochen `ear_l`/`ear_r` (vor/zurück, zur Seite, um die Längsachse drehen wie eine Katze).
 - **Detailstufe:** `TM_TRIS` (Standard 40.000) und `TM_VOXEL` (0,009); fürs Handy später z. B. 7.000 / 0,018 oder das
@@ -136,7 +136,9 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
   Stolz, Müde, Traurig, Beleidigt, Wütend, Ängstlich, Schläft). Ansehen: Charakterbogen → „Animationen testen“ → Mimik,
   „Gesicht nah“ (Tele, sonst verzerrt der Weitwinkel die Schnauze). Zweibeiner empfangen keine Schatten mehr (eckige
   Flecken im Gesicht).
-- **Maul:** Unterkiefer als Keil (`Jaw`, vorn schmal), dunkler Mundraum (`Mouth`), Zunge (`Tongue`, am Kiefer),
+- **Brauen:** keine eigenen Teile (wirkten aufgeklebt), sondern ein heller Fleck im Fell über dem inneren Augenwinkel;
+  den Ausdruck tragen die Lider.
+- **Maul:** Unterkiefer als Keil (`Jaw`, vorn schmal, mit kurzem Schalenfell), dunkler Mundraum (`Mouth`), Zunge (`Tongue`, am Kiefer),
   zwei Eckzähne (`FangL/R`).
 - **Schalenfell im Gesicht:** Fellmaske `_FUR` aus dem Bauskript (Export mit `export_attributes`): lang an den Wangen,
   mittel auf Stirn und Kehle, kurz auf der Schnauze, frei an Augen und Nase. Im Spiel (`face.js`, `FACE_FUR`) nur die

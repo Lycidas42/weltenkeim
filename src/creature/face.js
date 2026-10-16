@@ -198,6 +198,14 @@ function addFaceFur(model) {
     m.position.copy(sk.position); m.quaternion.copy(sk.quaternion); m.scale.copy(sk.scale); m.bind(sk.skeleton, sk.bindMatrix);
     m.frustumCulled = false; m.castShadow = m.receiveShadow = false; m.userData.shell = true; m.visible = false; sk.parent.add(m); shells.push(m);
   }
+  // feste Teile mit kurzem Fell (Unterkiefer): gleiche Schichten ohne Skelett, Fellmaske als feste Länge
+  for (const [name, len] of [['Jaw', .45]]) {
+    const o = model.getObjectByName(name); if (!o || !o.isMesh) continue;
+    const g = o.geometry.clone(); g.setAttribute('_fur', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(len), 1));
+    for (let i = 1; i <= FACE_FUR.shells; i++) {
+      const m = new THREE.Mesh(g, faceFurMaterial(o.material, i / FACE_FUR.shells, uni)); m.castShadow = m.receiveShadow = false; m.userData.shell = true; m.visible = false; o.add(m); shells.push(m);
+    }
+  }
   return { sk, uni, shells, tris: keep.length / 3, on: false };
 }
 function updateFaceFur(F) {

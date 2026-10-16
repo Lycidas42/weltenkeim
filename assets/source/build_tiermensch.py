@@ -165,8 +165,9 @@ def build(kind='fox', out=None):
     if A.get('ruff'):                                                                                                           # Wangenfell, seitlich abstehend
         for s in (1, -1):
             ellip(hp(s * 0.075, -0.075, 1.67), (0.05 * hk, 0.07 * hk, 0.055 * hk), 20)
-            # Büschel als Teil der Form (verschmelzen weich mit der Wange): nach hinten, außen und etwas nach unten
-            for b, t, r in RUFF: cone(hp(b[0] * s, b[1], b[2]), hp(t[0] * s, t[1], t[2]), r * hk, .12, .45)
+            # Büschel als Teil der Form nur ohne Schalenfell (sonst wirken sie von der Seite wie abstehende Finger)
+            if not A.get('facefur', True):
+                for b, t, r in RUFF: cone(hp(b[0] * s, b[1], b[2]), hp(t[0] * s, t[1], t[2]), r * hk, .12, .45)
     E = A['ears']
     for s in (1, -1):                                                                                                           # Ohren
         if E.get('round'): ellip(hp(s * 0.13, 0.02, 1.90), (E['round'] * hk, E['round'] * .6 * hk, E['round'] * hk), 20)
@@ -291,6 +292,10 @@ def build(kind='fox', out=None):
             back = ear * smooth(yc + 0.002, yc + 0.016, y) * smooth(0.05, 0.25, t)
         ruff = smooth(.085, .11, ax) * smooth(1.55, 1.58, z) * smooth(1.72, 1.70, z) * smooth(0.08, 0.04, y) if A.get('ruff') else 0  # Wangenbüschel hell
         light = max(belly, muzzle, cheek, throat, tip, ruff)
+        brow = 0
+        if A.get('brow'):  # heller Fleck über dem inneren Augenwinkel (wie beim Rotfuchs), gilt auch fürs Schalenfell
+            bx_, by_, bz_ = hp(EY['x'] * .78, EY['y'], EY['z'] + 0.034)
+            brow = smooth(1.0, .45, ((ax - bx_) / 0.026) ** 2 + ((z - bz_) / 0.014) ** 2) * smooth(-0.10, -0.12, y)
         tear = 0
         if A.get('tear'):  # dunkle Tränenlinie vom inneren Augenwinkel zur Schnauze
             p0, p1 = Vector(hp(0.052, -0.155, 1.776)), Vector(hp(0.03, -0.235, 1.712)); q = Vector((ax, y, z)); d = p1 - p0
@@ -304,6 +309,7 @@ def build(kind='fox', out=None):
         c = [c[i] * (1 - dark) + DARK[i] * dark for i in range(3)]
         c = [c[i] * (1 - back * .8) + DARK[i] * back * .8 for i in range(3)]
         c = [c[i] * (1 - cup) + CUP[i] * cup for i in range(3)]
+        if brow: BR = srgb(A['brow']); c = [c[i] * (1 - brow * .75) + BR[i] * brow * .75 for i in range(3)]
         ca.data[v.index].color = (*c, 1)
         # Fellmaske fürs Schalenfell der Nahsicht (0 = kein Fell, 1 = lang): erst nur das Gesicht
         if fur is not None:
@@ -368,7 +374,7 @@ def build(kind='fox', out=None):
         extra += [bead('EyeRim' + k, hp(ex, ey + 0.003, ez), (0.037, 0.011, 0.026), A['dark'], .5, roll=sl_),
                   bead('Eye' + k, hp(ex, ey, ez), (0.031, 0.012, 0.0205), iris, .3, roll=sl_),
                   bead('EyePupil' + k, hp(ex * .985, ey - 0.008, ez), (0.0075, 0.006, 0.016), '120c08', .2, roll=sl_ * .3),
-                  bead('Brow' + k, hp(s * 0.064, -0.148, ez + 0.032), (0.024, 0.01, 0.012), A.get('brow', A['fur']), .8, roll=-s * 12)]
+]  # Brauen keine eigenen Teile mehr (wirkten aufgeklebt): heller Fleck im Fell, siehe Farben
     extra += [
              # Unterkiefer am Kieferknochen (öffnet sich im Spiel), dahinter der dunkle Mundraum am Kopf
              # Unterkiefer als Keil unter der Schnauze, vorn schmal; dazwischen der dunkle Mundraum, auf dem Kiefer die Zunge,
