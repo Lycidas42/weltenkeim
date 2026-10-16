@@ -65,6 +65,7 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 | Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | ✅ vorhanden |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
 | Handeln als Tier | Vierbeiner handeln mit Maul, Rücken, Schwanz; Bewohner beladen sie; Wunder als Ritual | 3.13 | 🟡 Prototyp (Fuchs) |
+| Charakter | Antriebe, Wesenszüge und Vertrauen einzeln trainiert; Mischung und Grundtypus je Gestalt | 3.14 | 🔵 geplant |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -196,7 +197,7 @@ Offen zu entscheiden: Was ist angeboren, was muss gelernt werden? Vorschlag:
 
 **Stand:** 🟡 teilweise – nur der Fuchs hat eigene Reaktionen auf Lob und Tadel
 
-- Startwerte je Art, z. B.: Fuchs (verspielt, schlau, lernt schnell), Wolf (treu, kräftig, neigt zu Jagd),
+- Startwerte je Art (werden mit 3.14 zum Grundtypus), z. B.: Fuchs (verspielt, schlau, lernt schnell), Wolf (treu, kräftig, neigt zu Jagd),
   Hirsch (sanft, groß, langsam), Stier (stark, stur – verweigert öfter), Alpaka (freundlich, eigensinnig),
   Katze (eigenwillig, neugierig, liebt Fisch).
 - Lieblingsessen (`nahrung.md` 4) und Lieblingsspiel je Art.
@@ -522,6 +523,110 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
 3. Ausrüstung aus der Sattlerei (B), sobald der Jäger da ist.
 4. Wunder durch die Kreatur zusammen mit dem Lernen (3.9).
 
+### 3.14 Charakter: Antriebe, Wesenszüge, Vertrauen
+
+**Stand:** 🔵 geplant – heute schließen sich Helfen, Spielen und Unfug gegenseitig aus (`S.w` ist eine Verteilung,
+Lob auf eine Neigung senkt die anderen)
+
+#### A. Warum
+
+- Heute gibt es keinen „verspielten Helfer“: Mehr Helfen heißt zwangsläufig weniger Spielen. Spielen bringt aber
+  Glaube (etwa 10 ✦ je Runde), Helfen bringt Holz und Waren. Die Spannung soll bleiben, ohne dass man sich zwischen
+  beidem entscheiden muss.
+- Jeder Charakterzug wird deshalb **einzeln** trainiert. Aus der **Mischung** entsteht der Charakter, und jede Gestalt
+  hat einen **Grundtypus**, zu dem sie ohne Erziehung langsam zurückkehrt.
+
+#### B. Vier Schichten
+
+1. **Antriebe** – *was* sie aus eigenem Antrieb tut, je 0…100, unabhängig voneinander:
+   - **Fleiß:** Waren tragen, Bäume bringen, eigene Hilfen der Gestalt (3.13 D).
+   - **Spieltrieb:** toben am Platz, Reiten lassen, Fangen mit Bewohnern; bringt Glaube.
+   - **Übermut:** Unfug (Bäume umwerfen, Säcke klauen, Bewohner schubsen).
+   - **Neugier** (neu): erkunden, Pilze suchen, an Felsen und am Wasser schnuppern, neue Orte finden.
+   - Was die vier übrig lassen, ist **Ruhe**: Ein Tier mit niedrigen Antrieben döst viel, eines mit hohen ist
+     ständig unterwegs. Tatendrang wird so selbst zum Charakterzug.
+2. **Wesenszüge** – *wie* sie es tut, je eine Achse zwischen zwei Polen (−1…+1); keine Seite ist besser:
+   - **Sanft ↔ Grob:** sanft trägt vorsichtig und lässt Bewohner gern aufsitzen, ist langsamer; grob ist schneller und
+     trägt mehr, verliert mal etwas, rollt statt zu tragen, erschreckt Bewohner.
+   - **Mutig ↔ Scheu:** mutig geht nachts hinaus, verjagt Wild, geht ins Wasser; scheu bleibt nah am Dorf, meidet
+     Nacht und Fluss, verirrt sich nie.
+   - **Gesellig ↔ Eigen:** gesellig sucht die Bewohner, begleitet und spielt mit ihnen; eigen arbeitet am Rand, im
+     Wald oder auf den Feldern und ist dort ausdauernder.
+   - **Ruhig ↔ Rastlos:** ruhig ruht länger und bleibt bei einer Sache; rastlos wechselt oft, ist schnell, bricht
+     auch mal ab.
+3. **Vertrauen** – Bindung an den Spieler (0…100):
+   - steigt durch Streicheln, Lob und Tadel, die zu einer Tat passen, und vorsichtiges Tragen mit der Hand;
+   - sinkt durch Tadel ohne Anlass, Werfen, lange Vernachlässigung;
+   - hohes Vertrauen: Lob wirkt stärker, sie kommt, wenn die Hand ruft; niedriges: duckt sich weg, lernt langsamer.
+   - Später dazu **Gehorsam ↔ Eigensinn** für Leine (3.5) und Verweigern (3.4).
+4. **Stimmung** – kurzfristig, kein Charakter: Müdigkeit, Hunger, Laune, Langeweile (3.2). Verschiebt die Wahl für
+   ein paar Minuten, ändert nichts dauerhaft.
+
+#### C. Die Mischung prägt das Wie
+
+Antriebe entscheiden über die Tätigkeit, Wesenszüge und die übrigen Antriebe über die Ausführung, zum Beispiel:
+
+- **ernster Helfer** (Fleiß hoch, Spieltrieb niedrig): direkter Weg, etwas schneller, mehr je Gang;
+- **verspielter Helfer** (Fleiß und Spieltrieb hoch): Hüpfer unterwegs, lässt einen Bewohner zur Hütte mitreiten,
+  nach dem Abliefern eine kurze Runde Spiel (etwas Glaube);
+- **Fleiß und Übermut:** hilft, wirft dabei aber mal einen Sack um oder schubst einen Bewohner an;
+- **Spieltrieb und Übermut:** wilde Streiche, erschreckte Bewohner;
+- **Neugier und Mut:** weite Streifzüge, findet Pilze, Felsen und Orte fern vom Dorf.
+
+#### D. Erziehen und Grundtypus
+
+- **Lob und Tadel wirken auf mehrere Züge:** Jede Tat trägt kleine Marken, Lob oder Tadel verschiebt alle beteiligten
+  Züge ein Stück. Beispiele: Bewohner reiten lassen → Spieltrieb, gesellig, sanft; Baum umwerfen → Übermut, grob;
+  Hasen verjagen → Fleiß, mutig; Nachtwache → Fleiß, mutig, eigen. Wer das Reiten lobt, bekommt nebenbei ein
+  sanftes, geselliges Tier.
+- **Abnehmender Zuwachs:** je näher am Rand, desto kleiner der Schritt (`+k·(1−v)`), 100 bleibt schwer erreichbar.
+- **Gewohnheit:** Was sie oft tut (`S.cXp`), verschiebt die Züge auch ohne Zutun, nur langsamer.
+- **Grundtypus je Gestalt** (ersetzt die Startwerte aus 3.10): Ausgangspunkt und Ziel des langsamen Zurückdriftens,
+  wenn nicht erzogen wird. So bleibt jede Art erkennbar.
+
+  | | Fleiß | Spieltrieb | Übermut | Neugier | Wesen |
+  |---|---|---|---|---|---|
+  | Fuchs | mittel | hoch | mittel | hoch | sanft, gesellig, rastlos |
+  | Stier | hoch | niedrig | niedrig | niedrig | grob, mutig, ruhig |
+  | Hirsch | mittel | niedrig | niedrig | mittel | sanft, scheu, eigen, ruhig |
+  | Wolf | hoch | mittel | niedrig | mittel | mutig, eigen, ausdauernd |
+
+- **Gestalt wechseln:** Die erzogenen Abweichungen vom Grundtypus bleiben. Ein sanft erzogener Fuchs wird ein sanfter
+  Stier, aber eben ein Stier.
+- **Alter (3.1):** Beim Jungtier wirkt Lob schneller, driftet aber auch schneller zurück; im Alter festigt sich der
+  Charakter (langsameres Zurückdriften).
+
+#### E. Sichtbar machen
+
+- **Charakterbogen:** Antriebe als Balken, Wesenszüge als Schieber zwischen zwei Polen, Vertrauen als Herz, jeweils
+  mit ▲/▼ seit Tagesbeginn.
+- **Titel aus der Mischung**, z. B. „ernster Helfer“, „verspielter Helfer“, „sanfter Riese“, „Rabauke“, „Streuner“,
+  „Wächter“, „Faulpelz“, „Dorfliebling“.
+- **„Warum?“** nennt auch Wesenszüge: „trägt den Sack vorsichtig, weil sie sanft ist“.
+
+#### F. Balance
+
+- Glaube vor allem aus Spiel und Geselligkeit, Holz und Waren aus Fleiß, Funde aus Neugier; Übermut kostet etwas,
+  macht aber Spaß.
+- Alles auf 100 ist nicht automatisch das Beste: Wer ständig unterwegs ist, wird müde (3.2); rastlos und grob ist
+  unordentlich.
+- Die Ausrichtung (3.3) bleibt eigener Wert; Übermut, grob und viel Tadel ohne Anlass ziehen sie langsam nach unten.
+
+#### G. Spielstand
+
+- `S.cTraits = { drive: { work, play, mischief, curious }, nature: { gentle, brave, social, calm }, trust }`
+  (Antriebe 0…1, Wesenszüge −1…+1, Vertrauen 0…1). Fehlt es, wird es aus dem Grundtypus angelegt; ein vorhandenes
+  `S.w` wird umgerechnet (Anteile × Grundtypus), damit alte Spielstände ihren Charakter behalten.
+- `S.cDay` merkt sich zusätzlich die Züge zu Tagesbeginn.
+
+#### H. Reihenfolge
+
+1. Antriebe einzeln mit Ruhe als Rest, Grundtypus und Zurückdriften, Umrechnung aus `S.w`, Balken im Bogen.
+2. Wesenszüge sanft/grob, mutig/scheu, gesellig/eigen mit ersten Unterschieden im Wie (C) und Marken an den Taten (D).
+3. Vertrauen.
+4. Neugier mit Streifzügen; ruhig/rastlos.
+5. Titel aus der Mischung; Stimmung und Bedürfnisse (3.2); Gehorsam mit Leine und Verweigern.
+
 ## 4. Spielstand (Vorschlag, abwärtskompatibel)
 
 - `S.cAge` – Erfahrung/Alter (Zahl), daraus Lebensabschnitt und Größe.
@@ -531,7 +636,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
   (nach dem Laden ist die Leine von der Hand gelöst).
 - `S.skills` – Fähigkeiten (siehe `kreatur-lernen.md`).
 - `S.cMiracles` – Erlaubnis Wunder (bool).
-- Bestehendes `S.w` bleibt als Grundneigung.
+- `S.cTraits` – Antriebe, Wesenszüge, Vertrauen (3.14 G); ersetzt `S.w` (wird beim Laden umgerechnet).
 - `S.cXp`, `S.cLearn`, `S.cDay` – Erfahrung, Lernchronik, Neigungen zu Tagesbeginn (3.11 E).
 
 ## 5. Vorgeschlagene Reihenfolge
@@ -540,7 +645,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
 1. Nahrung (Lager hat Zweck) – Voraussetzung für Hunger der Kreatur. ✅
 2. Lernen durch Vormachen + Fähigkeiten (Felder zuerst). Davor die zweibeinige Gestalt (3.12 G 1–3), damit Arbeiten
    mit den Händen gleich mitgebaut werden kann.
-3. Bedürfnisse und Launen, Fressen aus dem Lager, Schlafen.
+3. Charakter (3.14 H 1–3), danach Bedürfnisse und Launen, Fressen aus dem Lager, Schlafen.
 4. Ausrichtung Gut/Böse mit sichtbarer Veränderung.
 5. Leine (3.5).
 6. Verweigern.

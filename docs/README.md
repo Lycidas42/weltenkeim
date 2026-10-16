@@ -10,7 +10,7 @@ ausgeliefert. Regeln für den Code stehen in `CLAUDE.md` im Wurzelordner.
 | `gott-und-hand.md` | der Spieler als Gott: Werkzeuge, Wunder, Greifen und Tragen, Formen, Hand stärken, Waage und Taten, Aussehen der Hand |
 | `gut-und-boese.md` | wie Welt, Schrein und Kreatur auf die Waage reagieren |
 | `bewohner.md` | die Bewohner: Identität, Bedürfnisse, Gefühle und Ausdruck, Pausen und Urlaub, Freizeit und Sport, Animationen, Fokus auf einen Bewohner |
-| `kreatur.md` | die Kreatur (Tiergeist): Alter, Bedürfnisse, Ausrichtung, Eigenwille, Leine, Persönlichkeit, Erleben in der Welt und „Warum?“, zweibeinige Gestalt, Handeln als Tier |
+| `kreatur.md` | die Kreatur (Tiergeist): Alter, Bedürfnisse, Ausrichtung, Eigenwille, Leine, Persönlichkeit, Erleben in der Welt und „Warum?“, zweibeinige Gestalt, Handeln als Tier, Charakter |
 | `kreatur-lernen.md` | die Kreatur lernt durch Zusehen, was die Hand vormacht, bis hin zu Wundern |
 | `werkstaetten.md` | neue Werkstätten und Rohstoffe: Steinmetz und Steine, Bauplätze von Felsen freiräumen |
 | `nahrung.md` | wofür die Lebensmittel da sind: Essen, Wachstum, Gaben, Kreatur füttern, Verarbeitung |
