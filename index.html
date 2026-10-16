@@ -111,6 +111,12 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 #tmPause[aria-checked="true"]{color:var(--glaube)}
 @media (max-width:420px){.stat.wetter .lbl{letter-spacing:.04em}.stat.wetter b{font-size:15px}.res,.tiles{gap:4px}.store .sitem .nm{display:none}.stat{padding:5px 7px 6px;min-width:0}.stat b{font-size:19px}}
 .top-actions{display:flex;gap:6px}
+/* Leisten eingeklappt (Knopf #btnHud): nur Glaube und Seelen in einer schmalen Zeile; wartet die Kreatur auf Lob oder Tadel, pulsiert der Knopf */
+#btnHud svg{display:block;width:18px;height:18px;margin:auto;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.top.mini .store,.top.mini .stat.zeit,.top.mini .stat.wetter,.top.mini .stat .lbl,.top.mini .stat small,.top.mini .top-actions > :not(#btnHud){display:none!important}
+.top.mini .stat{padding:5px 10px}.top.mini .stat b{font-size:17px}
+.hud-mini #hint{display:none!important}
+.top.mini:has(.chip.pulse) #btnHud{border-color:var(--glaube);box-shadow:0 0 0 0 rgba(243,192,77,.7);animation:pulse 1.4s ease-out infinite}
 .chip{background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
 .chip.round{width:38px;padding:8px 0;font-family:var(--f-display);font-size:18px;line-height:1}
 .chip.pulse{border-color:var(--glaube);box-shadow:0 0 0 0 rgba(243,192,77,.7);animation:pulse 1.4s ease-out infinite}
@@ -362,6 +368,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
       <button class="chip" id="btnFollow" hidden aria-pressed="true">Folgen ✕</button>
       <button class="chip" id="btnFox">Fenja</button>
       <button class="chip round" id="btnInfo" aria-label="Info und Credits">i</button>
+      <button class="chip round" id="btnHud" aria-label="Leisten einklappen" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
     </div>
   </header>
   <div class="time-menu" id="wxMenu" role="menu" hidden>
