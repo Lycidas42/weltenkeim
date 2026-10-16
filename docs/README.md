@@ -12,6 +12,7 @@ ausgeliefert. Regeln für den Code stehen in `CLAUDE.md` im Wurzelordner.
 | `bewohner.md` | die Bewohner: Identität, Bedürfnisse, Gefühle und Ausdruck, Pausen und Urlaub, Freizeit und Sport, Animationen, Fokus auf einen Bewohner |
 | `kreatur.md` | die Kreatur (Tiergeist): Alter, Bedürfnisse, Ausrichtung, Eigenwille, Leine, Persönlichkeit, Erleben in der Welt und „Warum?“, zweibeinige Gestalt, Handeln als Tier |
 | `kreatur-lernen.md` | die Kreatur lernt durch Zusehen, was die Hand vormacht, bis hin zu Wundern |
+| `werkstaetten.md` | neue Werkstätten und Rohstoffe: Steinmetz und Steine, Bauplätze von Felsen freiräumen |
 | `nahrung.md` | wofür die Lebensmittel da sind: Essen, Wachstum, Gaben, Kreatur füttern, Verarbeitung |
 | `jahreszeiten.md` | Frühling bis Winter: Verfärben, Laubfall, Wiesen, Felder; Kalender und Technik |
 | `spielstaende.md` | mehrere Welten, Export und Import, Cloud-Sicherung mit Supabase |
