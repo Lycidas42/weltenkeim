@@ -94,7 +94,7 @@ export default {
     // Gelände: Ufer (tief, nass, Sand), Gras (zwei Töne), trocken, kahl, Fels, Schnee
     // Bachbett und Ufergras, Trampelpfade (zwei Töne). Zur Laufzeit änderbar: setTerrainColor (src/world/paths.js)
     terrain: { deep: 0xb7a06a, wet: 0xc8ad74, sand: 0xecd9a0, g1: 0x82b047, g2: 0x5a8d36, dry: 0xa6ad52, bare: 0x8f7a54, rock: 0x8e8476, snow: 0xf2f1ea,
-      streamBed: 0x8d8270, streamGrass: 0x4f8a3a, path: 0xa88a5c, path2: 0x957548, pave: 0x9a958b, pave2: 0xc2bcaf },
+      streamBed: 0x8d8270, streamGrass: 0x4f8a3a, path: 0xa88a5c, path2: 0x957548, pave: 0x9a958b, pave2: 0xc9c3b6, paveJoint: 0x5f5a52 },
     // Farbrollen der im Code gebauten Pflanzen und Felsen (src/core/colors.js): je Rolle eine Farbe oder eine Liste
     // (Verlauf dunkel → hell bzw. Auswahl). Zur Laufzeit lässt sich jede Rolle umfärben (Jahreszeiten).
     nature: {

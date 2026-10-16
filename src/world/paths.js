@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { smooth } from '../core/util.js';
 import { S, onSave } from '../core/state.js';
-import { C, CELL, H, HALF, J, N, SEG, tCol, terrainColor, tg } from './terrain.js';
+import { scene } from '../core/render.js';
+import { C, CELL, H, HALF, J, N, SEG, heightAt, tCol, terrainColor, tg } from './terrain.js';
 
 // Trampelpfade: jeder Geländepunkt zählt, wie lange dort gelaufen wurde (Sekunden, gedeckelt).
 // Ab etwa 6 s färbt sich das Gras zu Erde, bei 30 s ist der Pfad voll ausgetreten. Ungenutzte Pfade wachsen langsam zu.
@@ -17,7 +18,7 @@ if (S.pathsN === N && Array.isArray(S.paved)) for (const k of S.paved) if (k >= 
 const hash = k => { const x = Math.sin(k * 12.9898) * 43758.5453; return x - Math.floor(x); };
 function vertexColor(k) {
   const c = terrainColor(H[k], J[k], k), w = WEAR[k];
-  if (PAVE[k]) return c.copy(C.pave).lerp(C.pave2, hash(k) * .8 + J[k] * .2); // Pflastersteine, jeder Punkt etwas anders
+  if (PAVE[k]) return c.copy(C.paveJoint); // Fugen; die Steine selbst liegen als eigene Körper darauf (paveStones)
   if (w > 6 && H[k] > .15 && H[k] < 3.4) c.lerp(tg.copy(C.path).lerp(C.path2, J[k]), smooth(6, 30, w) * .92);
   return c;
 }
@@ -42,6 +43,7 @@ function repaintStep() {
 }
 function updateWear(dt) {
   repaintStep();
+  if ((stonesT -= dt) <= 0 || stonesDirty) { stonesT = 2; if (stonesDirty || stoneMesh.count) layStones(); stonesDirty = false; }
   wearT += dt; if (wearT < .5) return;
   // alle halbe Sekunde: Pfade langsam zuwachsen lassen (Halbwertszeit etwa 10 Minuten) und geänderte Punkte neu färben
   const decay = Math.pow(.5, wearT / 600); wearT = 0;
@@ -62,6 +64,7 @@ function paveAt(x, z, r = .8) {
     if (PAVE[k] || WEAR[k] < 12 || Math.hypot(px - x, pz - z) > r || H[k] < .1) continue;
     PAVE[k] = 1; WEAR[k] = WEAR_MAX; wearDirty.add(k); n++;
   }
+  if (n) stonesDirty = true;
   return n;
 }
 // Nächste Stelle zum Pflastern: gut ausgetreten, noch nicht gepflastert, nah am Dorf; bevorzugt neben schon
@@ -76,6 +79,28 @@ function paveSpot(skip = []) {
     const sc = d - (next ? 6 : 0) - WEAR[k] * .05; if (sc < bs) { bs = sc; best = k; }
   }
   if (best < 0) return null; const i = best % N, j = (best - i) / N; return { x: -HALF + i * CELL, z: -HALF + j * CELL };
+}
+// Pflastersteine wie bei einer Römerstraße: je gepflastertem Geländepunkt vier flache, leicht unregelmäßige Steine,
+// der Neigung des Bodens folgend, mit dunklen Fugen dazwischen. Alle in einem InstancedMesh; neu gelegt, wenn gepflastert
+// wird, und alle zwei Sekunden der Höhe nach nachgeführt (die Hand kann das Gelände formen)
+const STONE_MAX = 16000, stoneMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.172, .06, .172), new THREE.MeshStandardMaterial({ roughness: .9, flatShading: true }), STONE_MAX);
+stoneMesh.castShadow = false; stoneMesh.receiveShadow = true; stoneMesh.frustumCulled = false; stoneMesh.count = 0; scene.add(stoneMesh);
+const stoneC = new THREE.Color(), dummy = new THREE.Object3D(), STONE_OFF = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+let stonesDirty = true, stonesT = 0;
+function layStones() {
+  let n = 0; const q = CELL / 4, e = .08;
+  for (let k = 0; k < PAVE.length && n < STONE_MAX - 4; k++) {
+    if (!PAVE[k]) continue;
+    const i = k % N, j = (k - i) / N, cx = -HALF + i * CELL, cz = -HALF + j * CELL;
+    STONE_OFF.forEach(([ox, oz], m) => {
+      const r = hash(k * 4 + m), x = cx + ox * q + (r - .5) * .02, z = cz + oz * q + (hash(k * 7 + m) - .5) * .02, h = heightAt(x, z);
+      const sx = (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), sz = (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
+      dummy.position.set(x, h + .002, z); dummy.rotation.set(-Math.atan(sz), (r - .5) * .3, Math.atan(sx)); // flach auf dem Hang
+      const s = .86 + r * .18; dummy.scale.set(s * (.92 + hash(k + m * 13) * .16), .7 + r * .3, s); dummy.updateMatrix();
+      stoneMesh.setMatrixAt(n, dummy.matrix); stoneMesh.setColorAt(n, stoneC.copy(C.pave).lerp(C.pave2, hash(k * 3 + m * 5)).multiplyScalar(.92 + r * .14)); n++;
+    });
+  }
+  stoneMesh.count = n; stoneMesh.instanceMatrix.needsUpdate = true; if (stoneMesh.instanceColor) stoneMesh.instanceColor.needsUpdate = true;
 }
 const pavedCount = () => { let n = 0; for (let k = 0; k < PAVE.length; k++) n += PAVE[k]; return n; };
 for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }

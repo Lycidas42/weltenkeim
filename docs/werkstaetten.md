@@ -78,8 +78,10 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
   ausgetretene Stelle (`paveSpot`): nah am Dorf, bevorzugt neben schon gepflasterten Stellen, so wachsen die Straßen
   vom Dorf aus weiter. Sie knien und klopfen den Stein fest („Weg gepflastert“). Ein Stein pflastert die
   ausgetretenen Punkte im Umkreis von 0,8 Einheiten.
-- Gepflastert ist dauerhaft: graue Pflastersteine (`palette.terrain.pave`, `pave2`), der Weg wächst nicht mehr zu,
-  auf Pflaster gehen Bewohner um ein Drittel schneller.
+- Gepflastert ist dauerhaft wie bei einer Römerstraße: je Geländepunkt vier flache, leicht unregelmäßige Steine, die
+  der Neigung folgen, mit dunklen Fugen dazwischen (`palette.terrain.pave`, `pave2`, `paveJoint`; ein InstancedMesh,
+  höchstens 16 000 Steine, alle zwei Sekunden der Geländehöhe nachgeführt). Der Weg wächst nicht mehr zu, auf
+  Pflaster gehen Bewohner um ein Drittel schneller.
 - Spielstand: `S.paved` (Liste der gepflasterten Geländepunkte, gilt nur bei gleicher Rastergröße `S.pathsN`).
 
 ## 4. Steinhäuser
