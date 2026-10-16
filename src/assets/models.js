@@ -8,7 +8,9 @@ import { $ } from '../core/util.js';
 import { S } from '../core/state.js'; // stellt sicher, dass S.creature eine bekannte Gestalt ist
 
 const loader = new GLTFLoader();
-const load = f => new Promise((res, rej) => loader.load('assets/models/' + f, res, undefined, () => rej(new Error(f + ' konnte nicht geladen werden'))));
+const load1 = f => new Promise((res, rej) => loader.load('assets/models/' + f, res, undefined, () => rej(new Error(f + ' konnte nicht geladen werden'))));
+// bei schwacher Verbindung (z. B. Handy im WLAN nach geleertem Cache) bricht schon mal eine Datei ab: bis zu dreimal nachladen
+const load = async f => { for (let t = 0; ; t++) { try { return await load1(f); } catch (e) { if (t >= 3) throw e; await new Promise(r => setTimeout(r, 600 * (t + 1))); } } };
 function modelInfo(key) { const m = theme.models[key]; if (!m) throw new Error('Modell fehlt im Theme: ' + key); return m; }
 
 // beim Start alle Modelle des Themes laden; von den Kreaturen nur die gewählte Gestalt (die anderen bei Bedarf)
