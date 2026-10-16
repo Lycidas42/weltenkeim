@@ -34,6 +34,10 @@ export default {
     // Wassermühle am Bach (erste Mühle): Rad an der Rückwand (−z), Achse quer zur Wand; der Bach läuft hinter dem Haus entlang
     'hut.watermill': { file: 'building_watermill_blue.gltf', anchors: { door: { x: .12, z: 1 }, work: { x: .8, z: .6 } }, foot: [0, .47, .56, .44], parts: { wheel: 'building_watermill_wheel_blue' }, sacks: [[.68, .32, .3], [.8, .45, -.4]] },
     'hut.baker': { file: 'building_home_B_green.gltf', anchors: { door: { x: .14, z: .32 }, work: { x: -.52, z: .56 } }, foot: HOME_B },
+    // Steinmetzhütte (Schmiede-Modell) und Steinmine am Berg (werkstaetten.md 1)
+    'hut.mason': { file: 'building_blacksmith_blue.gltf', anchors: { door: { x: -.42, z: .6 }, work: { x: 0, z: .8 } }, foot: [0, -.1, .64, .46], pile: [.48, .62] },
+    'hut.mine': { file: 'building_mine_blue.gltf', anchors: { door: { x: 0, z: .55 }, work: { x: .55, z: 1 } }, foot: [0, -.3, .8, .72], pile: [.62, .72] },
+    'prop.stone': { file: 'resource_stone.gltf' },
     'prop.logs': { file: 'resource_lumber.gltf' },
     'prop.crate': { file: 'crate_A_big.gltf' },
     'prop.sack': { file: 'sack.gltf' },

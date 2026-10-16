@@ -7,7 +7,7 @@ import { sky } from '../world/sky.js';
 import { PRAY_T, prayPose } from './shrine.js';
 import { groundAt } from './huts.js';
 import { smoothH } from '../world/nav.js';
-import { HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VS, chopPose, digPose, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers } from './villagers.js';
+import { HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VS, chopPose, digPose, vAll, vAxe, vBasket, vPick, vStone, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers } from './villagers.js';
 import { lV, lights } from './night.js';
 import { LOAD_T, REEL_T } from './ai.js';
 import { FOOD_COL } from './food.js';
@@ -20,7 +20,7 @@ function renderVillagers(dt, t) {
   const lantern = sky.night > .3; // ab der Dämmerung trägt jeder eine Laterne
   villagers.forEach((v, i) => {
     const L = v.look;
-    if (v.state === 'sleep' || v.hidden) { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte bzw. gehalten bei ausgeblendeter Hand
+    if (v.state === 'sleep' || v.state === 'mine' || v.hidden) { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte bzw. gehalten bei ausgeblendeter Hand
     let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
     v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
     v.st = v.state === 'lunch' || v.state === 'ride' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
@@ -28,7 +28,7 @@ function renderVillagers(dt, t) {
       const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
-    } else if (v.state === 'chop') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
+    } else if (v.state === 'chop' || v.state === 'quarry') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
     else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
     else if (v.state === 'proc') { const s = Math.sin(t * (v.role === 'baker' ? 7 : 3) + v.ph); if (v.role === 'baker') { armA = armB = -1.15 + s * .25; tilt = .22; splay = .05; } else { armA = -1.9 + s * .12; armB = -1.7 - s * .12; splay = .2; tilt = -.04; } leg = .15; } // kneten bzw. Korn in den Trichter schütten
     else if (v.state === 'tend') { const s = Math.sin(t * 7 + v.ph); armA = -.5; armB = -1.1 + s * .35; splay = .15; tilt = .1; } // Futter streuen
@@ -58,7 +58,7 @@ function renderVillagers(dt, t) {
     if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
     else if (v.state === 'ride') { const s = Math.sin(t * 9 + v.ph); armA = -2.6 + s * .35; armB = -2.6 - s * .35; splay = .5; } // jubelt auf dem Rücken
     else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
-    const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
+    const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : v.role === 'mason' || v.role === 'miner' ? vPick : null, shoulder = vTool && v.state === 'walk' && !v.carry;
     const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
     const vh = v.state === 'grabbed' || v.state === 'falling' ? (v.vh = v.h) : smoothH(v, dt);
     dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
@@ -105,7 +105,7 @@ function renderVillagers(dt, t) {
     vGame.setMatrixAt(i, v.carry === 3 ? M : zero); vBasket.setMatrixAt(i, v.carry === 4 ? M : zero);
     vVeg.setMatrixAt(i, v.carry === 5 ? M : zero); vVegTop.setMatrixAt(i, v.carry === 5 ? M : zero); vMilk.setMatrixAt(i, v.carry === 6 ? M : zero);
     vEggBasket.setMatrixAt(i, v.carry === 7 ? M : zero); vEggs.setMatrixAt(i, v.carry === 7 ? M : zero);
-    vGrainSack.setMatrixAt(i, v.carry === 8 ? M : zero); vFlourSack.setMatrixAt(i, v.carry === 9 ? M : zero); vLoafBasket.setMatrixAt(i, v.carry === 10 ? M : zero); vLoaves.setMatrixAt(i, v.carry === 10 ? M : zero);
+    vGrainSack.setMatrixAt(i, v.carry === 8 ? M : zero); vFlourSack.setMatrixAt(i, v.carry === 9 ? M : zero); vLoafBasket.setMatrixAt(i, v.carry === 10 ? M : zero); vLoaves.setMatrixAt(i, v.carry === 10 ? M : zero); vStone.setMatrixAt(i, v.carry === 11 ? M : zero);
     // Jäger: Bogen und Köcher auf dem Rücken, zum Schuss nimmt er den Bogen in die linke Hand und spannt die Sehne
     const aiming = v.role === 'hunter' && v.state === 'aim', drawn = aiming && v.timer < .8;
     vBowBack.setMatrixAt(i, v.role === 'hunter' && !aiming ? M : zero);
@@ -116,9 +116,9 @@ function renderVillagers(dt, t) {
     for (const r in vHats) vHats[r].setMatrixAt(i, v.role === r ? M : zero);
     // Werkzeug: beim Arbeiten in beiden Händen (Drehpunkt Schultermitte), unterwegs geschultert
     if (shoulder) part(vParts.armR, -.085, SHO_Y, -1.05, -.1); // hält den Stiel
-    for (const set of [vAxe, vShovel]) {
+    for (const set of [vAxe, vShovel, vPick]) {
       if (set !== vTool) { set.forEach(m => m.setMatrixAt(i, zero)); continue; }
-      if (v.state === 'chop' || v.state === 'plant') set.forEach(m => part(m, 0, SHO_Y, armA, 0));
+      if (v.state === 'chop' || v.state === 'plant' || v.state === 'quarry') set.forEach(m => part(m, 0, SHO_Y, armA, 0));
       else if (shoulder) {
         const a = 2.15, sh = .17; // Stiel liegt mit der Mitte auf der rechten Schulter, Kopf hinten oben
         // Drehpunkt so verschoben, dass die Stielmitte (y = -.17) auf der Schulter liegt; vorderes Ende in der rechten Hand

@@ -22,7 +22,10 @@ function leaveJob(v) {
   const keep = v.state === 'walk' && v.next === 'dropHut';
   if (v.carry && !keep) { if (v.drop) putDown(v, true); else if (v.carry === 1 && v.state !== 'saw') S.logs++; v.carry = 0; }
   if (v.field) { if (v.field.by === v) v.field.by = null; v.field = null; }
-  if (['chop', 'plant', 'saw', 'sow', 'harvest', 'tend', 'proc'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
+  if (v.rock) { if (v.rock.by === v) v.rock.by = null; v.rock = null; }
+  if (v.stones > 0) { S.stone += v.stones; v.stones = 0; } // angefangene Steine zählen trotzdem
+  if (v.state === 'mine') { idle(v, .3); }
+  if (['chop', 'plant', 'saw', 'sow', 'harvest', 'tend', 'proc', 'quarry'].includes(v.state) || (v.state === 'walk' && !keep)) idle(v, .3);
   v.role = null; v.hut = null; v.saplings = 0; v.prey = null; v.catch = 0; if (v.state === 'aim' || v.state === 'fish') idle(v, .3);
 }
 // Bewohner auf Berufe verteilen: so viele wie gewünscht und Hüttenplätze frei sind, der Rest betet als Dorfbewohner

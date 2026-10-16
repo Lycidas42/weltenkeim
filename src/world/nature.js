@@ -38,7 +38,11 @@ if (Array.isArray(S.rocks) && S.rocks.length && S.rocks.every(okRock)) {
     addRock(o ? o.x + Math.cos(a) * r : rnd(HALF * .88), o ? o.z + Math.sin(a) * r : rnd(HALF * .88), .2 + Math.random() * .3);
   }
 }
-{ const cnt = ROCK_GEOS.map(() => 0); for (const r of rocks) rockMeshes[r.v].setColorAt(cnt[r.v]++, COL.setScalar(r.tint)); }
+// Farben je Instanz (Tönung); nach dem Entfernen eines Felsens neu verteilen
+function recolorRocks() { const cnt = ROCK_GEOS.map(() => 0); for (const r of rocks) rockMeshes[r.v].setColorAt(cnt[r.v]++, COL.setScalar(r.tint)); for (const m of rockMeshes) if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+recolorRocks();
+// Felsen ganz abgebaut (Steinmetz, werkstaetten.md 1)
+function removeRock(r) { const i = rocks.indexOf(r); if (i < 0) return; rocks.splice(i, 1); recolorRocks(); }
 const r3 = n => Math.round(n * 1000) / 1000;
 onSave(() => { S.rocks = rocks.map(r => [r3(r.x), r3(r.z), r.v, r3(r.s), r3(r.r), r3(r.tx), r3(r.tz), r3(r.tint)]); });
 // Büsche: gern am Waldrand, seltener auf offener Wiese
@@ -180,4 +184,4 @@ function renderNature(dt, t) {
   bushMeshes.forEach((m, k) => { m.count = bc[k]; m.instanceMatrix.needsUpdate = true; });
 }
 
-export { bushes, cover, grassU, renderNature, rocks };
+export { bushes, cover, grassU, removeRock, renderNature, rocks };

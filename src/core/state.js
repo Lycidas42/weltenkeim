@@ -45,6 +45,8 @@ const ROLES = {
   farmer: { label: 'Bauer', pl: 'Bauern', hut: 'Bauernhof', huts: 'Bauernhöfe', m: true, per: 3, cost: n => 30 + 14 * n, opt: true },
   miller: { label: 'Müller', hut: 'Mühle', huts: 'Mühlen', per: 2, cost: n => 26 + 12 * n, opt: true },
   baker: { label: 'Bäcker', hut: 'Bäckerei', huts: 'Bäckereien', per: 2, cost: n => 22 + 10 * n, opt: true },
+  mason: { label: 'Steinmetz', pl: 'Steinmetze', hut: 'Steinmetzhütte', huts: 'Steinmetzhütten', per: 2, cost: n => 20 + 10 * n, opt: true },
+  miner: { label: 'Bergmann', pl: 'Bergleute', hut: 'Steinmine', huts: 'Steinminen', per: 3, cost: n => 40 + 20 * n, opt: true },
 };
 // Arbeitsstätten: der Spieler weist ihnen Bewohner zu (0 oder mindestens `min`), sie verteilen sich auf die Berufe
 const WORKS = {
@@ -54,11 +56,13 @@ const WORKS = {
   hof: { label: 'Bauernhof', min: 1, desc: 'Bauern säen Gemüse auf den Feldern rund um den Hof, ernten, was reif ist, und versorgen Kühe, Schweine und Hühner. Regen lässt die Felder schneller wachsen. Reife Felder kannst du auch selbst mit der Hand abernten.', split: k => ({ farmer: k }) },
   muehle: { label: 'Mühle', min: 1, desc: 'Müller mahlen in der Windmühle Korn zu Mehl. Träger bringen das Korn aus dem Lager zur Mühle und das Mehl zurück ins Lager.', split: k => ({ miller: k }) },
   baeckerei: { label: 'Bäckerei', min: 1, desc: 'Bäcker backen im Steinofen aus Mehl Brot. Träger bringen das Mehl aus dem Lager und das Brot zurück ins Lager.', split: k => ({ baker: k }) },
+  stein: { label: 'Steinbruch', min: 1, desc: 'Steinmetze schlagen an Felsen in der Nähe Steine ab, bis der Felsen aufgebraucht ist. Träger bringen die Steine ins Lager. Mit Steinen pflastert das Dorf seine Wege und baut Steinhäuser.', split: k => ({ mason: k }) },
+  mine: { label: 'Steinmine', min: 1, desc: 'Bergleute holen im Stollen am Berg Steine. Die Mine geht nie zur Neige, liegt aber weit draußen.', split: k => ({ miner: k }) },
   saw: { label: 'Sägemühle', min: 1, desc: 'Säger sägen aus Stämmen Bretter, das Baumaterial für Hütten und Häuser. Freie Bewohner tragen die Stämme aus dem Lager zur Säge und die Bretter zurück.', split: k => ({ sawyer: k }) },
 };
 for (const id in WORKS) if (typeof S.jobs[id] !== 'number' || !isFinite(S.jobs[id]) || S.jobs[id] < 0) S.jobs[id] = 0;
 for (const r in ROLES) if (typeof S.huts[r] !== 'number' || !isFinite(S.huts[r]) || S.huts[r] < (ROLES[r].opt ? 0 : 1)) S.huts[r] = ROLES[r].opt ? 0 : 1; // Jagd- und Fischerhütte erst bei Bedarf
-for (const k of ['meat', 'fish', 'veg', 'milk', 'eggs', 'grain', 'flour', 'bread']) if (typeof S[k] !== 'number' || !isFinite(S[k]) || S[k] < 0) S[k] = 0;
+for (const k of ['meat', 'fish', 'veg', 'milk', 'eggs', 'grain', 'flour', 'bread', 'stone']) if (typeof S[k] !== 'number' || !isFinite(S[k]) || S[k] < 0) S[k] = 0;
 if (typeof S.logs !== 'number' || !isFinite(S.logs) || S.logs < 0) S.logs = 0;
 if (!Array.isArray(S.fields)) S.fields = [];
 if (!Array.isArray(S.hutGoods)) S.hutGoods = [];
@@ -70,7 +74,7 @@ S.meals = S.meals.filter(m => m && typeof m.d === 'number' && Array.isArray(m.k)
 if (!S.offer || typeof S.offer.d !== 'number' || typeof S.offer.k !== 'string') S.offer = null;
 if (!S.foodHints || typeof S.foodHints !== 'object') S.foodHints = {};
 // Waren: Name im Spielstand (S[key]) und Bezeichnung (Einzahl, Mehrzahl); carry = was ein Bewohner davon trägt
-const RES = { logs: ['Stamm', 'Stämme', 1, 2], meat: ['Fleisch', 'Fleisch', 3, 3], fish: ['Fisch', 'Fisch', 4, 4], veg: ['Gemüse', 'Gemüse', 5, 6], milk: ['Milch', 'Milch', 6, 4], eggs: ['Ei', 'Eier', 7, 6], grain: ['Korn', 'Korn', 8, 6], flour: ['Mehl', 'Mehl', 9, 4], bread: ['Brot', 'Brote', 10, 6] };
+const RES = { logs: ['Stamm', 'Stämme', 1, 2], meat: ['Fleisch', 'Fleisch', 3, 3], fish: ['Fisch', 'Fisch', 4, 4], veg: ['Gemüse', 'Gemüse', 5, 6], milk: ['Milch', 'Milch', 6, 4], eggs: ['Ei', 'Eier', 7, 6], grain: ['Korn', 'Korn', 8, 6], flour: ['Mehl', 'Mehl', 9, 4], bread: ['Brot', 'Brote', 10, 6], stone: ['Stein', 'Steine', 11, 3] };
 // Verarbeitung: Träger bringen `inp` aus dem Lager in den Vorrat der Werkstatt (bis `buf`), der Arbeiter macht aus `n` davon `m` Stück `out`
 const PROC = { miller: { inp: 'grain', n: 2, out: 'flour', m: 2, t: 4.5, buf: 6, verb: 'gemahlen' }, baker: { inp: 'flour', n: 2, out: 'bread', m: 3, t: 6, buf: 6, verb: 'gebacken' } };
 const resText = (k, n) => `${fmt(n)} ${n === 1 ? RES[k][0] : RES[k][1]}`;

@@ -64,6 +64,15 @@ const vAxe = [
     new THREE.BoxGeometry(.022, .034, .028).translate(0, -.285, .012),  // Nacken
   ]), 0x9aa3ab, .35),
 ];
+// Spitzhacke (Steinmetz, Bergmann): wie die Axt im Schulterraum, Kopf quer unten
+const vPick = [
+  vMesh(new THREE.CylinderGeometry(.011, .013, .26, 6).translate(0, -.19, 0), 0x7a5230, .9),
+  vMesh(mergeGeometries([
+    new THREE.CylinderGeometry(.009, .004, .07, 5).rotateX(Math.PI / 2).translate(0, -.3, -.04),
+    new THREE.CylinderGeometry(.009, .004, .07, 5).rotateX(-Math.PI / 2).translate(0, -.3, .04),
+    new THREE.BoxGeometry(.022, .024, .03).translate(0, -.3, 0),
+  ]), 0x8a9299, .35),
+];
 // Laterne: Aufhänger im Ursprung, hängt nach unten; das Glas leuchtet
 const vLantern = vMesh(mergeGeometries([
   new THREE.BoxGeometry(.008, .02, .008).translate(0, -.01, 0),
@@ -95,6 +104,8 @@ const vHats = {
   miller: vMesh(mergeGeometries([new THREE.CylinderGeometry(.088, .082, .05, 10).translate(0, HEAD_Y + .05, 0), new THREE.SphereGeometry(.09, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .45, 1).translate(0, HEAD_Y + .07, 0)]), 0xf0ece2, .95),
   baker: vMesh(mergeGeometries([new THREE.CylinderGeometry(.08, .08, .05, 10).translate(0, HEAD_Y + .05, 0), new THREE.CylinderGeometry(.1, .075, .1, 10).translate(0, HEAD_Y + .12, 0), new THREE.SphereGeometry(.1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .5, 1).translate(0, HEAD_Y + .17, 0)]), 0xfbfbf8, .9),
   farmer: vMesh(mergeGeometries([new THREE.CylinderGeometry(.14, .14, .012, 14).translate(0, HEAD_Y + .04, 0), new THREE.CylinderGeometry(.062, .074, .065, 10).translate(0, HEAD_Y + .075, 0)]), 0xe3c77a, .95),
+  mason: vMesh(mergeGeometries([new THREE.SphereGeometry(.088, 10, 6, 0, Math.PI * 2, 0, Math.PI * .42).scale(1.05, .7, 1.05).translate(0, HEAD_Y + .025, 0), new THREE.SphereGeometry(.018, 6, 4).translate(0, HEAD_Y + .088, 0)]), 0x7d8288, .95),
+  miner: vMesh(mergeGeometries([new THREE.SphereGeometry(.088, 10, 6, 0, Math.PI * 2, 0, Math.PI * .5).translate(0, HEAD_Y + .012, 0), new THREE.CylinderGeometry(.1, .1, .01, 12).translate(0, HEAD_Y + .012, 0), new THREE.CylinderGeometry(.018, .022, .02, 8).rotateX(Math.PI / 2).translate(0, HEAD_Y + .05, .085)]), 0xb8862f, .6),
   sawyer: vMesh(mergeGeometries([new THREE.SphereGeometry(.083, 10, 6, 0, Math.PI * 2, 0, Math.PI * .45).scale(1, .8, 1).translate(0, HEAD_Y + .02, -.004), new THREE.BoxGeometry(.1, .01, .05).translate(0, HEAD_Y + .03, .085)]), 0x6b4a2e, .95),
 };
 // Bogen (Bogenarm entlang der Hand, Sehne), Köcher auf dem Rücken, Angel, Fang und Wild zum Tragen
@@ -121,8 +132,9 @@ const vGrainSack = vMesh(sackGeo(), 0xb99a62, .95), vFlourSack = vMesh(sackGeo()
 const vLoafBasket = vMesh(new THREE.CylinderGeometry(.08, .062, .055, 8).translate(0, .2, .13), 0x9b7446, .95);
 const vLoaves = vMesh(mergeGeometries([[-.03, 0], [.03, .015], [0, -.03]].map(([x, z]) => new THREE.SphereGeometry(.03, 7, 5).scale(1.4, .75, 1).translate(x, .24, .13 + z))), 0xc98a3e, .8);
 const vEggs = vMesh(mergeGeometries([[-.03, 0], [.03, .01], [0, -.03], [0, .03]].map(([x, z]) => new THREE.SphereGeometry(.022, 6, 4).scale(1, 1.3, 1).translate(x, .24, .13 + z))), 0xf3ead8, .6);
+const vStone = vMesh(mergeGeometries([[-.04, 0, .05], [.04, .01, .045], [0, -.02, .055], [.005, .03, .04]].map(([x, z, s], k) => new THREE.DodecahedronGeometry(s, 0).scale(1, .8, 1).rotateY(k).translate(x, .22 + (k === 3 ? .05 : 0), .13 + z))), 0x9a958c, .9);
 const vBasket = vMesh(mergeGeometries([new THREE.CylinderGeometry(.08, .065, .09, 8).translate(0, .2, .13), ...[0, 1].map(k => new THREE.ConeGeometry(.02, .06, 3).rotateZ(Math.PI / 2).translate(-.03 + k * .06, .26, .13))]), 0xa98a5c, .95);
-const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats), vBowBack, vBowAim, vBowDraw, vQuiver, vRod, vGame, vBasket, vVeg, vVegTop, vMilk, vEggBasket, vEggs, vGrainSack, vFlourSack, vLoafBasket, vLoaves];
+const vAll = [vParts.legL, vParts.legR, vParts.body, vParts.armL, vParts.armR, vParts.head, vParts.eyes, ...vParts.hair, vParts.beard, ...vWood, ...vAxe, ...vPick, vStone, vLantern, vLanternGlass, vBread, ...vShovel, ...vSapling, vPlanks, ...Object.values(vHats), vBowBack, vBowAim, vBowDraw, vQuiver, vRod, vGame, vBasket, vVeg, vVegTop, vMilk, vEggBasket, vEggs, vGrainSack, vFlourSack, vLoafBasket, vLoaves];
 // Spatenstich: anheben, mit Gewicht hineinstechen, Erde herauswerfen
 const DIG_T = .9;
 function digPose(p) {
@@ -165,4 +177,4 @@ function spawnVillager(x, z) {
 const homeSpot = () => { const h = houses[Math.floor(Math.random() * houses.length)] || { x: 0, z: 0 }; return { x: h.x + rnd(1), z: h.z + rnd(1) }; };
 for (let i = 0; i < Math.min(S.pop, cap()); i++) { const p = homeSpot(); spawnVillager(p.x, p.z); }
 
-export { CHOP_HIT, CHOP_T, DIG_T, HEAD_Y, HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VCAP, VS, chopPose, digPose, homeSpot, spawnVillager, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers };
+export { CHOP_HIT, CHOP_T, DIG_T, HEAD_Y, HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VCAP, VS, chopPose, digPose, homeSpot, spawnVillager, vAll, vAxe, vBasket, vPick, vStone, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers };

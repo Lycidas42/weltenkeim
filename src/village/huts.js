@@ -8,7 +8,7 @@ import { scene } from '../core/render.js';
 import { HALF, heightAt, streamDist, surfaceAt } from '../world/terrain.js';
 import { model, modelInfo } from '../assets/models.js';
 import { LAGER, MILL_POS, SB, SHRINE_POS, onSacred, statics } from './layout.js';
-import { mill } from './houses.js';
+import { mill, sites } from './houses.js';
 
 // Punkt im Modellraum (Einheiten des Modells) eines platzierten Gebäudes in Weltkoordinaten
 function localPt(e, lx, lz, out = {}) { const k = e.o.scale.x, ry = e.o.rotation.y, x = lx * k, z = lz * k; out.x = e.x + x * Math.cos(ry) + z * Math.sin(ry); out.z = e.z - x * Math.sin(ry) + z * Math.cos(ry); return out; }
@@ -32,20 +32,22 @@ const lager = (() => {
   const prop = (key, x, z, ry, k) => { const o = model(key).scene.clone(true); o.position.set(x, B, z); o.rotation.y = ry; o.scale.setScalar(k * (modelInfo(key).scale || 1)); g.add(o); return o; };
   prop('prop.crate', -.8, -.38, .2, 1.6); prop('prop.crate', -.42, -.42, -.1, 1.6); prop('prop.crate', -.62, -.4, .4, 1.3).position.y = B + .32;
   prop('prop.sack', .1, -.4, .5, 1.8); prop('prop.sack', .3, -.35, -.3, 1.8); prop('prop.barrel', .65, -.38, 0, 1.6); prop('prop.barrel', .88, -.2, 0, 1.6); prop('prop.barrel', .85, -.48, 0, 1.6);
-  // Stammstapel (rechts außen) und Bretterstapel (links außen)
-  const logs = [], planks = [];
+  // Stammstapel (rechts außen), Bretterstapel (links außen), Steine hinter der Halle
+  const logs = [], planks = [], stones = [];
+  for (let k = 0; k < 5; k++) { const o = model('prop.stone').scene.clone(true); o.position.set(-.9 + k * .45, (k % 2) * .02, -D / 2 - .34 - (k % 2) * .06); o.rotation.y = k * 1.3; o.scale.setScalar(1.4); g.add(o); stones.push(o); }
   for (let k = 0; k < 5; k++) { const o = model('prop.logs').scene.clone(true); o.position.set(W / 2 + .45 + (k % 2) * .05, (k >> 1) * .19, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; o.scale.setScalar(1.3); g.add(o); logs.push(o); }
   const pg = mergeGeometries([0, 1, 2, 3].map(k => new THREE.BoxGeometry(.62, .035, .13).translate((k % 2) * .02, .02 + k * .037, (k % 2 ? .07 : -.07))));
   for (let k = 0; k < 5; k++) { const o = new THREE.Mesh(pg, plank); o.position.set(-W / 2 - .45, (k >> 1) * .15, -.45 + (k % 3) * .42); o.rotation.y = Math.PI / 2; g.add(o); planks.push(o); }
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   g.rotation.y = Math.atan2(-LAGER.x, -LAGER.z + .4); // Front zum Dorfplatz
-  scene.add(g); const e = { o: g, x: LAGER.x, z: LAGER.z, logs, planks };
+  scene.add(g); const e = { o: g, x: LAGER.x, z: LAGER.z, logs, planks, stones };
   statics.push(e); return e;
 })();
 const lagerDrop = () => localPt(lager, rnd(.6), 1.05); // abladen vor der offenen Front
 function updateLagerStock() {
   lager.logs.forEach((o, k) => { o.visible = S.logs > k * 6; });
   lager.planks.forEach((o, k) => { o.visible = S.holz > k * 12; });
+  lager.stones.forEach((o, k) => { o.visible = S.stone > k * 6; });
 }
 // Hütten der Spezialisten: Modell (Schlüssel im Theme) und Größe in der Welt
 const HUT = {
@@ -57,6 +59,8 @@ const HUT = {
   farmer: { key: 'hut.farmer', k: SB },
   miller: { key: 'hut.miller', k: 1.6 },
   baker: { key: 'hut.baker', k: SB },
+  mason: { key: 'hut.mason', k: SB },
+  miner: { key: 'hut.mine', k: 1.4 },
 };
 // Tür und Arbeitsplatz liegen im Modell: sie kommen aus dem Theme (Andockpunkte)
 for (const r in HUT) Object.assign(HUT[r], modelInfo(HUT[r].key).anchors);
@@ -111,16 +115,34 @@ const farmSites = [];
   cand.sort((a, b) => a.score - b.score);
   for (const st of cand) if (farmSites.length < 3 && farmSites.every(o => Math.hypot(o.x - st.x, o.z - st.z) > 10)) { farmSites.push(st); for (const h of st.near) h.used = true; }
 }
+// Steinmine: ein Platz am Berg (felsiger Hang, Eingang talwärts), möglichst nah am Dorf. Einmal gewählt, bleibt er im
+// Spielstand (S.mineAt), denn das Einebnen beim Bau verändert den Hang.
+let mineSite = null;
+if (S.mineAt && isFinite(S.mineAt.x) && isFinite(S.mineAt.z) && isFinite(S.mineAt.ry)) mineSite = { x: S.mineAt.x, z: S.mineAt.z, ry: S.mineAt.ry, used: false, mine: true };
+else {
+  let best = null, bs = 1e9;
+  for (let r = 10.5; r < HALF * .85; r += .6) for (let k = 0; k < 72; k++) {
+    const a = k / 72 * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
+    if (h < 2.5 || h > 4.4 || streamDist(x, z) < 2.5 || onSacred(x, z, 2) || Math.hypot(x - SHRINE_POS.x, z - SHRINE_POS.z) < 7) continue;
+    if (sites.some(st => Math.hypot(st.x - x, st.z - z) < 5.5) || hutSites.some(st => Math.hypot(st.x - x, st.z - z) < 3.5) || Math.hypot(x - MILL_POS.x, z - MILL_POS.z) < 4 || farmSites.some(F => Math.hypot(F.x - x, F.z - z) < 6.5)) continue; // Abstand zu Häusern (samt Garten) und Hütten
+    const gx = (heightAt(x + .5, z) - heightAt(x - .5, z)), gz = (heightAt(x, z + .5) - heightAt(x, z - .5)), g = Math.hypot(gx, gz);
+    if (g < .25 || g > 1.6) continue; // ein Hang, keine Kuppe und keine Steilwand
+    const fx = x - gx / g * 2, fz = z - gz / g * 2; if (heightAt(fx, fz) < .4 || streamDist(fx, fz) < 1.5) continue; // davor Platz zum Abladen
+    const score = r + Math.abs(h - 3.2) * 3; if (score < bs) { bs = score; best = { x, z, ry: Math.atan2(-gx, -gz), used: false, mine: true }; }
+  }
+  mineSite = best; if (best) S.mineAt = { x: Math.round(best.x * 100) / 100, z: Math.round(best.z * 100) / 100, ry: Math.round(best.ry * 1000) / 1000 };
+}
 const farmPt = (F, lx, lz, out = {}) => { const c = Math.cos(F.ry), sn = Math.sin(F.ry); out.x = F.x + lx * c + lz * sn; out.z = F.z - lx * sn + lz * c; return out; };
 const onFarm = (x, z, m = 0) => farmSites.some(F => { const dx = x - F.x, dz = z - F.z, c = Math.cos(F.ry), sn = Math.sin(F.ry), lx = dx * c - dz * sn, lz = dx * sn + dz * c; return lx > FARM.lx0 - m && lx < FARM.lx1 + m && lz > (F.lz0 ?? FARM.lz0) - m && lz < FARM.lz1 + m; });
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
   if (role === 'miller' && !mill.role) return { x: MILL_POS.x, z: MILL_POS.z, ry: mill.o.rotation.y, existing: mill }; // die Wassermühle am Bach wird die erste Mühle
   if (role === 'farmer') { const F = farmSites.find(st => !st.used); if (!F) return null; const p = farmPt(F, FARM.house[0], FARM.house[1]); return { x: p.x, z: p.z, ry: F.ry, farm: F }; }
+  if (role === 'miner') return mineSite && !mineSite.used ? mineSite : null; // nur eine Mine am Berg
   if (role === 'fisher') { const fs = fisherSites.filter(st => !st.used && fisherSites.every(o => !o.used || Math.abs(Math.atan2(Math.sin(o.a - st.a), Math.cos(o.a - st.a))) > .5)); return fs.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0] || null; }
   const free = hutSites.filter(st => !st.used); if (!free.length) return null;
   if (role !== 'sawyer') return free[0];
   return free.reduce((b, st) => (Math.hypot(st.x - LAGER.x, st.z - LAGER.z) < Math.hypot(b.x - LAGER.x, b.z - LAGER.z) ? st : b));
 }
 
-export { FARM, HUT, farmPt, farmSites, fisherSites, groundAt, hutSite, hutSites, huts, jetties, lager, lagerDrop, localPt, onFarm, updateLagerStock };
+export { FARM, HUT, farmPt, farmSites, mineSite, fisherSites, groundAt, hutSite, hutSites, huts, jetties, lager, lagerDrop, localPt, onFarm, updateLagerStock };

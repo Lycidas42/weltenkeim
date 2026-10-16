@@ -26,6 +26,7 @@ function addHut(role, site) {
   e.inp = 0; e.busy = 0;
   if (role === 'miller') { e.fan = findPart(e.o, e.key, 'fan'); for (const [lx, lz, ry] of modelInfo(e.key).sacks || []) { const q = localPt(e, lx, lz); place('prop.sack', q.x, q.z, ry, 1.8); } }
   if (role === 'baker') buildOven(e);
+  if (role === 'mason' || role === 'miner') { const pl = modelInfo(e.key).pile, p = localPt(e, pl[0], pl[1]); place('prop.stone', p.x, p.z, site.ry + .6, 1.5); e.pile = p; } // Steine vor der Hütte
   if (role === 'lumber') { const p = localPt(e, .62, -.12); place('prop.logs', p.x, p.z, site.ry + Math.PI / 2, 1.25); e.pile = p; }
   if (role === 'forester') for (const [lx, lz] of [[-.5, .05], [-.62, -.22], [.52, .18]]) { const p = localPt(e, lx, lz); place(TK[Math.random() < .5 ? 0 : 2], p.x, p.z, Math.random() * 6, ST * .2); }
   if (role === 'hunter') { const p = localPt(e, .7, .35); place('prop.target', p.x, p.z, site.ry, 1.6); e.pile = p; const q = localPt(e, -.55, .15); place('prop.arrows', q.x, q.z, site.ry, 1.6); }

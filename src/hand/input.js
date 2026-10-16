@@ -124,7 +124,7 @@ function updateHandHover(dt) {
   if ((hoverT -= dt) <= 0) {
     hoverT = .12;
     let best = null, bd = 40;
-    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, pointerXY.x, pointerXY.y); if (d < bd) { bd = d; best = v; } }
+    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine') continue; const d = screenDist(v.x, v.y + .25, v.z, pointerXY.x, pointerXY.y); if (d < bd) { bd = d; best = v; } }
     hoverHelp = best ? { label: 'Packen', pose: 'grab' } : helpAt(pointerXY.x, pointerXY.y);
     if (!hoverHelp && treeAt(pointerXY.x, pointerXY.y)) hoverHelp = { label: 'Ausreißen', pose: 'claw' };
     pick(pointerXY.x, pointerXY.y); // Trefferpunkt wieder auf den Zeiger (für die Hand)
@@ -159,7 +159,7 @@ function updatePointer(dt) {
   if (input.pressing && input.tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, input.sculptDir, dt);
   if (press.cand) { // Bewohner unter dem Finger zuckt, bis er gepackt wird
     const v = press.cand;
-    if (['grabbed', 'falling', 'sleep'].includes(v.state)) press.cand = null;
+    if (['grabbed', 'falling', 'sleep', 'mine'].includes(v.state)) press.cand = null;
     else if (press.t >= GRAB_T || press.moved) { press.cand = null; grab(v); }
     else v.h += Math.sin(press.t * 45) * dt * 5;
   }
@@ -224,7 +224,7 @@ function onToolDown(cx, cy) {
   if (input.tool === 'hand') {
     if (foxUnder(cx, cy)) { press.fox = { dist: 0, n: 1, on: 1, x: cx, y: cy }; input.pressing = false; return; }
     let best = null, bd = 40;
-    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
+    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) press.cand = best; // gepackt wird nach kurzem Halten oder beim Ziehen (updatePointer)
     else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) input.treeGrab = { tr, prog: 0, lastY: cy }; }
   } else if (input.tool === 'miracle' && hitOk) { tryMiracle(hit); input.pressing = false; return; }

@@ -18,11 +18,12 @@ import { PRAY_T, spawnMote } from './shrine.js';
 import { houseDoor, houses } from './houses.js';
 import { FARM, farmPt, groundAt, hutSites, huts, lagerDrop, localPt } from './huts.js';
 import { CROPS, fieldFront } from '../farm/farm.js';
-import { hutWork } from './build.js';
+import { hutDoor, hutWork } from './build.js';
 import { followPath, moveFree, navV, nearBuilding, setGoal } from '../world/nav.js';
 import { CHOP_HIT, CHOP_T, DIG_T, homeSpot, villagers } from './villagers.js';
 import { GIFT_GLAUBE, MEAL, eatLunch, food, giftDue, prayMul, takePortion, workMul } from './food.js';
 import { fish, killAnimal, removeAnimal, wild } from '../wildlife/land.js';
+import { removeRock, rocks } from '../world/nature.js';
 import { fishGeo, fishMesh, splash } from '../wildlife/sea.js';
 
 function walk(v, x, z, next) { v.state = 'walk'; v.next = next; v.stalk = next === 'aim'; setGoal(v, x, z, navV); }
@@ -110,6 +111,13 @@ function haulJob(v) {
   if (best) { v.haul = best; const p = hutWork(best.hut); walk(v, p.x + rnd(.2), p.z + rnd(.2), 'pickGoods'); return true; }
   return feed();
 }
+// Steinmetz: nächster freier Felsen nahe der Hütte; er steht an der Seite zur Hütte hin
+function findRock(v) {
+  let best = null, bd = 22 * 22;
+  for (const r of rocks) { if (r.s < .2 || (r.by && r.by !== v && villagers.includes(r.by) && r.by.rock === r) || heightAt(r.x, r.z) < .1) continue; const d = (r.x - v.hut.x) ** 2 + (r.z - v.hut.z) ** 2; if (d < bd) { bd = d; best = r; } }
+  return best;
+}
+const QUARRY_T = 2.4, ROCK_MIN = .2, ROCK_STEP = .045;
 function atHut(v, next = 'rest') { const p = hutWork(v.hut); walk(v, p.x + rnd(.25), p.z + rnd(.25), next); }
 // freier Platz für einen Setzling: leerer Baumplatz oder Stumpf nahe der Hütte, sonst ein neuer Platz am Waldrand
 function plantSpot(x, z) {
@@ -158,6 +166,16 @@ const JOB = {
   },
   miller(v) { procJob(v); }, // mahlt, was die Träger an Korn bringen
   baker(v) { procJob(v); },  // backt aus dem gebrachten Mehl Brot
+  mason(v) { // Felsen in der Nähe suchen, Steine abschlagen (der Felsen wird kleiner), je zwei an der Hütte ablegen
+    if (v.stones > 0 && !(v.rock && rocks.includes(v.rock))) { v.carry = 11; walkDrop(v, { stone: v.stones }); v.stones = 0; return; }
+    const r = v.rock && rocks.includes(v.rock) ? v.rock : findRock(v); if (!r) { atHut(v); return; }
+    r.by = v; v.rock = r; const dx = v.hut.x - r.x, dz = v.hut.z - r.z, d = Math.hypot(dx, dz) || 1, a = Math.atan2(dz, dx) + rnd(.6), R = r.s * .95 + .2;
+    walk(v, r.x + Math.cos(a) * R, r.z + Math.sin(a) * R, 'quarry');
+  },
+  miner(v) { // in den Stollen, eine Weile drinnen hacken, mit Steinen herauskommen und sie vor der Mine ablegen
+    const p = hutDoor(v.hut, .05); if (Math.hypot(v.x - p.x, v.z - p.z) > .3) { walk(v, p.x, p.z, 'mine'); return; }
+    v.state = 'mine'; v.timer = 7 + Math.random() * 3;
+  },
   sawyer(v) { // bleibt an der Säge und sägt, was die Träger bringen
     const p = hutWork(v.hut);
     if (Math.hypot(v.x - p.x, v.z - p.z) > .3) { walk(v, p.x, p.z, 'saw'); return; }
@@ -271,6 +289,8 @@ function arrive(v) {
     case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
     case 'store': v.carry = 0; addLogs(1, v.x, v.y + .2, v.z); idle(v, .4); break;
     case 'saw': if (v.role === 'sawyer' && v.hut) startSaw(v); else idle(v, .4); break;
+    case 'quarry': { const r = v.rock; if (v.role === 'mason' && r && rocks.includes(r) && r.by === v) { v.state = 'quarry'; v.timer = QUARRY_T; v.cp = 0; v.h = Math.atan2(r.x - v.x, r.z - v.z); } else { if (r && r.by === v) r.by = null; v.rock = null; idle(v, .4); } break; }
+    case 'mine': if (v.role === 'miner' && v.hut) { v.state = 'mine'; v.timer = 7 + Math.random() * 3; } else idle(v, .4); break;
     case 'aim': { // in Schussweite: zielen (ist das Tier weitergezogen, neu anpirschen)
       const a = v.prey; v.stalk = false;
       if (!a || !wild.includes(a) || a.state === 'dead' || Math.hypot(a.x - v.x, a.z - v.z) > 7) { v.prey = a && a.state === 'dead' ? a : null; idle(v, .3); break; }
@@ -351,6 +371,25 @@ function updateVillager(v, dt, t) {
       }
     }
       if (v.timer <= 0) { const tr = v.tree; v.tree = null; if (tr && tr.alive) { chopTree(tr); fallTree(tr, v.x, v.z, 2.4); v.carry = 1; walkDrop(v, { logs: 1 }); } else idle(v, .4); } break;
+    case 'quarry': { // mit der Spitzhacke auf den Felsen, Splitter fliegen; jede Runde ein Stein, der Felsen wird kleiner
+      const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), before = v.cp % 1, r = v.rock; v.timer -= k; v.cp += k / CHOP_T;
+      const now = v.cp % 1;
+      if (r && ((before < CHOP_HIT && now >= CHOP_HIT) || (now < before && before < CHOP_HIT))) spawnChips(v.x + Math.sin(v.h) * .3, surfaceAt(v.x, v.z) + .15, v.z + Math.cos(v.h) * .3, v.h, 0xa7a29a);
+      if (v.timer > 0) break;
+      if (!r || !rocks.includes(r)) { v.rock = null; idle(v, .3); break; }
+      r.s -= ROCK_STEP; v.stones = (v.stones || 0) + 1;
+      { const d = Math.hypot(r.x - v.x, r.z - v.z), want = r.s * .95 + .2; if (d > want + .05) { const k2 = (d - want) / d; v.x += (r.x - v.x) * k2; v.z += (r.z - v.z) * k2; } } // der Felsen wird kleiner: nachrücken
+      if (r.s < ROCK_MIN) { removeRock(r); v.rock = null; floatText(r.x, heightAt(r.x, r.z) + .6, r.z, 'Felsen abgebaut', 's'); }
+      if (v.stones >= 2 || !v.rock) { if (v.rock && v.rock.by === v) v.rock.by = null; v.rock = null; v.carry = 11; walkDrop(v, { stone: v.stones }); v.stones = 0; }
+      else { v.timer = QUARRY_T; v.cp = 0; }
+      break;
+    }
+    case 'mine': { // im Stollen (unsichtbar); ab und zu staubt es am Eingang
+      v.timer -= dt * (v.haste > 0 ? 2 : 1) * workMul(v);
+      if (Math.random() < dt * .8) { const p = hutDoor(v.hut, -.1); spawnChips(p.x, surfaceAt(p.x, p.z) + .2, p.z, v.hut.o.rotation.y + Math.PI, 0x8f8a82); }
+      if (v.timer <= 0) { const p = hutDoor(v.hut, .1); v.x = p.x; v.z = p.z; v.carry = 11; walkDrop(v, { stone: 2 }); }
+      break;
+    }
     case 'pray': {
       const k = dt * (v.haste > 0 ? 2 : 1), before = ((2 * PRAY_T - v.timer) / PRAY_T) % 1; v.timer -= k;
       const now = ((2 * PRAY_T - v.timer) / PRAY_T) % 1;
