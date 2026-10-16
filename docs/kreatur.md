@@ -408,6 +408,15 @@ könnte.** Was es nicht kann, übernehmen die Bewohner oder die Magie. Drei Stuf
 - Bewohner haben Hände, die Kreatur hat Kraft: Bewohner beladen sie, spannen sie vor Karren oder Pflug, Kinder reiten.
 - **Ausrüstung als Fortschritt:** Werkstätten fertigen Tragegeschirr, Satteltaschen, Körbe mit Henkel fürs Maul;
   sichtbar am Tier, erweitert, was es kann (z. B. mehr Tragkraft).
+- **Sattlerei** (🔵 geplant, Umsetzung später): eigene Hütte mit dem Beruf Sattler, in der die Ausrüstung entsteht.
+  - **Verfügbar erst mit dem Jäger:** Die Sattlerei lässt sich erst bauen, wenn es eine Jagdhütte gibt.
+  - **Ablauf:** Der Spieler bestellt ein Teil (heute im Charakterbogen gekauft). Der Sattler fertigt es über eine Weile
+    in seiner Hütte, sichtbar bei der Arbeit, bringt es dann zur Kreatur und legt es ihr an (Satteltaschen
+    festschnallen, Geschirr anlegen, Korb ins Maul geben). So arbeiten Bewohner und Tier zusammen (Stufe 2).
+  - **Material:** Bretter für Korb und Karren, für Satteltaschen und Geschirr zusätzlich Leder bzw. Fell vom Jäger.
+  - **Offen:** ob Leder eine eigene Ware im Lager wird oder der Jäger es direkt an die Sattlerei liefert; ob
+    Ausrüstung verschleißt und ausgebessert werden muss.
+  - Prototyp heute (Branch `claude/vierbeiner-test`): Kauf im Charakterbogen gegen Bretter, sofort angelegt.
 
 #### C. Stufe 3: Magie als Ritual
 
@@ -482,7 +491,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
    - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste (im
      normalen Verhalten erst mit dem Lernen, 3.9), Pflug, Lernen nach Tierart (E), andere Rassen.
 2. Ankerpunkte und Verben für die übrigen Rassen.
-3. Ausrüstung aus den Werkstätten.
+3. Ausrüstung aus der Sattlerei (B), sobald der Jäger da ist.
 4. Wunder durch die Kreatur zusammen mit dem Lernen (3.9).
 
 ## 4. Spielstand (Vorschlag, abwärtskompatibel)
