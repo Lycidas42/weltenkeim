@@ -43,7 +43,7 @@ function repaintStep() {
 }
 function updateWear(dt) {
   repaintStep();
-  if ((stonesT -= dt) <= 0 || stonesDirty) { stonesT = 2; if (stonesDirty || stoneMesh.count) layStones(); stonesDirty = false; }
+  if ((stonesT -= dt) <= 0 || stonesDirty) { stonesT = 3; const sig = paveSig(), moved = Math.abs(sig - stonesSig) > .01 && stoneCache.size; if (stonesDirty || moved || !stoneCache.size) { layStones(moved || !stoneCache.size); stonesSig = sig; } stonesDirty = false; }
   wearT += dt; if (wearT < .5) return;
   // alle halbe Sekunde: Pfade langsam zuwachsen lassen (Halbwertszeit etwa 10 Minuten) und geänderte Punkte neu färben
   const decay = Math.pow(.5, wearT / 600); wearT = 0;
@@ -62,7 +62,7 @@ const ROAD_FILL = 11;
 function paveFill(k) { let n = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) n += PAVE[k + dj * N + di] || 0; return n; }
 const roomForRoad = k => paveFill(k) < ROAD_FILL;
 // Pflaster wieder entfernen (zu breite Flächen, village/roads.js): der Pfad bleibt ausgetreten
-function unpave(k) { if (!PAVE[k]) return; PAVE[k] = 0; WEAR[k] = 7; wearDirty.add(k); stonesDirty = true; }
+function unpave(k) { if (!PAVE[k]) return; PAVE[k] = 0; WEAR[k] = 7; wearDirty.add(k); touchStones(k); }
 // Ein Stein pflastert die ausgetretenen Punkte im Umkreis r (folgt so der Form des Pfads); liefert die Anzahl.
 // pick: eigene Auswahl der Punkte (geplante Straßen, village/roads.js) statt Abnutzung und Breitengrenze
 function paveAt(x, z, r = .6, pick = null) {
@@ -70,7 +70,7 @@ function paveAt(x, z, r = .6, pick = null) {
   for (let j = Math.max(1, j0); j <= Math.min(SEG - 1, j1); j++) for (let i = Math.max(1, i0); i <= Math.min(SEG - 1, i1); i++) {
     const k = j * N + i, px = -HALF + i * CELL, pz = -HALF + j * CELL;
     if (PAVE[k] || Math.hypot(px - x, pz - z) > r || H[k] < .1 || (pick ? !pick(k) : WEAR[k] < 12 || !roomForRoad(k))) continue;
-    PAVE[k] = 1; WEAR[k] = WEAR_MAX; wearDirty.add(k); n++;
+    PAVE[k] = 1; WEAR[k] = WEAR_MAX; wearDirty.add(k); touchStones(k); n++;
   }
   if (n) stonesDirty = true;
   return n;
@@ -88,28 +88,67 @@ function paveSpot(skip = []) {
   }
   if (best < 0) return null; const i = best % N, j = (best - i) / N; return { x: -HALF + i * CELL, z: -HALF + j * CELL };
 }
-// Pflastersteine wie bei einer Römerstraße: je gepflastertem Geländepunkt vier flache, leicht unregelmäßige Steine,
-// der Neigung des Bodens folgend, mit dunklen Fugen dazwischen. Alle in einem InstancedMesh; neu gelegt, wenn gepflastert
-// wird, und alle zwei Sekunden der Höhe nach nachgeführt (die Hand kann das Gelände formen)
-const STONE_MAX = 16000, stoneMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.172, .06, .172), new THREE.MeshStandardMaterial({ roughness: .9, flatShading: true }), STONE_MAX);
-stoneMesh.castShadow = false; stoneMesh.receiveShadow = true; stoneMesh.frustumCulled = false; stoneMesh.count = 0; scene.add(stoneMesh);
-const stoneC = new THREE.Color(), dummy = new THREE.Object3D(), STONE_OFF = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
-let stonesDirty = true, stonesT = 0;
-function layStones() {
-  let n = 0; const q = CELL / 4, e = .08;
-  for (let k = 0; k < PAVE.length && n < STONE_MAX - 4; k++) {
-    if (!PAVE[k]) continue;
-    const i = k % N, j = (k - i) / N, cx = -HALF + i * CELL, cz = -HALF + j * CELL;
-    STONE_OFF.forEach(([ox, oz], m) => {
-      const r = hash(k * 4 + m), x = cx + ox * q + (r - .5) * .02, z = cz + oz * q + (hash(k * 7 + m) - .5) * .02, h = heightAt(x, z);
-      const sx = (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), sz = (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
-      dummy.position.set(x, h + .002, z); dummy.rotation.set(-Math.atan(sz), (r - .5) * .3, Math.atan(sx)); // flach auf dem Hang
-      const s = .86 + r * .18; dummy.scale.set(s * (.92 + hash(k + m * 13) * .16), .7 + r * .3, s); dummy.updateMatrix();
-      stoneMesh.setMatrixAt(n, dummy.matrix); stoneMesh.setColorAt(n, stoneC.copy(C.pave).lerp(C.pave2, hash(k * 3 + m * 5)).multiplyScalar(.92 + r * .14)); n++;
-    });
+// Pflaster wie bei einer Römerstraße: ein Mosaik aus unregelmäßigen, vieleckigen Steinen, dicht an dicht mit schmalen
+// Fugen, am Rand eine Reihe etwas höherer, hellerer Randsteine. Auf einem feinen Raster (halber Punktabstand) liegt je
+// Feld ein verschobener Mittelpunkt; jeder Stein ist die Voronoi-Zelle seines Mittelpunkts, etwas eingezogen (Fuge).
+// Die Ecken folgen der Geländehöhe. Alles in einer Geometrie, neu gebaut, wenn gepflastert wird oder sich die Höhe ändert.
+const FH = CELL / 2, FN = SEG * 2 + 1, stoneC = new THREE.Color();
+const stoneMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .92, flatShading: true });
+const stoneMesh = new THREE.Mesh(new THREE.BufferGeometry(), stoneMat); stoneMesh.receiveShadow = true; stoneMesh.frustumCulled = false; scene.add(stoneMesh);
+let stonesDirty = true, stonesT = 0, stonesSig = 0;
+// fertige Steine je Feld des feinen Rasters; nach dem Pflastern wird nur die Umgebung der geänderten Punkte neu gelegt
+const stoneCache = new Map(), stoneTouched = [];
+const touchStones = k => { stoneTouched.push(k); stonesDirty = true; };
+const seedX = (fi, fj) => -HALF + fi * FH + (hash(fi * 7919 + fj * 104729) - .5) * FH * .7;
+const seedZ = (fi, fj) => -HALF + fj * FH + (hash(fi * 3571 + fj * 7907 + 11) - .5) * FH * .7;
+const onPave = (fi, fj) => { const i = Math.round(fi / 2 + .01), j = Math.round(fj / 2 + .01); return i > 0 && j > 0 && i < SEG && j < SEG && PAVE[j * N + i] === 1; };
+function clip(poly, ax, az, nx, nz) { // Halbebene: Punkte p mit (p - a) · n <= 0 bleiben
+  const out = [];
+  for (let k = 0; k < poly.length; k++) {
+    const p = poly[k], q = poly[(k + 1) % poly.length], dp = (p[0] - ax) * nx + (p[1] - az) * nz, dq = (q[0] - ax) * nx + (q[1] - az) * nz;
+    if (dp <= 0) out.push(p);
+    if ((dp <= 0) !== (dq <= 0)) { const t = dp / (dp - dq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
   }
-  stoneMesh.count = n; stoneMesh.instanceMatrix.needsUpdate = true; if (stoneMesh.instanceColor) stoneMesh.instanceColor.needsUpdate = true;
+  return out;
 }
+function stoneAt(fi, fj) { // ein Stein: Voronoi-Zelle, eingezogen, Ecken auf Geländehöhe; null, wenn hier kein Pflaster liegt
+  if (!onPave(fi, fj)) return null;
+  const sx = seedX(fi, fj), sz = seedZ(fi, fj);
+  let poly = [[sx - FH, sz - FH], [sx + FH, sz - FH], [sx + FH, sz + FH], [sx - FH, sz + FH]], edge = false;
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+    if (!di && !dj) continue;
+    const nx = seedX(fi + di, fj + dj), nz = seedZ(fi + di, fj + dj); if (!onPave(fi + di, fj + dj) && (!di || !dj)) edge = true;
+    poly = clip(poly, (sx + nx) / 2, (sz + nz) / 2, nx - sx, nz - sz);
+  }
+  if (poly.length < 3) return null;
+  let cx = 0, cz = 0; for (const p of poly) { cx += p[0]; cz += p[1]; } cx /= poly.length; cz /= poly.length;
+  const r = hash(fi * 31 + fj * 977), shrink = edge ? .86 : .9, top = (edge ? .05 : .026) + r * .008, pos = [];
+  stoneC.copy(C.pave).lerp(C.pave2, edge ? .85 + r * .15 : hash(fi * 13 + fj * 71)).multiplyScalar(.9 + r * .16);
+  const pts = poly.map(p => { const x = cx + (p[0] - cx) * shrink, z = cz + (p[1] - cz) * shrink; return [x, z, heightAt(x, z)]; });
+  const cy = heightAt(cx, cz) + top + .006; // leicht gewölbt
+  for (let k = 0; k < pts.length; k++) {
+    const a = pts[k], b = pts[(k + 1) % pts.length];
+    pos.push(cx, cy, cz, b[0], b[2] + top, b[1], a[0], a[2] + top, a[1]); // Oberseite (von oben gegen den Uhrzeigersinn)
+    pos.push(a[0], a[2] + top, a[1], b[0], b[2] + top, b[1], b[0], b[2] - .015, b[1], a[0], a[2] + top, a[1], b[0], b[2] - .015, b[1], a[0], a[2] - .015, a[1]); // Seite bis in den Boden
+  }
+  const col = new Float32Array(pos.length); for (let v = 0; v < col.length; v += 3) { col[v] = stoneC.r; col[v + 1] = stoneC.g; col[v + 2] = stoneC.b; }
+  return { pos: new Float32Array(pos), col };
+}
+function layStones(all) {
+  if (all) { stoneCache.clear(); for (let fj = 2; fj < FN - 2; fj++) for (let fi = 2; fi < FN - 2; fi++) { const st = stoneAt(fi, fj); if (st) stoneCache.set(fj * FN + fi, st); } }
+  else for (const k of stoneTouched) { // nur die Felder rund um geänderte Punkte
+    const i = k % N, j = (k - i) / N;
+    for (let fj = 2 * j - 3; fj <= 2 * j + 3; fj++) for (let fi = 2 * i - 3; fi <= 2 * i + 3; fi++) { if (fi < 2 || fj < 2 || fi >= FN - 2 || fj >= FN - 2) continue; const st = stoneAt(fi, fj), key = fj * FN + fi; if (st) stoneCache.set(key, st); else stoneCache.delete(key); }
+  }
+  stoneTouched.length = 0;
+  let n = 0; for (const st of stoneCache.values()) n += st.pos.length;
+  const pos = new Float32Array(n), col = new Float32Array(n); let o = 0;
+  for (const st of stoneCache.values()) { pos.set(st.pos, o); col.set(st.col, o); o += st.pos.length; }
+  stoneMesh.geometry.dispose(); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); // flatShading: keine Normalen nötig
+  stoneMesh.geometry = g;
+}
+// Höhe der gepflasterten Punkte als Kennzahl: ändert sie sich (Hand formt das Gelände), neu legen
+const paveSig = () => { let h = 0; for (let k = 0; k < PAVE.length; k++) if (PAVE[k]) h += H[k] * (1 + (k % 7)); return h; };
 const pavedCount = () => { let n = 0; for (let k = 0; k < PAVE.length; k++) n += PAVE[k]; return n; };
 for (let k = 0; k < N * N; k++) if (WEAR[k] > 6) { const c = vertexColor(k); tCol.setXYZ(k, c.r, c.g, c.b); }
 tCol.needsUpdate = true;

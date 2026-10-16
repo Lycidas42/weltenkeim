@@ -88,9 +88,12 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
   ist danach kurz Erde und wächst wieder zu.
 - **Bewohner nutzen die Straße:** In der Wegsuche kostet ein Schritt auf Pflaster nur gut die Hälfte (`ROAD_COST`),
   und Abkürzungen verlassen eine gepflasterte Strecke nicht. Auf Pflaster gehen sie zudem um ein Drittel schneller.
-- **Aussehen:** wie bei einer Römerstraße je Geländepunkt vier flache, leicht unregelmäßige Steine, die der Neigung
-  folgen, mit dunklen Fugen dazwischen (`palette.terrain.pave`, `pave2`, `paveJoint`; ein InstancedMesh, höchstens
-  16 000 Steine, alle zwei Sekunden der Geländehöhe nachgeführt). Gepflastert wächst nicht mehr zu.
+- **Aussehen:** wie bei einer Römerstraße ein Mosaik aus unregelmäßigen, vieleckigen Steinen, dicht an dicht mit
+  schmalen dunklen Fugen; am Rand eine Reihe höherer, hellerer Randsteine. Auf einem feinen Raster (halber
+  Punktabstand) liegt je Feld ein verschobener Mittelpunkt, jeder Stein ist dessen Voronoi-Zelle, etwas eingezogen;
+  die Ecken folgen der Geländehöhe (`palette.terrain.pave`, `pave2`, `paveJoint`). Alle Steine in einer Geometrie;
+  fertige Steine werden zwischengespeichert, nach dem Pflastern wird nur die Umgebung neu gelegt, beim Formen des
+  Geländes alles. Gepflastert wächst nicht mehr zu.
 - **Vorrang für Steinhäuser:** Wird der Platz knapp und gibt es noch Holzhäuser, bleiben 8 Steine im Lager liegen.
 - Spielstand: `S.paved` (Liste der gepflasterten Geländepunkte, gilt nur bei gleicher Rastergröße `S.pathsN`); das
   Straßennetz selbst wird bei jedem Laden neu geplant.
