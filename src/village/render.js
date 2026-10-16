@@ -29,7 +29,7 @@ function renderVillagers(dt, t) {
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
       if (v.state === 'flee') { armA = armB = -2.6 + s * .4; }
     } else if (v.state === 'chop' || v.state === 'quarry') { const c = chopPose((v.cp || 0) % 1); tilt = c.tilt; bob = c.bob; armA = armB = c.arm; splay = -.55; leg = .22; }
-    else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
+    else if (v.state === 'plant' || v.state === 'sow' || v.state === 'harvest' || v.state === 'pave') { const c = digPose((v.cp || 0) % 1); tilt = c.tilt + (v.state === 'plant' ? 0 : .25); armA = armB = c.arm; splay = v.state === 'plant' ? -.5 : .05; leg = .3; }
     else if (v.state === 'proc') { const s = Math.sin(t * (v.role === 'baker' ? 7 : 3) + v.ph); if (v.role === 'baker') { armA = armB = -1.15 + s * .25; tilt = .22; splay = .05; } else { armA = -1.9 + s * .12; armB = -1.7 - s * .12; splay = .2; tilt = -.04; } leg = .15; } // kneten bzw. Korn in den Trichter schütten
     else if (v.state === 'tend') { const s = Math.sin(t * 7 + v.ph); armA = -.5; armB = -1.1 + s * .35; splay = .15; tilt = .1; } // Futter streuen
     else if (v.state === 'saw') { const s = Math.sin(t * 9 + v.ph); armA = armB = -1.35 + s * .2; splay = -.25; tilt = .18 + s * .05; leg = .25; }

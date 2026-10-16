@@ -29,7 +29,11 @@ const emit = (name, ...args) => (handlers[name] || []).forEach(fn => fn(...args)
 const prayYield = () => 1 + 0.6 * (S.temple - 1);
 const passive = () => 0.06 * S.temple;
 const MAX_POP = 40; // vorerst höchstens so viele Bewohner (Übersicht und Leistung auf dem Handy)
-const cap = () => Math.min(MAX_POP, 4 + 3 * S.houses);
+// Steinhäuser (werkstaetten.md 4): ein ausgebautes Haus bietet 2 Seelen mehr Platz und hebt die Höchstzahl um 2
+if (!Array.isArray(S.stoneHouses)) S.stoneHouses = [];
+S.stoneHouses = [...new Set(S.stoneHouses.filter(i => Number.isInteger(i) && i >= 0))];
+const STONE_HOUSE = { holz: 6, stone: 8, seats: 2 };
+const cap = () => { const sh = S.stoneHouses.length * STONE_HOUSE.seats; return Math.min(MAX_POP + sh, 4 + 3 * S.houses + sh); };
 const houseCost = () => 12 + 6 * Math.max(0, S.houses - 2);
 const templeCost = () => Math.round(30 * Math.pow(1.7, S.temple - 1));
 const handCost = () => Math.round(40 * Math.pow(1.8, S.hand - 1));
@@ -80,4 +84,4 @@ const PROC = { miller: { inp: 'grain', n: 2, out: 'flour', m: 2, t: 4.5, buf: 6,
 const resText = (k, n) => `${fmt(n)} ${n === 1 ? RES[k][0] : RES[k][1]}`;
 const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' } };
 
-export { MAX_POP, MIRACLES, PROC, RES, ROLES, S, SAVE_KEY, SOUL_COST, WORKS, cap, emit, handCost, houseCost, loaded, on, onSave, passive, prayYield, resText, save, stopSaving, templeCost };
+export { MAX_POP, MIRACLES, PROC, RES, ROLES, S, SAVE_KEY, SOUL_COST, STONE_HOUSE, WORKS, cap, emit, handCost, houseCost, loaded, on, onSave, passive, prayYield, resText, save, stopSaving, templeCost };

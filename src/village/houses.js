@@ -66,9 +66,20 @@ function addHouse(site) {
     const o = new THREE.Mesh(gardenGeo, plantMat); o.rotation.y = site.ry; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: gx, z: gz }); h.garden = { x: gx, z: gz, ry: site.ry }; }
   houses.push(h); return h;
 }
+// Steinhaus: halbhoher Sockel aus Bruchsteinen rund um das Haus, vorn mit Lücke für die Tür (eine Geometrie je Hausform)
+const stoneGeos = {}, stoneGeo = key => stoneGeos[key] || (stoneGeos[key] = (() => {
+  const parts = [], M = modelInfo(key), [cx, cz, hx, hz] = M.base, X = hx * SB + .03, Z = hz * SB + .03, ox = cx * SB, oz = cz * SB, door = M.anchors.door.x * SB;
+  const B = (w, h, d, x, y, z, ry = 0) => parts.push(paint(new THREE.BoxGeometry(w, h, d).rotateY(ry).translate(x, y, z), (px, py, pz, ny, c) => c.set(0x9d978c).multiplyScalar((.8 + .32 * Math.abs(Math.sin(x * 37 + z * 53 + y * 11))) * (ny > .5 ? 1.08 : .9))));
+  const hgt = x => .27 + Math.abs(Math.sin(x * 9)) * .05; // halbhoher Sockel aus Bruchsteinen vor der Wand
+  for (const sz of [-1, 1]) for (let x = -X; x < X - .01; x += .17) { const mx = x + .085; if (sz > 0 && Math.abs(mx - door) < .2) continue; B(.16, hgt(mx + sz), .07, ox + mx, hgt(mx + sz) / 2, oz + sz * Z, Math.sin(mx * 7) * .05); } // vorn Lücke für die Tür
+  for (const sx of [-1, 1]) for (let z = -Z; z < Z - .01; z += .17) { const mz = z + .085; B(.07, hgt(mz + sx), .16, ox + sx * X, hgt(mz + sx) / 2, oz + mz, Math.sin(mz * 7) * .05); }
+  return mergeGeometries(parts);
+})());
+function makeStone(h) { if (h.stone) return; const o = new THREE.Mesh(stoneGeo(h.key), plantMat); o.rotation.y = h.o.rotation.y; o.castShadow = o.receiveShadow = true; scene.add(o); statics.push({ o, x: h.x, z: h.z }); h.stone = o; }
 for (let i = 0; i < S.houses; i++) { const s = freeSite(); if (s) addHouse(s); }
+S.stoneHouses = S.stoneHouses.filter(i => i < houses.length); for (const i of S.stoneHouses) makeStone(houses[i]);
 S.houses = houses.length;
 const build = { construction: null };
 const scaff = place('scaffold', 0, 0, 0, 0.95); scaff.o.visible = false;
 
-export { addHouse, build, freeSite, houseDoor, houseMat, houseMats, houses, mill, millWheel, scaff, sites };
+export { addHouse, build, freeSite, makeStone, houseDoor, houseMat, houseMats, houses, mill, millWheel, scaff, sites };

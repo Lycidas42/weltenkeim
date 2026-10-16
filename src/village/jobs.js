@@ -22,6 +22,7 @@ function leaveJob(v) {
   const keep = v.state === 'walk' && v.next === 'dropHut';
   if (v.carry && !keep) { if (v.drop) putDown(v, true); else if (v.carry === 1 && v.state !== 'saw') S.logs++; v.carry = 0; }
   if (v.field) { if (v.field.by === v) v.field.by = null; v.field = null; }
+  if (v.haul && v.haul.kind === 'pave') { if (v.carry) S.stone += 1; v.haul = null; v.carry = 0; if (v.state === 'pave' || v.state === 'walk') idle(v, .3); } // angefangenes Pflastern
   if (v.rock) { if (v.rock.by === v) v.rock.by = null; v.rock = null; }
   if (v.stones > 0) { S.stone += v.stones; v.stones = 0; } // angefangene Steine zählen trotzdem
   if (v.state === 'mine') { idle(v, .3); }

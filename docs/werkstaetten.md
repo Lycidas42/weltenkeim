@@ -4,44 +4,49 @@ Neue Werkstätten des Dorfes und die Rohstoffe, die sie verarbeiten. Bestehende 
 Bäckerei) stehen im Code (`village/workshops.js`, `PROC` in `core/state.js`). Die Sattlerei für die Ausrüstung der
 Kreatur steht in `kreatur.md` 3.13 B, die Kreatur selbst in `kreatur.md`.
 
-## 1. Steinmetz und Steine
+## 1. Steinbruch, Steinmine und Steine
 
-**Stand:** 🔵 geplant – Umsetzung später
+**Stand:** 🟡 teilweise – Steinbruch, Mine und Ware Steine umgesetzt; die Kreatur bringt noch keine Felsen
 
 ### A. Warum
 
-- Felsen haben heute keinen Zweck: Sie liegen nur außerhalb des Dorfes. Die Kreatur kann sie schon bewegen (Stier
-  schiebt sie mit dem Kopf, Fuchs hebt sie mit Lichtranken, `kreatur.md` 3.13), und ihre Lage wird gespeichert
-  (`S.rocks`).
-- Ein Steinmetz macht aus Felsen **Steine**, eine neue Ware für spätere Bauten. So bekommt das Felsenschieben einen
-  Sinn, und Kreatur und Dorf arbeiten zusammen.
+- Felsen hatten keinen Zweck. Die Kreatur kann sie schon bewegen (Stier schiebt sie, Fuchs hebt sie mit Lichtranken,
+  `kreatur.md` 3.13), ihre Lage steht im Spielstand (`S.rocks`).
+- Steine sind eine neue Ware für gepflasterte Wege (3) und Steinhäuser (4).
 
-### B. Ablauf
+### B. Steinbruch (Steinmetz) ✅
 
-- **Hütte und Beruf:** Steinmetz (Steinmetzhütte) wie die übrigen Werkstätten, mit Arbeitsplatz und sichtbarer Arbeit
-  (Meißel, Splitter, Staub).
-- **Felsen zum Steinmetz:**
-  - Die Kreatur bringt einen Felsen zur Hütte: der Stier schiebt ihn, der Fuchs trägt ihn mit Lichtranken (kostet
-    Glaube). Dort zerlegt der Steinmetz ihn nach und nach; die Menge Steine hängt von der Größe ab.
-  - Ohne Kreatur geht der Steinmetz selbst zu einem Felsen in der Nähe und schlägt dort Steine ab (langsamer);
-    der Felsen wird dabei kleiner und verschwindet zuletzt. Träger bringen die Steine ins Lager.
-- **Ware Steine:** im Lager (`S.stone`, Feldname vorher prüfen), mit Anzeige in der Leiste wie Stämme und Bretter.
+- Arbeitsstätte **Steinbruch**, Beruf **Steinmetz** (`mason`), Hütte **Steinmetzhütte** (KayKit-Schmiede,
+  `hut.mason`) auf einem der Hüttenplätze am Waldrand, mit Steinhaufen davor.
+- Der Steinmetz sucht den nächsten freien Felsen (bis 22 Einheiten von der Hütte), stellt sich daneben und schlägt
+  mit der Spitzhacke Steine ab (graue Splitter). Jede Runde bringt einen Stein, der Felsen wird kleiner
+  (`ROCK_STEP`), er rückt nach. Unter einer Mindestgröße ist der Felsen **abgebaut** und verschwindet
+  („Felsen abgebaut“). Je zwei Steine legt er an der Hütte ab, Träger bringen sie ins Lager.
+- Felsen sind damit endlich: Ein großer Findling gibt etwa 15 bis 20 Steine.
 
-### C. Wofür Steine (offen, zur Auswahl)
+### C. Steinmine am Berg ✅
 
-- Brunnen und Fundamente, später Steinhäuser oder Häuser mit Steinsockel.
-- Wege pflastern (schneller gehen, weniger Abnutzung).
-- Ausbau des Schreins (Stufe, Mauer).
-- Steinbrücke über den Bach.
+- Arbeitsstätte **Steinmine**, Beruf **Bergmann** (Mehrzahl Bergleute, `miner`), Modell KayKit-Mine (`hut.mine`).
+- Es gibt **eine** Mine: am felsigen Hang (Höhe 2,5 bis 4,4), mindestens 10,5 Einheiten vom Dorfplatz, mit Abstand
+  zu Häusern samt Gärten, Hütten und Höfen, Eingang talwärts. Der Platz wird beim ersten Mal gewählt und gespeichert
+  (`S.mineAt`), weil das Einebnen beim Bau den Hang verändert.
+- Bergleute gehen in den Stollen (unsichtbar, am Eingang staubt es), kommen nach 7 bis 10 Sekunden mit zwei Steinen
+  heraus und legen sie am Steinhaufen ab. Die Mine geht nie zur Neige, liegt aber weit draußen.
 
-### D. Felsen werden weniger
+### D. Ware Steine ✅
 
-- Felsen sind endlich. Offen: ob neue Felsen auftauchen (z. B. wenn die Hand beim Formen tief gräbt oder Berge
-  anhebt) oder ob Steine knapp bleiben sollen.
+- `S.stone`, im Lager angezeigt (eigenes Symbol, sichtbar ab Steinbruch oder Mine), hinter der Lagerhalle wachsen
+  Steinstapel mit dem Vorrat. Bewohner tragen Steine in den Armen (`carry` 11).
+
+### E. Offen
+
+- Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken), siehe Reihenfolge.
+- Neue Felsen: ob sie auftauchen (z. B. wenn die Hand tief gräbt oder Berge anhebt) oder knapp bleiben.
+- Weitere Verwendungen: Brunnen, Ausbau des Schreins, Steinbrücke über den Bach.
 
 ## 2. Bauplätze freiräumen
 
-**Stand:** 🔵 geplant – Umsetzung später, zusammen mit dem Steinmetz
+**Stand:** 🔵 geplant – Umsetzung später
 
 🟡 Erster Teil im Prototyp (Branch `claude/vierbeiner-test`): Neue Felder des Stiers liegen oft auf Felsen; er
 schiebt sie vorher weg (`kreatur.md` 3.13).
@@ -50,12 +55,38 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
   am Dorfrand Felsen auch auf Plätzen liegen, die das Dorf erst später braucht (neue Häuser, Hütten, Felder).
 - Ein Bauplatz mit Felsen ist **blockiert** und so markiert. Gebaut wird erst, wenn er frei ist.
 - **Die Kreatur räumt ihn:** als Hilfe aus eigenem Antrieb (Neigung Helfen), wenn ein blockierter Platz gebraucht
-  wird. Der Felsen geht zum Steinmetz, sobald es einen gibt, sonst an den Rand des Dorfes.
+  wird. Der Felsen geht zum Steinmetz, sobald es einen gibt (1), sonst an den Rand des Dorfes.
 - Später denkbar: Die Hand kann kleine Felsen greifen und werfen wie Bäume (`gott-und-hand.md`).
 
-## 3. Reihenfolge
+## 3. Gepflasterte Wege
 
-1. Steinmetz und Ware Steine (1 A, B), mit dem Abschlagen am Felsen ohne Kreatur.
-2. Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken).
-3. Felsen auf späteren Bauplätzen, Freiräumen durch die Kreatur (2).
-4. Verwendung der Steine (1 C), je nach Wahl.
+**Stand:** ✅ vorhanden
+
+- Grundlage sind die Trampelpfade (`WEAR` in `world/paths.js`): Wo Bewohner oft gehen, wird das Gras zu Erde.
+- Liegen Steine im Lager, holen **freie Bewohner** (Träger) einzeln einen Stein und pflastern damit eine gut
+  ausgetretene Stelle (`paveSpot`): nah am Dorf, bevorzugt neben schon gepflasterten Stellen, so wachsen die Straßen
+  vom Dorf aus weiter. Sie knien und klopfen den Stein fest („Weg gepflastert“). Ein Stein pflastert die
+  ausgetretenen Punkte im Umkreis von 0,8 Einheiten.
+- Gepflastert ist dauerhaft: graue Pflastersteine (`palette.terrain.pave`, `pave2`), der Weg wächst nicht mehr zu,
+  auf Pflaster gehen Bewohner um ein Drittel schneller.
+- Spielstand: `S.paved` (Liste der gepflasterten Geländepunkte, gilt nur bei gleicher Rastergröße `S.pathsN`).
+
+## 4. Steinhäuser
+
+**Stand:** ✅ vorhanden
+
+- Wird der Platz knapp (Bewohner höchstens 3 unter der Höchstzahl) und liegen genug Steine im Lager, baut das Dorf
+  ein Holzhaus zum **Steinhaus** aus: 6 Bretter und 8 Steine, Bauzeit wie ein Haus (Gerüst).
+- Ein Steinhaus bietet **2 Seelen mehr** Platz und hebt die Höchstzahl der Bewohner um 2 (`cap()` in
+  `core/state.js`). Ohne Steinhäuser bleibt es bei 40 Bewohnern.
+- Aussehen: halbhoher Sockel aus Bruchsteinen rund um das Haus, vorn mit Lücke für die Tür (Grundfläche `base` im
+  Theme je Hausform).
+- Spielstand: `S.stoneHouses` (Nummern der ausgebauten Häuser).
+- Offen: ein eigenes, größeres Hausmodell aus Stein statt des Sockels.
+
+## 5. Reihenfolge
+
+1. ✅ Steinbruch, Steinmine und Ware Steine (1).
+2. ✅ Verwendung: gepflasterte Wege (3) und Steinhäuser (4).
+3. Die Kreatur bringt Felsen zum Steinmetz (Stier schiebt, Fuchs mit Lichtranken).
+4. Felsen auf späteren Bauplätzen, Freiräumen durch die Kreatur (2).

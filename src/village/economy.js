@@ -1,9 +1,9 @@
 // Wachstum des Dorfes: neue Seelen, Bauaufträge, Fortschritt in der Abwesenheit
 
 import { fmt } from '../core/util.js';
-import { MAX_POP, ROLES, S, cap, houseCost, loaded, passive, prayYield, save } from '../core/state.js';
+import { MAX_POP, ROLES, S, STONE_HOUSE, cap, houseCost, loaded, passive, prayYield, save } from '../core/state.js';
 import { floatText, toast } from '../ui/feedback.js';
-import { addHouse, build, freeSite, houses, scaff } from './houses.js';
+import { addHouse, build, freeSite, houses, makeStone, scaff } from './houses.js';
 import { hutSite } from './huts.js';
 import { addHut } from './build.js';
 import { homeSpot, spawnVillager, villagers } from './villagers.js';
@@ -14,6 +14,10 @@ import { SOUL_FOOD, food, growthState, noteStall, takePortions } from './food.js
 function nextBuild() {
   const want = wantRoles();
   for (const r in ROLES) if (want[r] > hutCap(r)) { const site = hutSite(r); if (site) return { role: r, label: ROLES[r].hut, cost: ROLES[r].cost(S.huts[r]), site }; }
+  // wird der Platz knapp und liegen Steine im Lager: ein Holzhaus zum Steinhaus ausbauen (werkstaetten.md 4).
+  // Vorher gehen die Steine in die Wege.
+  const wood = houses.findIndex(h => !h.stone);
+  if (wood >= 0 && S.stone >= STONE_HOUSE.stone && villagers.length >= cap() - 3) { const h = houses[wood]; return { role: null, stoneHouse: wood, label: 'Steinhaus', cost: STONE_HOUSE.holz, stone: STONE_HOUSE.stone, site: { x: h.x, z: h.z, ry: h.o.rotation.y } }; }
   if (4 + 3 * houses.length >= MAX_POP) return null; // genug Häuser für die Höchstzahl an Bewohnern
   const site = freeSite(); return site ? { role: null, label: 'Haus', cost: houseCost(), site } : null;
 }
@@ -28,10 +32,11 @@ function updateVillage(dt) {
     else if (food.growth === 'food') noteStall();
   }
   jobT -= dt; if (jobT <= 0) { jobT = 1; reconcileJobs(); }
-  if (!build.construction) { const b = nextBuild(); if (b && S.holz >= b.cost) { S.holz -= b.cost; build.construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
+  if (!build.construction) { const b = nextBuild(); if (b && S.holz >= b.cost && S.stone >= (b.stone || 0)) { S.holz -= b.cost; S.stone -= b.stone || 0; build.construction = { ...b, t: 0 }; b.site.used = true; scaff.x = b.site.x; scaff.z = b.site.z; scaff.o.rotation.y = b.site.ry; scaff.o.visible = true; } }
   if (build.construction) { build.construction.t += dt; if (build.construction.t > 9) {
     const c = build.construction; c.site.used = false; scaff.o.visible = false; build.construction = null;
-    if (c.role) { const e = addHut(c.role, c.site); S.huts[c.role]++; reconcileJobs(); floatText(e.x, 2.2, e.z, c.label, 's'); toast(`Eine neue ${c.label} steht. Platz für ${ROLES[c.role].per} weitere ${ROLES[c.role].label}.`); }
+    if (c.stoneHouse !== undefined) { const h = houses[c.stoneHouse]; makeStone(h); if (!S.stoneHouses.includes(c.stoneHouse)) S.stoneHouses.push(c.stoneHouse); floatText(h.x, 2.2, h.z, 'Steinhaus', 's'); toast(`Ein Haus ist jetzt aus Stein. Platz für ${cap()} Seelen.`); }
+    else if (c.role) { const e = addHut(c.role, c.site); S.huts[c.role]++; reconcileJobs(); floatText(e.x, 2.2, e.z, c.label, 's'); toast(`Eine neue ${c.label} steht. Platz für ${ROLES[c.role].per} weitere ${ROLES[c.role].label}.`); }
     else { const hs = addHouse(c.site); S.houses = houses.length; floatText(hs.x, 2.2, hs.z, 'Neues Haus', 's'); toast(`Ein neues Haus steht. Platz für ${cap()} Seelen.`); }
     save();
   } }

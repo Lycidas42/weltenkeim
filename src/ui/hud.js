@@ -87,7 +87,7 @@ function updateHud(dt, t) {
     // Lager: alle Rohstoffe und was als Nächstes gebaut wird
     $('sLogs').textContent = fmt(S.logs); $('sPlanks').textContent = fmt(S.holz); $('sMeat').textContent = fmt(S.meat); $('sFish').textContent = fmt(S.fish); $('sVeg').textContent = fmt(S.veg); $('sMilk').textContent = fmt(S.milk); $('sEggs').textContent = fmt(S.eggs); $('sGrain').textContent = fmt(S.grain); $('sFlour').textContent = fmt(S.flour); $('sBread').textContent = fmt(S.bread); $('sStone').textContent = fmt(S.stone);
     for (const [id, k, r] of [['sMeat', 'meat', 'hunter'], ['sFish', 'fish', 'fisher'], ['sVeg', 'veg', 'farmer'], ['sMilk', 'milk', 'farmer'], ['sEggs', 'eggs', 'farmer'], ['sGrain', 'grain', 'farmer'], ['sFlour', 'flour', 'miller'], ['sBread', 'bread', 'baker'], ['sStone', 'stone', 'mason']]) $(id).parentElement.hidden = !S[k] && !S.huts[r] && !(r === 'hunter' && S.huts.farmer) && !(r === 'mason' && S.huts.miner);
-    { const nb = build.construction ? null : nextBuild(); $('sBuild').textContent = build.construction ? `${build.construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern` : 'Dorf voll'; }
+    { const nb = build.construction ? null : nextBuild(); $('sBuild').textContent = build.construction ? `${build.construction.label} im Bau` : nb ? `${nb.label} ab ${nb.cost} Brettern${nb.stone ? ` und ${nb.stone} Steinen` : ''}` : 'Dorf voll'; }
     { const fd = foodDays(); $('sFood').textContent = fd.text; $('sFood').classList.toggle('low', fd.low);
       $('sGrow').textContent = GROW_TEXT[food.growth].replace(/ \(.*\)$/, ''); $('sGrow').classList.toggle('low', food.growth === 'food'); }
     updateLagerStock();
