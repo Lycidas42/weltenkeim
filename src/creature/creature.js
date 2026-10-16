@@ -109,6 +109,13 @@ const FOX_HIP = 1.07; // Beckenhöhe des Fuchses, auf die sich pos bezieht
 const NO_POSE = { rot: {}, pos: {} };
 const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.pos });
 // Aufladen eines Wunders (kreatur.md 3.13 C): liegen wie eine Sphinx, Kopf erhoben, Blick nach oben, Schwanz um den Körper
+// Huftiere (Stier, Hirsch, Alpaka): liegen mit untergeschlagenen Beinen und erhobenem Kopf; statt sich wie ein Hund
+// aufzubäumen steigen sie nur vorn etwas hoch (die Hundeposen ziehen bei ihren Proportionen die Beine lang)
+POSES.sitHoof = withPose(POSES.hoof, { Neck1: [-26, 0, 0], Head: [-8, 0, 0] });
+POSES.buck = {
+  rot: { Back: [-16, 0, 0], FrontShoulderL: [-18, 0, 0], FrontShoulderR: [-18, 0, 0], FrontLowerLegL: [40, 0, 0], FrontLowerLegR: [40, 0, 0], Neck1: [-6, 0, 0], Head: [-12, 0, 0] },
+  pos: { Body: [0, .02, -.04], IKFrontLegL: [0, .28, .02], IKFrontLegR: [0, .28, .02] },
+};
 POSES.sit = withPose(POSES.paw, { Neck1: [-38, 0, 0], Head: [-12, 0, 0], Tail1: [-28, 0, 0], Tail2: [-10, 40, 0], Tail3: [0, 40, 0], Tail5: [0, 35, 0], Tail7: [0, 30, 0] });
 // keys: [{ t, pose }] -> AnimationClip, ausgehend von der ersten Frame der Basis-Animation
 function poseClip(model, baseClip, name, keys) {
@@ -141,14 +148,14 @@ function poseClip(model, baseClip, name, keys) {
 }
 // Hinlegen, Liegen (mit leichtem Kopfdrehen), Aufstehen und Wunderwirken für ein Tier bauen
 function buildPoseClips(model, baseClip, rest) {
-  const L = POSES[rest], R = POSES.rear;
+  const L = POSES[rest], hoof = rest === 'hoof', R = hoof ? POSES.buck : POSES.rear, Sit = hoof ? POSES.sitHoof : POSES.sit;
   return {
     lieDown: poseClip(model, baseClip, 'lieDown', [{ t: 0, pose: NO_POSE }, { t: .9, pose: L }]),
     lie: poseClip(model, baseClip, 'lie', [{ t: 0, pose: L }, { t: 2.5, pose: withPose(L, { Head: [L.rot.Head[0] + 4, 14, 0] }) }, { t: 4, pose: withPose(L, { Head: [L.rot.Head[0] - 2, -10, 0] }) }, { t: 6, pose: L }]),
     standUp: poseClip(model, baseClip, 'standUp', [{ t: 0, pose: L }, { t: .7, pose: NO_POSE }]),
-    sitDown: poseClip(model, baseClip, 'sitDown', [{ t: 0, pose: NO_POSE }, { t: .7, pose: POSES.sit }]),
-    sit: poseClip(model, baseClip, 'sit', [{ t: 0, pose: POSES.sit }, { t: 1.5, pose: withPose(POSES.sit, { Neck1: [-42, 0, 0] }) }, { t: 3, pose: POSES.sit }]),
-    cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [-28, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [-28, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
+    sitDown: poseClip(model, baseClip, 'sitDown', [{ t: 0, pose: NO_POSE }, { t: .9, pose: Sit }]),
+    sit: poseClip(model, baseClip, 'sit', [{ t: 0, pose: Sit }, { t: 1.5, pose: withPose(Sit, { Neck1: [Sit.rot.Neck1[0] - 4, 0, 0] }) }, { t: 3, pose: Sit }]),
+    cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [R.rot.Head[0] - 8, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [R.rot.Head[0] - 8, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
   };
 }
 // Eigene Reaktionen auf Lob und Tadel (bisher nur Fuchs, CREATURES.*.react):
