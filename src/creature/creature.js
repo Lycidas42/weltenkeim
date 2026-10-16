@@ -10,6 +10,7 @@ import { TK } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H } from '../world/trees.js';
 import { surfaceAt } from '../world/terrain.js';
+import { nearBuilding } from '../world/nav.js';
 
 const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^Walk$/, run: /^Gallop$/, attack: /^Attack/, hit: /^Idle_HitReact/, jump: /^Jump/ };
 // fehlt eine Animation, wird eine vorhandene mit anderem Tempo genutzt
@@ -297,6 +298,8 @@ function updateMouthTree() {
 const dragUp = new THREE.Vector3(0, 1, 0), dragD = new THREE.Vector3(), dragS = new THREE.Vector3(), dragTip = new THREE.Vector3();
 // Wachsen mit der Erfahrung (kreatur.md 3.13 A): Anfangs schleift sie kleine Bäume, nach etwa 15 Bäumen ganze.
 // Später hängt das am Alter (3.1).
+// Zwischen Häusern dreht sie den Baum längs (sonst ragt er in die Wände), im Freien trägt sie ihn wieder quer
+function narrowK(C) { const t = nearBuilding(fox.x, fox.z, C.h * .9) ? 1 : 0; return (fox.narrow = (fox.narrow || 0) + (t - (fox.narrow || 0)) * .06); }
 const growK = () => .55 + .45 * Math.min(1, (S.cXp && S.cXp.tree || 0) / 15);
 function dragTree(o, s, C) {
   s *= growK();
@@ -308,7 +311,7 @@ function dragTree(o, s, C) {
   // geschleift ist der Baum länger als das Tier: in der Länge stärker gestreckt als in der Breite, damit die Krone
   // hinter dem Körper liegt und nicht den Kopf verdeckt
   const kw = 1.4, kl = 4, L = TREE_H * s * kl * .9, drop = mouthV.y - surfaceAt(mouthV.x, mouthV.z) - .05;
-  const sy = Math.min(.95, Math.max(.1, drop / L)), yaw = .6 + Math.sin(performance.now() * .004) * .03; // leicht pendelnd
+  const sy = Math.min(.95, Math.max(.1, drop / L)), yaw = .6 - .5 * narrowK(C) + Math.sin(performance.now() * .004) * .03; // leicht pendelnd
   dragD.copy(mouthF).multiplyScalar(-Math.cos(yaw)).addScaledVector(dragS, cs * Math.sin(yaw)).multiplyScalar(Math.sqrt(1 - sy * sy)); dragD.y = -sy; dragD.normalize();
   o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
   o.position.copy(mouthV).addScaledVector(dragD, -TREE_H * s * kl * .05);
@@ -340,7 +343,7 @@ function hornTree(o, s, C) {
   if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
   const kw = 1.8, kl = 3.6, L = TREE_H * s * kl;
   mouthV.addScaledVector(mouthF, C.h * .02).y += C.h * .1; // zwischen den Hörnern
-  dragD.copy(pushS).multiplyScalar(cs); dragD.y = .04 * Math.sin(performance.now() * .005); dragD.normalize(); // wippt leicht
+  const nk = narrowK(C); dragD.copy(pushS).multiplyScalar(cs * (1 - nk)).addScaledVector(mouthF, -nk); dragD.y = .04 * Math.sin(performance.now() * .005); dragD.normalize(); // wippt leicht; zwischen Häusern längs über den Rücken
   o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
   o.position.copy(mouthV).addScaledVector(dragD, -L * .38);
   o.visible = true; fox.dragTip = null;

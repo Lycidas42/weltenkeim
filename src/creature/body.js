@@ -274,7 +274,7 @@ function updateGear(dt) {
     anchor('mouth', gp); const fx = Math.sin(fox.vh), fz = Math.cos(fox.vh); gp.x += fx * k * .12; gp.z += fz * k * .12;
     const r = .075 * k * 1.4; gp.y = surfaceAt(gp.x, gp.z) + r;
     if (lastLog.lengthSq()) gear.roll += Math.hypot(gp.x - lastLog.x, gp.z - lastLog.z) / r; lastLog.copy(gp);
-    log.position.copy(gp); log.rotation.set(0, fox.vh, 0); logRoll.rotation.x = gear.roll; log.scale.setScalar(k * 1.4);
+    log.position.copy(gp); log.rotation.set(0, fox.vh, 0); logRoll.rotation.x = gear.roll; log.scale.set(k * .6, k * 1.4, k * 1.4); // etwa so lang, wie das Tier breit ist: der Weg hält nur für den Körper Abstand zu Häusern
   } else lastLog.set(0, 0, 0);
 }
 const Y = new THREE.Vector3(0, 1, 0);
