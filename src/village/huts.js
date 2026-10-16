@@ -112,7 +112,7 @@ const farmSites = [];
   for (const st of cand) if (farmSites.length < 3 && farmSites.every(o => Math.hypot(o.x - st.x, o.z - st.z) > 10)) { farmSites.push(st); for (const h of st.near) h.used = true; }
 }
 const farmPt = (F, lx, lz, out = {}) => { const c = Math.cos(F.ry), sn = Math.sin(F.ry); out.x = F.x + lx * c + lz * sn; out.z = F.z - lx * sn + lz * c; return out; };
-const onFarm = (x, z, m = 0) => farmSites.some(F => { const dx = x - F.x, dz = z - F.z, c = Math.cos(F.ry), sn = Math.sin(F.ry), lx = dx * c - dz * sn, lz = dx * sn + dz * c; return lx > FARM.lx0 - m && lx < FARM.lx1 + m && lz > FARM.lz0 - m && lz < FARM.lz1 + m; });
+const onFarm = (x, z, m = 0) => farmSites.some(F => { const dx = x - F.x, dz = z - F.z, c = Math.cos(F.ry), sn = Math.sin(F.ry), lx = dx * c - dz * sn, lz = dx * sn + dz * c; return lx > FARM.lx0 - m && lx < FARM.lx1 + m && lz > (F.lz0 ?? FARM.lz0) - m && lz < FARM.lz1 + m; });
 // die Sägemühle möglichst nah am Lager, Holzfäller und Förster der Reihe nach rundum
 function hutSite(role) {
   if (role === 'miller' && !mill.role) return { x: MILL_POS.x, z: MILL_POS.z, ry: mill.o.rotation.y, existing: mill }; // die Wassermühle am Bach wird die erste Mühle

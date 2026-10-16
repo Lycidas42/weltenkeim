@@ -8,7 +8,7 @@ import { noise } from '../core/noise.js';
 import { dummy, scene } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
 import { sky, weather } from '../world/sky.js';
-import { heightAt } from '../world/terrain.js';
+import { heightAt, markTerrainDirty, streamDist } from '../world/terrain.js';
 import { flattenAt } from '../world/sculpt.js';
 import { COL, COL2, paint, plantMat } from '../models/nature.js';
 import { place, statics } from '../village/layout.js';
@@ -24,7 +24,9 @@ const CROPS = [
   { label: 'Weizen', grow: 240, yield: 6, rows: 6, per: 13, sp: .22, res: 'grain' }, // Korn für die Mühle
 ];
 const FIELD_STATES = ['leer', 'grow', 'reif'];
-const FIELD_STAGES = 4; // Wachstumsstufen bis zur Reife (Regenwunder hebt ein Feld auf die nächste)
+const FIELD_STAGES = 4;
+// Neue Felder (kreatur.md 3.13, Stier): zweite Reihe hinter der ersten, höchstens 8 Felder je Hof
+const ROW2 = FARM.fz - FARM.fd - .35, MAX_FIELDS = FARM.fx.length * 2; // Wachstumsstufen bis zur Reife (Regenwunder hebt ein Feld auf die nächste)
 const cropGeo = (() => {
   const P = (geo, fn, slot) => paint(geo, fn, false, slot), C = (c, c2, k = 6) => (x, y, z, ny, col) => col.set(c).lerp(COL2.set(c2), clamp(y * k, 0, 1));
   const ring = (n, make) => mergeGeometries([...Array(n)].map((_, k) => make(k).rotateY(k / n * Math.PI * 2 + k * .3)));
@@ -58,7 +60,11 @@ const cropGeo = (() => {
 const CROP_LAYOUT = CROPS.map(C => { const out = []; for (let i = 0; i < C.rows; i++) for (let j = 0; j < C.per; j++) out.push({ x: (i - (C.rows - 1) / 2) * (C.sp || (FARM.fw / 3) * (C.rows === 2 ? 1.2 : 1)) + rnd(.03), z: ((j + .5) / C.per - .5) * (FARM.fd - .25) + rnd(.04), r: Math.random() * 6.28, s: .85 + Math.random() * .3 }); return out; });
 const cropMeshes = cropGeo.map((g, c) => ['leaf', 'fruit'].map(k => { const m = new THREE.InstancedMesh(g[k], plantMat, 12 * CROPS[c].rows * CROPS[c].per); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.set(1, 1, 1)); scene.add(m); return m; }));
 const fields = [], stock = [], farms = [];
-onSave(() => { S.fields = fields.map(f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000]); });
+const fieldSave = f => [f.c, FIELD_STATES.indexOf(f.state), Math.round(f.g * 1000) / 1000];
+onSave(() => { // erste Reihe wie bisher in S.fields, gepflügte Felder mit Hof und Platz in S.newFields
+  S.fields = fields.filter(f => !f.extra).map(fieldSave);
+  S.newFields = fields.filter(f => f.extra && f.reveal >= 1).map(f => [farms.indexOf(f.F), f.lx, ...fieldSave(f)]);
+});
 const stockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9, flatShading: true });
 // Rinder, Schweine, Hühner: Körper aus einem Stück, Beine und Kopf beweglich
 function makeStock(kind) {
@@ -103,6 +109,23 @@ function makeStock(kind) {
   scene.add(g); return { g, legs, head, body };
   function C2(a, b) { return (x, y, z, ny, col) => col.set(a).lerp(COL2.set(b), clamp((y - .15) * 8, 0, 1)); }
 }
+// Ein Feld (Ackerboden mit Furchen, folgt dem Gelände) an Hofposition lx, lz anlegen; sv = gespeicherter Stand [Sorte, Zustand, Wuchs]
+function makeField(F, lx, lz, i, sv) {
+  const p = farmPt(F, lx, lz), fy = heightAt(p.x, p.z);
+  const f = { F, i, x: p.x, z: p.z, ry: F.ry, lx, lz, c: i % CROPS.length, state: 'leer', g: 0, water: 0, by: null };
+  if (Array.isArray(sv)) { f.c = Math.abs(sv[0] | 0) % CROPS.length; f.state = FIELD_STATES[sv[1]] || 'leer'; f.g = clamp(+sv[2] || 0, 0, 1); }
+  const geo = new THREE.PlaneGeometry(FARM.fw, FARM.fd, 20, 12).rotateX(-Math.PI / 2), pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = Math.cos(F.ry), sn = Math.sin(F.ry);
+  for (let k = 0; k < pos.count; k++) {
+    const x = pos.getX(k), z = pos.getZ(k), ridge = .5 + .5 * Math.cos(2 * Math.PI * x / (FARM.fw / 5)), edge = Math.abs(x) > FARM.fw / 2 - .01 || Math.abs(z) > FARM.fd / 2 - .01;
+    pos.setY(k, heightAt(p.x + x * c + z * sn, p.z - x * sn + z * c) - fy + (edge ? .005 : .03 + ridge * .03));
+    COL.set(0x4a3222).lerp(COL2.set(0x7a5638), ridge * .8).multiplyScalar(.92 + Math.random() * .12); col.set([COL.r, COL.g, COL.b], k * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+  f.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  const o = new THREE.Mesh(geo, f.mat); o.receiveShadow = true; o.rotation.y = F.ry; scene.add(o); f.st = { o, x: p.x, z: p.z, gx: p.x, gz: p.z }; statics.push(f.st);
+  fields.push(f); F.fields.push(f);
+  return f;
+}
 // Hof anlegen: Lichtung schlagen, einebnen, Felder mit Furchen, Weide mit Zaun, Trog, Hühnerstall, Heu, Schubkarre
 function buildFarm(e, F) {
   F.used = true; clearAround(F.x, F.z, 5); flattenAt(F.x, F.z, 5.2); flattenAt(e.x, e.z, 1.9);
@@ -137,22 +160,9 @@ function buildFarm(e, F) {
   const mesh = new THREE.Mesh(mergeGeometries(parts), plantMat); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
   g.rotation.y = F.ry; scene.add(g); statics.push({ o: g, x: F.x, z: F.z });
   { const p = farmPt(F, -2.95, .55); place('prop.wheelbarrow', p.x, p.z, F.ry + .6, 1.5); F.barrow = p; const q = farmPt(F, -.45, .5); place('prop.bucket', q.x, q.z, F.ry, 1.5); F.bucket = q; }
-  // Felder: Ackerboden mit Furchen, folgt dem Gelände
-  FARM.fx.forEach((lx, i) => {
-    const p = farmPt(F, lx, FARM.fz), sv = S.fields[fields.length], fy = heightAt(p.x, p.z);
-    const f = { F, i, x: p.x, z: p.z, ry: F.ry, lx, lz: FARM.fz, c: i, state: 'leer', g: 0, water: 0, by: null };
-    if (Array.isArray(sv)) { f.c = Math.abs(sv[0] | 0) % CROPS.length; f.state = FIELD_STATES[sv[1]] || 'leer'; f.g = clamp(+sv[2] || 0, 0, 1); }
-    const geo = new THREE.PlaneGeometry(FARM.fw, FARM.fd, 20, 12).rotateX(-Math.PI / 2), pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = Math.cos(F.ry), sn = Math.sin(F.ry);
-    for (let k = 0; k < pos.count; k++) {
-      const x = pos.getX(k), z = pos.getZ(k), ridge = .5 + .5 * Math.cos(2 * Math.PI * x / (FARM.fw / 5)), edge = Math.abs(x) > FARM.fw / 2 - .01 || Math.abs(z) > FARM.fd / 2 - .01;
-      pos.setY(k, heightAt(p.x + x * c + z * sn, p.z - x * sn + z * c) - fy + (edge ? .005 : .03 + ridge * .03));
-      COL.set(0x4a3222).lerp(COL2.set(0x7a5638), ridge * .8).multiplyScalar(.92 + Math.random() * .12); col.set([COL.r, COL.g, COL.b], k * 3);
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
-    f.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-    const o = new THREE.Mesh(geo, f.mat); o.receiveShadow = true; o.rotation.y = F.ry; scene.add(o); statics.push({ o, x: p.x, z: p.z });
-    fields.push(f); F.fields.push(f);
-  });
+  // Felder: die erste Reihe gehört zum Hof, die zweite pflügt der Stier nach und nach dazu (newFieldSlot)
+  FARM.fx.forEach((lx, i) => makeField(F, lx, FARM.fz, i, S.fields[fields.length]));
+  for (const e of S.newFields || []) if (Array.isArray(e) && e[0] === farms.length - 1 && FARM.fx.includes(e[1])) addNewField(F, e[1], e.slice(2), true);
   // Vieh auf der Weide
   for (const [kind, n] of [['kuh', 2], ['schwein', 2], ['huhn', 5], ['hahn', 1]]) for (let k = 0; k < n; k++) {
     let lx = 0, lz = 0;
@@ -178,9 +188,8 @@ function updateFarm(dt, t) {
   const k = (1 + .7 * weather.wet) * (1 - .9 * smooth(.2, .6, weather.snowCover)) * (sky.night > .6 ? .4 : 1);
   for (const f of fields) {
     f.water = Math.max(0, f.water - dt);
-    // gepflügt (Stier) wächst ein Feld schneller, bis es reif ist
-    if (f.state === 'grow') { f.g = Math.min(1, f.g + dt / CROPS[f.c].grow * k * (f.water > 0 ? 2.2 : 1) * (f.plowed ? 1.35 : 1)); if (f.g >= 1) { f.state = 'reif'; f.plowed = false; if (!ripeTip) { ripeTip = true; toast('Ein Feld ist reif. Der Bauer erntet es, du kannst aber auch mit der Hand darauf tippen.', 4); } } }
-    f.mat.color.setScalar((1 - .4 * Math.max(weather.wet, smooth(0, 12, f.water))) * (f.plowed ? .78 : 1)); // frisch gepflügt: dunkle Erde
+    if (f.state === 'grow') { f.g = Math.min(1, f.g + dt / CROPS[f.c].grow * k * (f.water > 0 ? 2.2 : 1)); if (f.g >= 1) { f.state = 'reif'; if (!ripeTip) { ripeTip = true; toast('Ein Feld ist reif. Der Bauer erntet es, du kannst aber auch mit der Hand darauf tippen.', 4); } } }
+    f.mat.color.setScalar(1 - .4 * Math.max(weather.wet, smooth(0, 12, f.water)));
   }
   // Erzeugnisse der Tiere sammeln sich tagsüber im Stall
   for (const F of farms) {
@@ -268,4 +277,28 @@ function updateFarm(dt, t) {
   }
 }
 
-export { CROPS, FIELD_STAGES, buildFarm, farms, fieldAt, fieldFront, fields, stock, updateFarm };
+// Freier Platz für ein neues Feld: in der zweiten Reihe, fester Boden, kein Bach, kein Gebäude, kein Felsen
+function newFieldSlot(F, blocked) {
+  if (F.fields.length >= MAX_FIELDS) return null;
+  for (const lx of FARM.fx) {
+    if (F.fields.some(f => f.lx === lx && f.lz === ROW2)) continue;
+    let ok = true;
+    for (const [ax, az] of [[0, 0], [-.6, -.9], [.6, -.9], [-.6, .9], [.6, .9]]) { const q = farmPt(F, lx + ax, ROW2 + az), h = heightAt(q.x, q.z); if (h < .3 || streamDist(q.x, q.z) < .9 || (blocked && blocked(q.x, q.z))) { ok = false; break; } }
+    if (ok) return { lx, lz: ROW2 };
+  }
+  return null;
+}
+// Neues Feld anlegen; beim Pflügen wächst es hinter dem Pflug (reveal 0 … 1), beim Laden steht es gleich da
+function addNewField(F, lx, sv, loaded = false) {
+  const p = farmPt(F, lx, ROW2);
+  if (!loaded) { clearAround(p.x, p.z, 1.3); flattenAt(p.x, p.z, 1.35); markTerrainDirty(); }
+  const f = makeField(F, lx, ROW2, F.fields.length, sv); f.extra = true; f.reveal = loaded ? 1 : 0; setReveal(f);
+  F.lz0 = ROW2 - FARM.fd / 2 - .3; // der Hof reicht jetzt weiter nach hinten (onFarm)
+  return f;
+}
+// Das Feld entsteht von der äußeren Kante zum Hof hin
+function setReveal(f) {
+  const k = Math.max(.001, Math.min(1, f.reveal)), q = farmPt(f.F, f.lx, f.lz - (1 - k) * FARM.fd / 2);
+  f.st.x = q.x; f.st.z = q.z; f.st.o.scale.z = k; f.st.o.visible = f.reveal > 0;
+}
+export { CROPS, FIELD_STAGES, MAX_FIELDS, ROW2, addNewField, buildFarm, newFieldSlot, setReveal, farms, fieldAt, fieldFront, fields, stock, updateFarm };

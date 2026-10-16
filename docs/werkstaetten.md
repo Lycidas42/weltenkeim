@@ -43,6 +43,9 @@ Kreatur steht in `kreatur.md` 3.13 B, die Kreatur selbst in `kreatur.md`.
 
 **Stand:** 🔵 geplant – Umsetzung später, zusammen mit dem Steinmetz
 
+🟡 Erster Teil im Prototyp (Branch `claude/vierbeiner-test`): Neue Felder des Stiers liegen oft auf Felsen; er
+schiebt sie vorher weg (`kreatur.md` 3.13).
+
 - Heute halten die Felsen Abstand zu Dorf, Bauplätzen und Feldern (`keepFree` in `world/nature.js`). Künftig dürfen
   am Dorfrand Felsen auch auf Plätzen liegen, die das Dorf erst später braucht (neue Häuser, Hütten, Felder).
 - Ein Bauplatz mit Felsen ist **blockiert** und so markiert. Gebaut wird erst, wenn er frei ist.

@@ -496,8 +496,10 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
      nur, was die gewählte Gestalt kann.
    - **Stier zum Vergleich (rohe Kraft):** rammt den Baum mit dem Kopf um und trägt ihn quer auf den Hörnern zum
      Lager (Schieben vor den Hörnern gibt es als Variante `push`); kann nichts selbst aufladen, lässt sich aber mit 8 Waren beladen (mit Karren 13); trägt zwei Reiter;
-     **pflügt** die leeren Felder eines Hofs (Pflug am Geschirr, gepflügte Felder wachsen bis zur Ernte 35 % schneller,
-     dunklere Erde); **schiebt Felsen** mit dem Kopf ein Stück vom Dorf weg (Kraft statt Lichtranken). Ritual: lädt
+     **pflügt neue Felder:** hinter der ersten Feldreihe eines Hofs eine zweite, höchstens 8 Felder je Hof; er
+     pflügt von außen zum Hof hin, das Feld entsteht hinter dem Pflug, Bäume auf dem Platz verschwinden, der Boden wird
+     eingeebnet; gespeichert in `S.newFields`. Liegt ein Felsen auf dem Platz, **schiebt er ihn zuerst weg** (mit Stirn
+     und Hörnern, Kraft statt Lichtranken). So hat das Felsenschieben einen Zweck (`werkstaetten.md` 2). Ritual: lädt
      stehend auf, scharrt mit dem Huf und schnaubt; steigt vorn hoch und stampft auf, eine Stoßwelle und eine Welle
      über den Boden laufen zum Ziel und steigen dort auf (Regen, Eile). Keine Fuchs-Hilfen (Fegen, Graben, Pilze,
      Hasen).

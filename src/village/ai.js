@@ -150,7 +150,7 @@ const JOB = {
   },
   farmer(v) { // reife Felder ernten, leere besäen, sonst das Vieh füttern und Milch, Eier, Fleisch holen
     const F = v.hut.farm; if (!F) { atHut(v); return; }
-    const free = f => !f.by || f.by === v || f.by.field !== f || f.by.role !== 'farmer' || !villagers.includes(f.by);
+    const free = f => (f.reveal ?? 1) >= 1 && (!f.by || f.by === v || f.by.field !== f || f.by.role !== 'farmer' || !villagers.includes(f.by));
     const f = F.fields.find(f => f.state === 'reif' && free(f)) || F.fields.find(f => f.state === 'leer' && free(f));
     if (f) { f.by = v; v.field = f; const p = fieldFront(f); walk(v, p.x, p.z, f.state === 'reif' ? 'harvest' : 'sow'); return; }
     if (F.milk >= 1 || F.eggs >= 2 || F.pork >= 1 || Math.random() < .3) { const p = farmPt(F, FARM.trough[0] + rnd(.3), FARM.pen.z1 + .35); walk(v, p.x, p.z, 'tend'); return; }

@@ -13,7 +13,7 @@ import { FARM, farmPt, huts, lager, lagerDrop, localPt } from '../village/huts.j
 import { hutWork } from '../village/build.js';
 import { blockedAt, buildNav, followPath, moveFree, navF, navReady, navV, nearBuilding, setGoal } from '../world/nav.js';
 import { bushes, rocks } from '../world/nature.js';
-import { fields } from '../farm/farm.js';
+import { ROW2, addNewField, farms, fields, newFieldSlot, setReveal } from '../farm/farm.js';
 import { scareAway, wild } from '../wildlife/land.js';
 import { villagers } from '../village/villagers.js';
 import { ACT_DESC, ACT_LABEL, foxActs, foxAnim, foxMixer, foxOnce, foxPivot, growK, updateMouthTree } from './creature.js';
@@ -34,6 +34,7 @@ function foxFinish(a, kind) {
   emit('fox');
 }
 function foxChoose() {
+  if (fox.plowRun && fox.plowRun.field) { fox.plowRun.field.reveal = 1; setReveal(fox.plowRun.field); } fox.plowRun = null;
   gear.basket = 0; gear.log = false; gear.cart = false; gear.plow = false; fox.forage = null; fox.dig = null; fox.mouthSack = false; // Reste einer unterbrochenen Tätigkeit
   if (fox.haul || fox.carryGoods) { if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k]; fox.haul = null; fox.carryGoods = null; back.n = 0; fox.mouthSack = false; } // abgebrochenes Tragen: Waren gehen ins Lager
   // ab und zu hinlegen und ausruhen
@@ -183,28 +184,36 @@ function dismount() {
   if (!fox.riders) return; const L = fox.riders; fox.riders = null; fox.rider = null;
   L.forEach((v, i) => { const s = i ? -1 : 1; dropRide(v, fox.x + Math.cos(fox.vh || 0) * .8 * s, fox.z - Math.sin(fox.vh || 0) * .8 * s); });
 }
-// Pflügen (Stier): einmal die Reihe der Felder eines Hofs entlang, der Pflug furcht die leeren Felder
+// Pflügen (Stier): ein neues Feld in der zweiten Reihe eines Hofs anlegen (höchstens 8 Felder je Hof). Er pflügt von
+// der äußeren Kante zum Hof hin; das Feld entsteht hinter dem Pflug. Felsen auf dem Platz verhindern das (Felsen schieben)
 function foxPlowGo(why = []) {
-  const free = fields.filter(f => f.state === 'leer' && !f.plowed); if (!free.length) return false;
-  const f0 = free.sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0], F = f0.F;
-  const xs = F.fields.map(f => f.lx), x0 = Math.min(...xs) - FARM.fw / 2 - .4, x1 = Math.max(...xs) + FARM.fw / 2 + .4;
-  fox.plowRun = { F, x0, x1, lz: FARM.fz, n: 0 }; const p = farmPt(F, x0, FARM.fz); fox.act = 'help'; foxWalk(p.x, p.z, 'plow');
-  noteChoice('help', 'plow', 'die Felder pflügen', [...why, { key: 'field', label: 'auf dem Hof liegen Felder brach', weight: .6 }]); return true;
+  const C = CREATURES[fox.kind], rockOn = (x, z) => rocks.some(r => Math.hypot(r.x - x, r.z - z) < r.s + .35);
+  const F = farms.filter(F => newFieldSlot(F, rockOn)).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z))[0];
+  if (!F) { // kein freier Platz: liegt auf einem Feldplatz ein Felsen, schiebt er ihn zuerst weg (werkstaetten.md 2)
+    for (const G of farms) { const sl = newFieldSlot(G); if (!sl) continue; const c = farmPt(G, sl.lx, sl.lz);
+      const r = rocks.filter(r => Math.hypot(r.x - c.x, r.z - c.z) < r.s + 1.6).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
+      if (r && foxRockGo([...why, { key: 'field', label: 'ein Felsen liegt dort, wo ein neues Feld hin soll', weight: .7 }], r, c)) return true; }
+    return false;
+  }
+  const slot = newFieldSlot(F, rockOn), z0 = slot.lz - FARM.fd / 2 - .25; // Kopf an der äußeren Kante
+  fox.plowRun = { F, lx: slot.lx, z: z0 - C.h * .45, phase: 'align', field: null };
+  const p = farmPt(F, slot.lx, fox.plowRun.z - C.h * .4); fox.act = 'help'; foxWalk(p.x, p.z, 'plow');
+  noteChoice('help', 'plow', 'ein neues Feld pflügen', [...why, { key: 'field', label: 'der Hof hat Platz für ein weiteres Feld', weight: .6 }]); return true;
 }
 // Felsen wegschieben (Stier): mit dem Kopf ein Stück vom Dorf weg
-function foxRockGo(why = []) {
+function foxRockGo(why = [], only = null, from = null) {
   if (!navReady) buildNav(); const C = CREATURES[fox.kind];
   // Felsen mittlerer Größe in der Nähe, nächster zuerst; schieben vom Dorf weg. Der Platz dahinter muss erreichbar sein
-  const list = rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z));
+  const list = only ? [only] : rocks.filter(r => r.s > .25 && r.s < .8 && Math.hypot(r.x - fox.x, r.z - fox.z) < 16).sort((a, b) => Math.hypot(a.x - fox.x, a.z - fox.z) - Math.hypot(b.x - fox.x, b.z - fox.z));
   let r = null, dx = 0, dz = 0, gap = 0;
   for (const c of list) {
-    let ux = c.x - CENTER.x, uz = c.z - CENTER.z; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
+    const o = from || CENTER; let ux = c.x - o.x, uz = c.z - o.z; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l; // vom Dorf (bzw. vom Feldplatz) weg
     const g = c.s * .85 + C.h * .48, bx = c.x - ux * g, bz = c.z - uz * g; // Felsen liegt an der Stirn an (Kopf eingezogen)
     if (blockedAt(navF, bx, bz) || blockedAt(navF, bx - ux * C.h * .5, bz - uz * C.h * .5)) continue;
     r = c; dx = ux; dz = uz; gap = g; break;
   }
   if (!r) return false;
-  fox.rockJob = { r, dx, dz, gap, left: 3 };
+  fox.rockJob = { r, dx, dz, gap, left: only ? Math.max(1.5, 1.8 + r.s - Math.hypot(r.x - from.x, r.z - from.z)) : 3 }; // vom Feldplatz: bis er ihn frei gibt
   fox.act = 'help'; foxWalk(r.x - dx * gap, r.z - dz * gap, 'shove');
   noteChoice('help', 'rock', 'einen Felsen wegschieben', [...why, { key: 'strong', label: 'ein Stier ist stark genug dafür', weight: .5 }]); return true;
 }
@@ -310,14 +319,23 @@ function updateFox(dt, t) {
       anim(gear.cart ? 'idle' : 'lie'); fox.timer -= dt;
       if (fox.loadDone || fox.timer <= 0) { if (fox.loader) dropLoad(fox.loader); fox.loader = null; if (!gear.cart) foxOnce('standUp'); haulOn(); }
       break;
-    case 'plow': { // die Reihe entlang, der Pflug furcht hinterher
-      anim('walk'); const P = fox.plowRun, a = farmPt(P.F, P.x0, P.lz), b = farmPt(P.F, P.x1, P.lz);
-      P.x += dt * .75; const p = farmPt(P.F, P.x, P.lz); fox.x = p.x; fox.z = p.z; fox.h = Math.atan2(b.x - a.x, b.z - a.z);
-      if (gear.towX !== undefined) {
-        for (const f of P.F.fields) if (f.state === 'leer' && !f.plowed && Math.hypot(f.x - gear.towX, f.z - gear.towZ) < FARM.fw * .45) { f.plowed = true; P.n++; floatText(f.x, surfaceAt(f.x, f.z) + .6, f.z, 'gepflügt', 's'); }
-        if (Math.random() < dt * 12) dust(gear.towX, surfaceAt(gear.towX, gear.towZ) + .03, gear.towZ, 1, .35);
+    case 'plow': { // erst an den Anfang der Furche, dann zum Hof hin pflügen; das Feld wächst hinter dem Pflug
+      const P = fox.plowRun, F = P.F, a = farmPt(F, P.lx, ROW2 - 1), b = farmPt(F, P.lx, ROW2 + 1);
+      const dirH = Math.atan2(b.x - a.x, b.z - a.z), s0 = farmPt(F, P.lx, P.z);
+      if (P.phase === 'align') { // ohne Wegsuche die letzten Schritte zum Anfang (der Platz liegt am Rand des Hofs)
+        anim('walk'); fox.h = Math.atan2(s0.x - fox.x, s0.z - fox.z);
+        if (moveFree(fox, s0.x, s0.z, C.walk * dt, navV) === true || Math.hypot(s0.x - fox.x, s0.z - fox.z) < .05) {
+          P.phase = 'run'; fox.h = fox.vh = dirH; gear.plow = true; P.field = addNewField(F, P.lx); floatText(fox.x, foxPivot.position.y + C.h, fox.z, 'Neues Feld!', 's');
+        } else if ((P.alignT = (P.alignT || 0) + dt) > 4) { fox.x = s0.x; fox.z = s0.z; } // hängt fest: hinsetzen
+        break;
       }
-      if (P.x > P.x1 + C.h * 1.3) { gear.plow = false; fox.plowRun = null; fox.desc = P.n ? `${P.n} ${P.n === 1 ? 'Feld' : 'Felder'} gepflügt` : 'den Pflug über den Hof gezogen'; foxFinish('help', 'plow'); }
+      anim('walk'); P.z += dt * .7; const p = farmPt(F, P.lx, P.z); fox.x = p.x; fox.z = p.z; fox.h = dirH;
+      if (gear.towX !== undefined && P.field) { // wie weit der Pflug das Feld schon gefurcht hat
+        const dx = gear.towX - F.x, dz = gear.towZ - F.z, lz = dx * Math.sin(F.ry) + dz * Math.cos(F.ry);
+        P.field.reveal = Math.max(P.field.reveal, Math.min(1, (lz - (ROW2 - FARM.fd / 2)) / FARM.fd)); setReveal(P.field);
+        if (Math.random() < dt * 14) dust(gear.towX, surfaceAt(gear.towX, gear.towZ) + .03, gear.towZ, 1, .4);
+      }
+      if (P.field && P.field.reveal >= 1) { gear.plow = false; fox.plowRun = null; fox.desc = 'ein neues Feld angelegt'; foxFinish('help', 'plow'); }
       break;
     }
     case 'shove': { // anlaufen, dann mit gesenktem Kopf schieben; der Felsen rutscht vor ihr her
@@ -522,7 +540,7 @@ function foxDo(kind) {
   const why = [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }];
   const A = CREATURES[fox.kind].acts;
   if (kind === 'self' && !A.toss) return `Ein ${CREATURES[fox.kind].label} kann Waren nicht selbst aufladen.`;
-  if (kind === 'plow') { if (!fields.some(f => f.state === 'leer' && !f.plowed)) { const f = fields.find(f => f.state !== 'leer') ; if (f) { f.state = 'leer'; f.g = 0; } } return fields.length ? (foxPlowGo(why) ? '' : 'Kein leeres Feld.') : 'Noch kein Hof mit Feldern.'; }
+  if (kind === 'plow') return farms.length ? (foxPlowGo(why) ? '' : 'Kein Platz mehr für ein neues Feld (höchstens 8 je Hof, Felsen räumen).') : 'Noch kein Hof.';
   if (kind === 'rock') return foxRockGo(why) ? '' : 'Kein Felsen in der Nähe.';
   if (kind === 'sweep') { foxSweepGo(why); return ''; }
   if (kind === 'plant') return foxPlantGo(why) ? '' : 'Kein Platz am Waldrand gefunden.';
@@ -573,6 +591,7 @@ function foxDrop() {
   if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k];
   if (fox.loader) { dropLoad(fox.loader); fox.loader = null; }
   fox.haul = null; fox.carryGoods = null; fox.mouthSack = false; back.n = 0; fox.act = null;
+  if (fox.plowRun && fox.plowRun.field) { fox.plowRun.field.reveal = 1; setReveal(fox.plowRun.field); } // abgebrochen: das angefangene Feld bleibt fertig liegen
   gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
 }
 export { foxCast, foxDo, foxDrop, foxHaul, foxToShrine, foxIdle, reinforce, updateFox };
