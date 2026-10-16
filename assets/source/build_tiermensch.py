@@ -172,14 +172,37 @@ def build(kind='fox', out=None):
     for s in (1, -1):                                                                                                           # Ohren
         if E.get('round'): ellip(hp(s * 0.13, 0.02, 1.90), (E['round'] * hk, E['round'] * .6 * hk, E['round'] * hk), 20)
         else: cone(hp(s * 0.10, 0.01, 1.88), hp(s * (0.10 + E['spread']), 0.03, 1.88 + E['h']), E['r'] * hk, .15, .55)  # flach wie ein echtes Ohr: Drehen sieht man
+    # Gliedmaßen als Profile entlang der Knochen statt Röhren: prof = [(t, Breite, Tiefe, Versatz)] von a nach b,
+    # Versatz in Blickrichtung (−y vorn, +y hinten); dazwischen dicht überlappende Ellipsoide, die das Verschmelzen glättet
+    def loft(a, b, prof, side_ax='x'):
+        a, b = Vector(a), Vector(b); L = (b - a).length; n = max(6, int(L / 0.022))
+        for i in range(n + 1):
+            t = i / n; k = next(j for j in range(len(prof) - 1) if prof[j][0] <= t <= prof[j + 1][0] or j == len(prof) - 2)
+            (t0, w0, d0, o0), (t1, w1, d1, o1) = prof[k], prof[k + 1]; u = smooth(0, 1, (t - t0) / max(1e-6, t1 - t0))
+            w, dp, o = w0 + (w1 - w0) * u, d0 + (d1 - d0) * u, o0 + (o1 - o0) * u
+            c = a + (b - a) * t + Vector((0, o, 0)); r = max(w, dp)
+            ellip(c, (w, dp, r) if side_ax == 'x' else (r, dp, w), 16)
     for s in ('l', 'r'):
+        sx = 1 if s == 'l' else -1
         ua, la, hd = B['upperarm_' + s], B['lowerarm_' + s], B['hand_' + s]
-        capsule(B['clavicle_' + s][1], ua[1], 0.065 * lk); capsule(la[0], la[1], 0.055 * lk)
-        ellip(hd[0] + (hd[1] - hd[0]).normalized() * 0.06, (0.075 * lk, 0.06 * lk, 0.05 * lk))                                   # Pfote
+        # Arme: kräftige Schulter, schmaler zum Ellbogen, Unterarm mit Fellbausch, schlankes Handgelenk (Arme liegen in der T-Pose waagrecht: Breite = Höhe z)
+        loft(B['clavicle_' + s][1], ua[1], [(0, .085 * lk, .085 * lk, 0), (.45, .075 * lk, .072 * lk, 0.005), (1, .06 * lk, .058 * lk, 0.01)], 'z')
+        loft(la[0], la[1], [(0, .06 * lk, .058 * lk, 0.01), (.3, .066 * lk, .062 * lk, 0.012), (.8, .05 * lk, .046 * lk, 0.004), (1, .043 * lk, .04 * lk, 0)], 'z')
+        ellip(ua[1] + Vector((0, 0.035, 0)), (0.04 * lk, 0.045 * lk, 0.05 * lk), 16)                                            # Fellbausch am Ellbogen
+        # Pfote: flacher Handteller und kurze Finger an den Fingerknochen (bewegen sich mit den Animationen)
+        ellip(hd[0] + Vector((sx * 0.06, 0.005, 0)), (0.065 * lk, 0.05 * lk, 0.032 * lk), 20)
+        for fg in ('index', 'middle', 'ring', 'pinky'):
+            f1, f3 = B[f'{fg}_01_{s}'], B[f'{fg}_03_{s}']; capsule(f1[0] - Vector((sx * 0.02, 0, 0)), f3[1] - Vector((sx * 0.012, 0, 0)), 0.017 * lk)
+        capsule(B[f'thumb_01_{s}'][0], B[f'thumb_03_{s}'][0], 0.018 * lk)
         th, ca, ft = B['thigh_' + s], B['calf_' + s], B['foot_' + s]
-        ofs = Vector((0.02 if s == 'l' else -0.02, 0, 0))   # Beine leicht nach außen, damit innen eine Lücke bleibt
-        capsule(th[0] + ofs + Vector((0, 0, -0.02)), th[1] + ofs * .5, 0.082 * gk); capsule(ca[0] + ofs * .5, ca[1] + Vector((0, 0, 0.03)), 0.068 * gk)
-        ellip(ft[0] + Vector((0, -0.07, -0.05)), (0.075 * gk, 0.13 * gk, 0.055 * gk))                                                           # Fuß
+        ofs = Vector((0.022 * sx, 0, 0))   # Beine leicht nach außen, damit innen eine Lücke bleibt
+        # Beine wie beim Fuchs: kräftiger, fellbauschiger Oberschenkel, schlankes Knie, Wade hinten, dünner Lauf mit Sprunggelenk
+        loft(th[0] + ofs + Vector((0, 0, -0.02)), th[1] + ofs * .5, [(0, .104 * gk, .13 * gk, 0.02), (.35, .1 * gk, .125 * gk, 0.016), (.8, .072 * gk, .078 * gk, 0.002), (1, .062 * gk, .064 * gk, -0.006)])
+        loft(ca[0] + ofs * .5, ca[1] + Vector((0, 0, 0.02)), [(0, .06 * gk, .062 * gk, -0.004), (.25, .062 * gk, .07 * gk, 0.016), (.6, .046 * gk, .048 * gk, 0.006), (1, .04 * gk, .042 * gk, 0)])
+        ellip(ca[1] + Vector((0, 0.035, 0.035)), (0.036 * gk, 0.04 * gk, 0.04 * gk), 16)                                          # Sprunggelenk (Ferse)
+        # Hinterpfote: lang, vorn auf den Zehen, mit vier Zehenballen
+        ellip((ft[0].x, -0.07, 0.045), (0.06 * gk, 0.135 * gk, 0.044 * gk), 20)
+        for zx, zy in ((-0.032, -0.165), (-0.011, -0.183), (0.011, -0.183), (0.032, -0.165)): ellip((ft[0].x + zx * gk, zy, 0.03), (0.021 * gk, 0.03 * gk, 0.026 * gk), 12)
     for x, y, z, r in TAILS[A['tail']]: ellip((x, y, z), (r * .9, r, r), 20)
 
     bpy.ops.object.select_all(action='DESELECT')
@@ -304,7 +327,9 @@ def build(kind='fox', out=None):
         for s_ in (1, -1):  # Augenhöhle leicht abgedunkelt (Schatten unter dem Stirnwulst)
             ex_, ey_, ez_ = hp(EY['x'] * s_, EY['y'], EY['z'])
             sock = max(sock, smooth(1.6, 1.0, ((x - ex_) / 0.04) ** 2 + ((z - ez_) / 0.03) ** 2) * smooth(-0.11, -0.13, y))
-        dark = max(tear * .85, sock * .45, smooth(.53, .58, ax) * smooth(1.25, 1.35, z), smooth(.2, .12, z), smooth(1.975, 2.03, z))
+        # Strümpfe wie beim Rotfuchs: schwarzbraun mit weichem Verlauf, Arme ab dem Ellbogen, Beine ab dem Knie
+        stock = max(smooth(.36, .5, ax) * smooth(1.25, 1.33, z) * smooth(1.62, 1.55, z), smooth(.62, .4, z) * smooth(.004, .02, ax))
+        dark = max(tear * .85, sock * .45, stock * .92, smooth(1.975, 2.03, z))
         c = [FUR[i] * (1 - light) + LIGHT[i] * light for i in range(3)]
         c = [c[i] * (1 - dark) + DARK[i] * dark for i in range(3)]
         c = [c[i] * (1 - back * .8) + DARK[i] * back * .8 for i in range(3)]

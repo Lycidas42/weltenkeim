@@ -144,6 +144,10 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
   mittel auf Stirn und Kehle, kurz auf der Schnauze, frei an Augen und Nase. Im Spiel (`face.js`, `FACE_FUR`) nur die
   Dreiecke mit Fell als 7 (Handy) bzw. 14 Schichten mit gleichmäßigen, an der Wurzel dicken Strähnen, gekämmt nach hinten, sichtbar wenn die Kamera näher als 11 ist.
   Haare hängen an der Ruhelage der Haut. Auf dem Handy noch messen.
+- **Körper (16.10., Abend):** Gliedmaßen als Profile entlang der Knochen (`loft` im Bauskript) statt Röhren:
+  kräftige Schulter, Unterarm mit Fellbausch, Pfote mit Fingern an den Fingerknochen; Oberschenkel massig, schlankes
+  Knie, Wade, Sprunggelenk, lange Hinterpfote mit Zehenballen. Schwarzbraune „Strümpfe“ mit weichem Verlauf (Arme ab
+  dem Ellbogen, Beine ab dem Knie) statt Handschuhen. Als Nächstes: Oberkörper (Brustlatz, Taille) und Brustfell.
 - **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Fell auf der Stirn noch körnig,
   Geräusche.
 - **Lokal testen:** Läuft kein Server, zeigt der Service Worker den letzten Stand aus dem Cache (sieht aus wie „alt“).
