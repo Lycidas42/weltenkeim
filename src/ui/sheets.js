@@ -15,7 +15,7 @@ import { farmSites, huts } from '../village/huts.js';
 import { fields, stock } from '../farm/farm.js';
 import { spawnVillager, villagers } from '../village/villagers.js';
 import { ACT_COL, ACT_LABEL, loadCreature, pron, useCreature } from '../creature/creature.js';
-import { XP, mind, share, why } from '../creature/mind.js';
+import { DRIVES, XP, baseOf, drive, mind, why } from '../creature/mind.js';
 import { foxToShrine } from '../creature/ai.js';
 import { fish, wild } from '../wildlife/land.js';
 import { effJobs, reconcileJobs, roleCount } from '../village/jobs.js';
@@ -253,16 +253,17 @@ const clockText = h => `${Math.floor(h)}:${String(Math.floor(h % 1 * 60)).padSta
 const whenText = (day, h) => `${day === S.day ? 'heute' : day === S.day - 1 ? 'gestern' : `Tag ${day + 1}`}, ${clockText(h)}`;
 const pc = p => `${Math.round(p * 100)} %`;
 function renderFox() {
-  const base = S.cDay && S.cDay.w, bsum = base ? base.help + base.play + base.mischief : 1;
-  setHTML('foxBars', ['help', 'play', 'mischief'].map(k => {
-    const p = share(k), d = base ? Math.round(p * 100) - Math.round(base[k] / bsum * 100) : 0;
+  // Antriebe einzeln (0…100), Strich = Grundtypus der Gestalt, zu dem sie ohne Erziehung langsam zurückkehrt
+  const day = S.cDay && S.cDay.d, B = baseOf();
+  setHTML('foxBars', DRIVES.map(k => {
+    const p = drive(k), d = day ? Math.round(p * 100) - Math.round(day[k] * 100) : 0;
     const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d)}</span>` : '';
-    return `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(p * 100)}%;background:${ACT_COL[k]}"></div></div><span class="num">${Math.round(p * 100)} %${delta}</span></div>`;
-  }).join(''));
+    return `<div class="bar"><span>${ACT_LABEL[k]}</span><div class="track"><div class="fill" style="width:${Math.round(p * 100)}%;background:${ACT_COL[k]}"></div><i class="base" style="left:${Math.round(B[k] * 100)}%"></i></div><span class="num">${Math.round(p * 100)}${delta}</span></div>`;
+  }).join('') + `<p class="baseNote">Strich: Grundtypus ${CREATURES[fox.kind].label}. Ohne Erziehung kehrt ${S.name} langsam dorthin zurück.</p>`);
   setHTML('foxXp', Object.keys(XP).map(k => `<dt>${fmt(S.cXp[k])}</dt><dd>${XP[k]}</dd>`).join(''));
   setHTML('foxLearn', S.cLearn.length ? S.cLearn.slice(0, 12).map(e => {
     const what = e.kind === 'pet' ? '<b class="pet">Lob</b>' : '<b class="slap">Tadel</b>';
-    const txt = e.act ? `${what} für „${e.desc}“: ${ACT_LABEL[e.act]} ${pc(e.from)} → ${pc(e.to)}` : `${what} ohne Tat: ${S.name} wusste nicht, wofür`;
+    const txt = e.act ? `${what} für „${e.desc}“: ${ACT_LABEL[e.act]} ${Math.round(e.from * 100)} → ${Math.round(e.to * 100)}` : `${what} ohne Tat: ${S.name} wusste nicht, wofür`;
     return `<li><time>${whenText(e.day, e.hour)}</time>${txt}</li>`;
   }).join('') : `<li class="empty">Noch nichts. Lobe oder tadle ${S.name} gleich nach einer Tat, dann steht hier, was ${pron().er} daraus lernt.</li>`);
   setHTML('foxLog', mind.log.length ? mind.log.slice(0, 8).map((e, i) =>

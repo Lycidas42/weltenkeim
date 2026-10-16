@@ -8,7 +8,7 @@ import { heldTree, input, pointerXY } from '../hand/pointer.js';
 import { ACT_COL, ACT_DESC, ACT_LABEL, foxPivot } from '../creature/creature.js';
 import { reinforce } from '../creature/ai.js';
 import { follow, foxDoing, observe, openSheet, setFollow } from './sheets.js';
-import { mind, why } from '../creature/mind.js';
+import { DRIVES, drive, mind, why } from '../creature/mind.js';
 
 // Tippt die Hand auf den Tiergeist, öffnet sich um ihn ein Kreis aus Aktionen. Die Liste lässt sich erweitern;
 // icon = SVG-Pfade im 24er-Raster wie bei den Werkzeugen.
@@ -76,7 +76,7 @@ function placeFoxUI(dt) {
     $('badgeName').textContent = full ? S.name : ''; $('badgeNow').textContent = full ? `${foxDoing()}.` : '';
     const w = full ? why() : ''; $('badgeWhy').textContent = w ? `Warum: ${w}` : '';
     $('badgeAsk').textContent = ask ? (full ? `Hat ${fox.lastDesc || ACT_DESC[fox.last]}: Lob oder Tadel?` : 'Lob oder Tadel?') : '';
-    $('badgeBars').innerHTML = full ? ['help', 'play', 'mischief'].map(k => `<span>${ACT_LABEL[k]}</span><i><u style="width:${Math.round(S.w[k] * 100)}%;background:${ACT_COL[k]}"></u></i>`).join('') : '';
+    $('badgeBars').innerHTML = full ? DRIVES.map(k => `<span>${ACT_LABEL[k]}</span><i><u style="width:${Math.round(drive(k) * 100)}%;background:${ACT_COL[k]}"></u></i>`).join('') : '';
   }
   // über dem Kopf, bei offenem Menü über dem oberen Knopf; am Bildschirmrand halten
   toScreen(fox.x, y + C.h + .15, fox.z, tB);

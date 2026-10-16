@@ -17,7 +17,8 @@ Verwandt: `kreatur.md` (Gesamtkonzept), `gott-und-hand.md` (was Hand und was Wun
   Waren tragen.
 - Wunder: `tryMiracle()` / `castRain()` / `castHaste()` in `src/hand/miracles.js`; die Kreatur zeigt heute nur eine
   Geste (`foxCast()` in `src/creature/ai.js`).
-- Neigungen der Kreatur: `S.w` (help / play / mischief), Lob und Tadel über `reinforce()` (`src/creature/ai.js`).
+- Antriebe der Kreatur: `S.cTraits` (help / play / mischief, je einzeln, `kreatur.md` 3.14), Lob und Tadel über
+  `reinforce()` (`src/creature/ai.js`).
 
 ## 1. Zuschauen und lernen
 

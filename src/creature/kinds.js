@@ -28,6 +28,17 @@ const ACTS = {
   wolf: { tree: 'drag', toss: true, self: 4, load: 6, riders: 1, rite: 'howl', rites: ['rain', 'haste'], help: ['pest', 'patrol', 'escort'] },
   bull: { tree: 'horns', toss: false, self: 0, load: 8, riders: 2, rite: 'stomp', rites: ['rain', 'haste'], help: ['plow', 'rock'] },
 };
+// Grundtypus (kreatur.md 3.14 D): Antriebe 0…1, von denen die Erziehung abweicht und zu denen der Charakter ohne
+// Erziehung langsam zurückkehrt. Fuchs verspielt, Stier fleißig und ernst, Hirsch ruhig, Wolf pflichtbewusst.
+const BASE = {
+  fox: { help: .45, play: .65, mischief: .35 },
+  stag: { help: .45, play: .2, mischief: .15 },
+  wolf: { help: .65, play: .4, mischief: .15 },
+  bull: { help: .7, play: .2, mischief: .15 },
+  alpaca: { help: .45, play: .5, mischief: .2 },
+  cat: { help: .3, play: .5, mischief: .5 },
+};
+for (const id in CREATURES) CREATURES[id].base = BASE[id];
 const ACT_DEF = { tree: 'mouth', toss: true, self: 3, load: 5, riders: 1, rite: 'tail', rites: ['rain', 'haste'], help: [] };
 for (const id in CREATURES) CREATURES[id].acts = Object.assign({}, ACT_DEF, ACTS[id]);
 if (!CREATURES[S.creature] || CREATURES[S.creature].off) S.creature = 'fox'; // abgeschaltete Gestalt: zurück zum Fuchs

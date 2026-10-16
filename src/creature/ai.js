@@ -22,7 +22,7 @@ import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, dropLoad, dropRide, hauling, helpLoad, startRide } from '../village/ai.js';
 import { addWear } from '../world/paths.js';
 import { anchor, back, dust, footExtra, gear, over, overOff, seat, shakeOff, tossOnBack, updateBody } from './body.js';
-import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
+import { leanReasons, noteChoice, noteDone, noteLearn, pickDrive, train, updateMind } from './mind.js';
 
 function foxIdle(t) { dismount(); fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
 function foxWalk(x, z, next) { fox.state = 'walk'; fox.next = next; setGoal(fox, x, z, navF); }
@@ -38,16 +38,17 @@ function foxChoose() {
   if (fox.plowRun && fox.plowRun.field) { fox.plowRun.field.reveal = 1; setReveal(fox.plowRun.field); } fox.plowRun = null;
   gear.basket = 0; gear.log = false; gear.cart = false; gear.plow = false; fox.forage = null; fox.dig = null; fox.mouthSack = false; // Reste einer unterbrochenen Tätigkeit
   if (fox.haul || fox.carryGoods) { if (fox.carryGoods) for (const k in fox.carryGoods) S[k] += fox.carryGoods[k]; fox.haul = null; fox.carryGoods = null; back.n = 0; fox.mouthSack = false; } // abgebrochenes Tragen: Waren gehen ins Lager
-  // ab und zu hinlegen und ausruhen
-  if (foxActs.lie && Math.random() < .25) { // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
+  // Wahl nach den Antrieben, Ruhe ist der Rest (kreatur.md 3.14); die Gründe kommen ins Gedächtnis (mind.js), damit der
+  // Spieler nachvollziehen kann, warum
+  let a = pickDrive(true);
+  const why = leanReasons(a);
+  if (a === 'rest') {
+    if (!foxActs.lie) { noteChoice('rest', 'rest', 'eine Weile stehen und schauen', why); foxIdle(6 + Math.random() * 6); return; }
+    // zum Dösen erst dorthin, wo der ganze liegende Körper Platz hat
+    noteChoice('rest', 'rest', 'ausruhen', why);
     const p = restSpot(); if (Math.hypot(p.x - fox.x, p.z - fox.z) > .15) { foxWalk(p.x, p.z, 'rest'); return; }
-    noteChoice('rest', 'rest', 'ausruhen', [{ key: 'rest', label: 'zwischendurch braucht es Ruhe', weight: .25 }]);
     fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); return;
   }
-  // Wahl nach den Neigungen; die Gründe kommen ins Gedächtnis (mind.js), damit der Spieler nachvollziehen kann, warum
-  const w = S.w, r = Math.random() * (w.help + w.play + w.mischief);
-  let a = r < w.help ? 'help' : r < w.help + w.play ? 'play' : 'mischief';
-  const why = leanReasons(a);
   if (a === 'help') { // Hilfen mit dem eigenen Körper, je nach Gestalt (kreatur.md 3.13 A, D)
     const H = CREATURES[fox.kind].acts.help, can = k => H.includes(k), r2 = Math.random();
     const hare = can('pest') && wild.find(h => h.state === 'nibble');
@@ -288,7 +289,7 @@ function playSpot() {
   return CENTER;
 }
 function updateFox(dt, t) {
-  updateMind();
+  updateMind(dt);
   const C = CREATURES[fox.kind], drag = fox.carry && (C.acts.tree === 'drag' || C.acts.tree === 'push'), spd = C.walk * (drag ? .7 : fox.carry && C.acts.tree === 'horns' ? .85 : gear.log ? .75 : gear.cart ? .8 : 1);
   // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
@@ -581,10 +582,7 @@ function reinforce(kind) {
     }
   });
   if (a && t - fox.lastT < 25) {
-    const from = share(a);
-    S.w[a] = clamp(S.w[a] * (kind === 'pet' ? 1.6 : .5), .04, 10);
-    const sum = S.w.help + S.w.play + S.w.mischief; for (const k in S.w) S.w[k] /= sum;
-    const to = share(a), pc = p => `${Math.round(p * 100)} %`;
+    const [from, to] = train(a, kind === 'pet'), pc = p => Math.round(p * 100); // nur dieser Antrieb, die anderen bleiben
     noteLearn(kind, a, fox.lastDesc, from, to); learned = `${ACT_LABEL[a]} ${pc(from)} → ${pc(to)}`;
     toast(`${kind === 'pet' ? 'Lob' : 'Tadel'}, weil ${S.name} ${fox.lastDesc} hat. ${S.name} lernt: ${kind === 'pet' ? 'mehr' : 'weniger'} ${ACT_LABEL[a]} (${pc(from)} → ${pc(to)}).`);
     fox.last = null; $('btnFox').classList.remove('pulse');

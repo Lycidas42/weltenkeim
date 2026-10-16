@@ -38,7 +38,8 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 - **Gestalten:** Fuchs (eigene Reaktionen; Fell-Modell vorhanden, derzeit nicht geladen), Wolf, Hirsch, Stier, Alpaka,
   Katze (Katze und Alpaka vorerst abgeschaltet, `off` in `kinds.js`: noch zu unfertig); gewählt am Schrein (die Kreatur läuft hin und verwandelt sich). Name und Geschlecht im Charakterbogen
   (Start: Fenja, weiblich). `S.creature`, `S.name`, `S.gender`.
-- **Neigungen:** `S.w` mit `help` (Helfen), `play` (Spielen), `mischief` (Unfug); bestimmen, was sie aus eigenem Antrieb tut.
+- **Antriebe:** Helfen, Spielen, Unfug, jeder für sich 0…100 (Grundtypus der Gestalt plus Erzogenes, `S.cTraits`, 3.14);
+  bestimmen, was sie aus eigenem Antrieb tut, der Rest ist Ruhe. Früher `S.w` als Verteilung, wird beim Laden umgerechnet.
 - **Tätigkeiten:** Baum fällen und ins Lager bringen (Helfen), Waren tragen (bis zu 3 Stück im Maul: von Hütten ins
   Lager, aus dem Lager zu Säge, Mühle, Bäckerei), mit dem Dorf spielen, Baum umwerfen (Unfug; Bewohner in der Nähe
   fliehen), dösen, eine Geste beim Wunder des Spielers (`foxCast`).
@@ -65,7 +66,7 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 | Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | ✅ vorhanden |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
 | Handeln als Tier | Vierbeiner handeln mit Maul, Rücken, Schwanz; Bewohner beladen sie; Wunder als Ritual | 3.13 | 🟡 Prototyp (Fuchs) |
-| Charakter | Antriebe, Wesenszüge und Vertrauen einzeln trainiert; Mischung und Grundtypus je Gestalt | 3.14 | 🔵 geplant |
+| Charakter | Antriebe, Wesenszüge und Vertrauen einzeln trainiert; Mischung und Grundtypus je Gestalt | 3.14 | 🟡 Antriebe einzeln |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -238,7 +239,7 @@ Verhalten kommt. Je mehr Tätigkeiten, Bedürfnisse und Fähigkeiten dazukommen 
 #### C. Gedanken und „Warum?“
 
 - **Entscheidungen mit Begründung:** `foxChoose` hält jede Wahl fest: Tätigkeit, Ziel, Uhrzeit und eine Liste von
-  Gründen `{ key, label, weight }`, heute die Anteile der Neigungen (z. B. Helfen 48 %) und ob die Wahl gegen die
+  Gründen `{ key, label, weight }`, heute die Werte der Antriebe (z. B. Helfen 48) und ob die Wahl gegen die
   stärkste Neigung fiel („aus einer Laune heraus“). Später kommen weitere Gründe hinzu: Hunger, Müdigkeit, Spieltrieb
   (3.2), Ausrichtung (3.3), Eigenwille (3.4), gelernte Fähigkeit und Lob für genau dieses Ziel (3.9). Die Datenform
   bleibt gleich, damit der Bogen jede neue Ursache ohne Umbau zeigen kann.
@@ -257,7 +258,8 @@ Ohne Porträt, als Bogen zum Nachschlagen, von oben nach unten:
 
 1. **Kopf:** Name (änderbar), Geschlecht, Gestalt, später Lebensabschnitt (3.1) und Ausrichtung (3.3). Knopf
    „Beobachten“ startet die Nahsicht (A).
-2. **Neigungen:** Balken für Helfen, Spielen und Unfug mit der Veränderung seit Tagesbeginn (▲ +14 / ▼ −6).
+2. **Antriebe:** Balken für Helfen, Spielen und Unfug (je 0…100) mit Strich für den Grundtypus und der Veränderung seit
+   Tagesbeginn (▲ +14 / ▼ −6).
 3. **Erfahrung:** je Tätigkeit, wie oft sie es getan hat (Bäume ins Lager gebracht, Waren getragen, gespielt, Bäume
    umgeworfen). Grundlage für Alter und Wachstum (3.1). Später kommen hier die Fähigkeiten aus `kreatur-lernen.md` 4
    mit Fortschritt dazu (ungelernt, im Lernen, gelernt).
@@ -274,7 +276,7 @@ Ohne Porträt, als Bogen zum Nachschlagen, von oben nach unten:
 
 - `S.cXp` – Erfahrung je Tätigkeit `{ tree, haul, play, mischief }` (Zahlen, Standard 0).
 - `S.cLearn` – Liste der letzten 30 Lernereignisse `{ day, hour, kind: 'pet' | 'slap', act, desc, from, to }`.
-- `S.cDay` – Neigungen zu Tagesbeginn (für ▲/▼ im Bogen), Standard `null`.
+- `S.cDay` – Antriebe zu Tagesbeginn `{ day, d }` (für ▲/▼ im Bogen), Standard `null`.
 - Entscheidungen nur zur Laufzeit (`fox.log`, die letzten 10), nicht im Spielstand.
 
 #### F. Reihenfolge der Umsetzung
@@ -525,8 +527,9 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
 
 ### 3.14 Charakter: Antriebe, Wesenszüge, Vertrauen
 
-**Stand:** 🔵 geplant – heute schließen sich Helfen, Spielen und Unfug gegenseitig aus (`S.w` ist eine Verteilung,
-Lob auf eine Neigung senkt die anderen)
+**Stand:** 🟡 teilweise – Stufe 1 (H 1) umgesetzt: Helfen, Spielen und Unfug sind einzelne Antriebe mit Grundtypus
+je Gestalt, Ruhe als Rest und langsamer Rückkehr. Früher schlossen sie sich aus (`S.w` war eine Verteilung, Lob auf
+eine Neigung senkte die anderen).
 
 #### A. Warum
 
@@ -614,14 +617,19 @@ Antriebe entscheiden über die Tätigkeit, Wesenszüge und die übrigen Antriebe
 
 #### G. Spielstand
 
-- `S.cTraits = { drive: { work, play, mischief, curious }, nature: { gentle, brave, social, calm }, trust }`
-  (Antriebe 0…1, Wesenszüge −1…+1, Vertrauen 0…1). Fehlt es, wird es aus dem Grundtypus angelegt; ein vorhandenes
-  `S.w` wird umgerechnet (Anteile × Grundtypus), damit alte Spielstände ihren Charakter behalten.
-- `S.cDay` merkt sich zusätzlich die Züge zu Tagesbeginn.
+- ✅ `S.cTraits.dev = { help, play, mischief }`: erzogene Abweichung vom Grundtypus (Grundtypus in `kinds.js`, `base`).
+  Wert = Grundtypus + Abweichung, begrenzt auf 3…97. Die Abweichung bleibt beim Gestaltwechsel und schwindet mit der
+  Spielzeit (Halbwertszeit etwa zehn Spieltage). Fehlt sie, wird ein vorhandenes `S.w` umgerechnet (Anteil × 3 ×
+  Grundtypus), damit alte Spielstände ihren Charakter behalten; `S.w` entfällt danach.
+- ✅ Lob: `+15 % des Abstands nach oben`, Tadel: `−20 % des Werts`; nur der betroffene Antrieb (`train` in `mind.js`).
+- ✅ Wahl (`pickDrive`): gewichtet mit den Werten, Ruhe mit `0,35 + 0,7 × max(0, 1,5 − Summe)`. Ergibt etwa:
+  Fuchs 21 % Ruhe, Wolf 32 %, Stier 38 %, Hirsch 51 %.
+- ✅ `S.cDay = { day, d }` merkt sich die Antriebe zu Tagesbeginn.
+- 🔵 Später dazu: `curious` (Neugier), `nature: { gentle, brave, social, calm }` (−1…+1), `trust` (0…1).
 
 #### H. Reihenfolge
 
-1. Antriebe einzeln mit Ruhe als Rest, Grundtypus und Zurückdriften, Umrechnung aus `S.w`, Balken im Bogen.
+1. ✅ Antriebe einzeln mit Ruhe als Rest, Grundtypus und Zurückdriften, Umrechnung aus `S.w`, Balken im Bogen.
 2. Wesenszüge sanft/grob, mutig/scheu, gesellig/eigen mit ersten Unterschieden im Wie (C) und Marken an den Taten (D).
 3. Vertrauen.
 4. Neugier mit Streifzügen; ruhig/rastlos.
@@ -637,7 +645,7 @@ Antriebe entscheiden über die Tätigkeit, Wesenszüge und die übrigen Antriebe
 - `S.skills` – Fähigkeiten (siehe `kreatur-lernen.md`).
 - `S.cMiracles` – Erlaubnis Wunder (bool).
 - `S.cTraits` – Antriebe, Wesenszüge, Vertrauen (3.14 G); ersetzt `S.w` (wird beim Laden umgerechnet).
-- `S.cXp`, `S.cLearn`, `S.cDay` – Erfahrung, Lernchronik, Neigungen zu Tagesbeginn (3.11 E).
+- `S.cXp`, `S.cLearn`, `S.cDay` – Erfahrung, Lernchronik, Antriebe zu Tagesbeginn (3.11 E).
 
 ## 5. Vorgeschlagene Reihenfolge
 

@@ -274,7 +274,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .now .dot{width:8px;height:8px;border-radius:50%;background:var(--soul);flex:none;animation:pulse 1.6s ease-out infinite;box-shadow:0 0 0 0 rgba(165,216,201,.7)}
 .act[aria-pressed="true"]{background:var(--soul);color:#10302a;border-color:var(--soul)}
 .bar{display:grid;grid-template-columns:7.5em 1fr minmax(3em,auto);gap:8px;align-items:center;font-size:13.5px}
-.bar .track{height:9px;background:rgba(244,239,225,.12);border-radius:9px;overflow:hidden}
+.bar .track{position:relative;height:9px;background:rgba(244,239,225,.12);border-radius:9px;overflow:hidden}
+.bar .track .base{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(244,239,225,.75)}
+.baseNote{margin:0;font-size:11px;color:var(--ink-dim)}
 .bar .fill{height:100%;border-radius:9px;transition:width .5s}
 .bar .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim);white-space:nowrap}
 .bar .delta{font-size:11.5px;margin-left:3px}
@@ -407,7 +409,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button></div>
     <p class="formsLbl">Ausrüstung <span class="sub">aus den Werkstätten, gegen Bretter</span></p>
     <div class="items" id="foxGearItems"></div>
-    <p class="formsLbl">Neigungen <span class="sub">seit Tagesbeginn</span></p>
+    <p class="formsLbl">Antriebe <span class="sub">jeder für sich, ▲/▼ seit Tagesbeginn</span></p>
     <div class="bars" id="foxBars"></div>
     <p class="formsLbl">Erfahrung</p>
     <dl class="xp" id="foxXp"></dl>
