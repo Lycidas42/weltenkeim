@@ -418,6 +418,9 @@ könnte.** Was es nicht kann, übernehmen die Bewohner oder die Magie. Drei Stuf
     Ausrüstung verschleißt und ausgebessert werden muss.
   - Prototyp heute (Branch `claude/vierbeiner-test`): Kauf im Charakterbogen gegen Bretter, sofort angelegt.
 
+- **Felsen bewegen** (🔵 geplant): Stier schiebt, Fuchs hebt mit Lichtranken. Zweck: Bauplätze freiräumen und Felsen
+  zum Steinmetz bringen, siehe `werkstaetten.md` 1 und 2.
+
 #### C. Stufe 3: Magie als Ritual
 
 - Ablauf: **Pose zum Aufladen** (Fellzeichen leuchten auf) → **Geste je Rasse** → **Wirkung** geht vom Anker aus.
