@@ -136,8 +136,16 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
   Stolz, Müde, Traurig, Beleidigt, Wütend, Ängstlich, Schläft). Ansehen: Charakterbogen → „Animationen testen“ → Mimik,
   „Gesicht nah“ (Tele, sonst verzerrt der Weitwinkel die Schnauze). Zweibeiner empfangen keine Schatten mehr (eckige
   Flecken im Gesicht).
-- **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Kiefer wirkt geöffnet klotzig,
-  Schalenfell im Gesicht für die Nahsicht, Geräusche.
+- **Maul:** Unterkiefer als Keil (`Jaw`, vorn schmal), dunkler Mundraum (`Mouth`), Zunge (`Tongue`, am Kiefer),
+  zwei Eckzähne (`FangL/R`).
+- **Schalenfell im Gesicht:** Fellmaske `_FUR` aus dem Bauskript (Export mit `export_attributes`): lang an den Wangen,
+  mittel auf Stirn und Kehle, kurz auf der Schnauze, frei an Augen und Nase. Im Spiel (`face.js`, `FACE_FUR`) nur die
+  Dreiecke mit Fell als 6 (Handy) bzw. 10 Schichten, gekämmt nach hinten, sichtbar wenn die Kamera näher als 11 ist.
+  Haare hängen an der Ruhelage der Haut. Auf dem Handy noch messen.
+- **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Fell auf der Stirn noch körnig,
+  Geräusche.
+- **Lokal testen:** Läuft kein Server, zeigt der Service Worker den letzten Stand aus dem Cache (sieht aus wie „alt“).
+  Fürs Handy `weltenkeim-lan` (Port 8000) starten.
 - **Vorlage für echte Vierbeiner** (falls wir umschwenken): „Fox“ von AIUM2 auf Sketchfab (CC BY 4.0, bearbeitbar);
   „Fox Idle“ von kenchoo ist CC BY-NC-ND (nicht nutzbar, nur Vorbild). Die Gesichtssteuerung hängt nur an benannten
   Teilen und ließe sich übertragen.

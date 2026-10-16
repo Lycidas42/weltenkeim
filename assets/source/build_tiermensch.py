@@ -274,6 +274,8 @@ def build(kind='fox', out=None):
     # 4. Farben als Vertexfarben mit weichen Übergängen (Masken in der T-Pose)
     FUR, LIGHT, DARK, CUP = srgb(A['fur']), srgb(A['light']), srgb(A['dark']), srgb(A.get('cup', A['dark']))
     me = body.data; ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); me.color_attributes.active_color = ca
+    fur = me.attributes.new('_FUR', 'FLOAT', 'POINT') if A.get('facefur', True) else None
+    ca = me.color_attributes['Col']; fur = me.attributes['_FUR'] if fur is not None else None  # nach dem Anlegen neu holen (Verweise werden ungültig)
     for v in me.vertices:
         x, y, z = v.co; ax = abs(x)
         belly = smooth(1.15, .8, (x / .135) ** 2 + ((z - 1.22) / .27) ** 2) * smooth(-0.03, -0.11, y)
@@ -303,12 +305,34 @@ def build(kind='fox', out=None):
         c = [c[i] * (1 - back * .8) + DARK[i] * back * .8 for i in range(3)]
         c = [c[i] * (1 - cup) + CUP[i] * cup for i in range(3)]
         ca.data[v.index].color = (*c, 1)
+        # Fellmaske fürs Schalenfell der Nahsicht (0 = kein Fell, 1 = lang): erst nur das Gesicht
+        if fur is not None:
+            f_ = smooth(1.56, 1.62, z) * (0.3 if (z > 1.88 and ax > 0.06) else 1.0)
+            f_ *= 1.0 if (ax > 0.08 and z < 1.73) else (0.35 if y < -0.13 else 0.6)            # Wangen lang, Schnauze kurz, Stirn mittel
+            for s_ in (1, -1):
+                ex_, ey_, ez_ = hp(EY['x'] * s_, EY['y'], EY['z']); f_ *= smooth(1.0, 2.2, ((x - ex_) / 0.04) ** 2 + ((z - ez_) / 0.032) ** 2 + ((y - ey_) / 0.06) ** 2)
+            f_ *= smooth(-0.10 - sl * .97, -0.10 - sl * .85, y)                                                    # Nasenspitze frei
+            fur.data[v.index].value = f_
     mat = bpy.data.materials.new('Fell_' + kind); mat.use_nodes = True; nt = mat.node_tree
     p = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'); p.inputs['Roughness'].default_value = .85
     cn = nt.nodes.new('ShaderNodeVertexColor'); cn.layer_name = 'Col'; nt.links.new(cn.outputs['Color'], p.inputs['Base Color'])
     me.materials.clear(); me.materials.append(mat)
 
     # 5. Augen und Nase am Kopfknochen
+    # Kegelteil (Kiefer, Mundraum, Zunge, Zähne) zwischen zwei Punkten, flat = Höhe als Anteil der Breite
+    def part(name, base, tip, r, tip_r, flat, rgb, rough, bone='Head'):
+        base, tip = Vector(base), Vector(tip); d = tip - base
+        m2 = bpy.data.materials.new(name); m2.use_nodes = True
+        q = next(n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'); q.inputs['Base Color'].default_value = (*srgb(rgb), 1); q.inputs['Roughness'].default_value = rough
+        me2 = bpy.data.meshes.new(name); o = bpy.data.objects.new(name, me2); sc.collection.objects.link(o)
+        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r * tip_r, depth=d.length)
+        if flat != 1: bmesh.ops.scale(bm, vec=(1, flat, 1), verts=bm.verts)
+        bm.to_mesh(me2); bm.free()
+        for f in me2.polygons: f.use_smooth = True
+        o.location = base + d / 2; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized())
+        me2.materials.append(m2); bpy.context.view_layer.update()
+        w = o.matrix_world.copy(); o.parent = arm; o.parent_type = 'BONE'; o.parent_bone = bone; o.matrix_world = w
+        return o
     def bead(name, c, r, rgb, rough, bone='Head', roll=0):  # roll: Neigung in der Gesichtsebene (Grad, + = außen hoch für die linke Seite)
         m2 = bpy.data.materials.new(name); m2.use_nodes = True
         q = next(n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'); q.inputs['Base Color'].default_value = (*srgb(rgb), 1); q.inputs['Roughness'].default_value = rough
@@ -347,8 +371,12 @@ def build(kind='fox', out=None):
                   bead('Brow' + k, hp(s * 0.064, -0.148, ez + 0.032), (0.024, 0.01, 0.012), A.get('brow', A['fur']), .8, roll=-s * 12)]
     extra += [
              # Unterkiefer am Kieferknochen (öffnet sich im Spiel), dahinter der dunkle Mundraum am Kopf
-             bead('Jaw', hp(0, -0.10 - sl * .36, JAW_Z - 0.017), (sr * .62 * hk, sl * .44 * hk, sr * .4 * hk), A['light'], .8, 'jaw'),
-             bead('Mouth', hp(0, -0.10 - sl * .38, JAW_Z), (sr * .5 * hk, sl * .4 * hk, sr * .2 * hk), '4a2420', .6),
+             # Unterkiefer als Keil unter der Schnauze, vorn schmal; dazwischen der dunkle Mundraum, auf dem Kiefer die Zunge,
+             # oben zwei kleine Eckzähne: geöffnet sieht man ein Maul statt eines Klotzes
+             part('Jaw', hp(0, -0.10, JAW_Z - 0.026), hp(0, -0.10 - sl * .8, JAW_Z - 0.004), sr * .95 * hk, .42, .5, A['light'], .8, 'jaw'),
+             part('Tongue', hp(0, -0.12, JAW_Z - 0.008), hp(0, -0.10 - sl * .74, JAW_Z + 0.004), sr * .55 * hk, .55, .3, 'c4636a', .5, 'jaw'),
+             part('Mouth', hp(0, -0.11, JAW_Z - 0.012), hp(0, -0.10 - sl * .87, JAW_Z + 0.008), sr * .7 * hk, .35, .35, '3a1c1a', .7),
+             *[part('Fang' + k, hp(sx * 0.02, -0.10 - sl * .8, JAW_Z + 0.014), hp(sx * 0.02, -0.10 - sl * .79, JAW_Z - 0.006), 0.0055 * hk, .1, 1, 'f2ede2', .3) for sx, k in ((1, 'L'), (-1, 'R'))],
              bead('Nose', hp(0, -0.10 - sl + 0.012, 1.695), (0.03 * hk, 0.026 * hk, 0.024 * hk), A['dark'], .5)]  # sitzt auf der Schnauzenspitze
 
     # 6. Animationen aus UAL1 und UAL2 als NLA-Spuren
@@ -376,7 +404,7 @@ def build(kind='fox', out=None):
     bpy.context.view_layer.objects.active = arm
     out = out or os.path.join(REPO, 'assets', 'models', 'animals', A['file'])
     bpy.ops.export_scene.gltf(filepath=out, use_selection=True, export_animations=True, export_animation_mode='NLA_TRACKS', export_skins=True,
-                              export_yup=True, export_vertex_color='MATERIAL', export_optimize_animation_size=True)
+                              export_yup=True, export_vertex_color='MATERIAL', export_optimize_animation_size=True, export_attributes=True)
     body.data.calc_loop_triangles()
     print('fertig', out, os.path.getsize(out), 'Bytes,', len(body.data.loop_triangles), 'Dreiecke')
 

@@ -5,7 +5,7 @@
 // Brauen „BrowL/R“, Knochen ear_l/ear_r, jaw, neck_01, Head. Fehlt etwas, bleibt der Teil einfach unbewegt.
 
 import * as THREE from 'three';
-import { camera } from '../core/render.js';
+import { camera, isMobile } from '../core/render.js';
 import { CREATURES, fox } from './kinds.js';
 import { foxModel, foxPivot } from './creature.js';
 import { hand } from '../hand/hand.js';
@@ -107,6 +107,7 @@ function updateFace(dt, t) {
   const B = face.blink; B.t -= dt; if (B.t <= 0) { B.d = .15; B.t = 2 + Math.random() * 4; if (Math.random() < .15) B.t = .3; }
   let blink = 0; if (B.d > 0) { B.d -= dt; blink = Math.sin(Math.max(0, B.d) / .15 * Math.PI); }
   foxModel.updateMatrixWorld(true);
+  updateFaceFur(F);
 
   // Kopf und Nacken: zum Ziel drehen (über der Animation), dazu Neigung und Schieflage aus dem Ausdruck
   const L = face.look, lying = fox.state === 'rest' || fox.state === 'cast';
@@ -154,6 +155,59 @@ function updateFace(dt, t) {
   }
   return true;
 }
+// Schalenfell im Gesicht (kreatur-modelle.md 5, erste Stufe): nur die Dreiecke mit Fellmaske _fur (aus dem Bauskript,
+// lang an den Wangen, kurz auf der Schnauze, frei an Augen und Nase), als Schichten entlang der Normalen nach außen
+// geschoben. Die Haare hängen an der Ruhelage der Haut (Attribut position), so bleiben sie über alle Schichten Strähnen,
+// auch wenn sich der Kopf bewegt. Nur nah an der Kamera sichtbar.
+const FACE_FUR = { shells: isMobile ? 6 : 10, len: .032, den: 190, near: 11 };
+function faceFurMaterial(src, h, uni) {
+  const m = src.clone();
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uni, { uH: { value: h } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute float _fur; uniform float uLen, uH; varying float vFur; varying vec3 vBase;`)
+      .replace('#include <skinning_vertex>', `#include <skinning_vertex>
+        vFur = _fur; vBase = position;
+        // nach außen, leicht nach hinten gekämmt (Modell blickt nach +Z) und mit dem Gewicht ein wenig nach unten
+        transformed += (normalize(objectNormal) + vec3(0.0, -0.4 * uH, -1.1 * uH)) * uLen * _fur * uH;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uDen, uH; varying float vFur; varying vec3 vBase;
+        float h31(vec3 p) { p = fract(p * vec3(.1031, .1030, .0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vFur < 0.03) discard;
+        vec3 g = vBase * uDen, id = floor(g), f = fract(g) - 0.5 + (vec3(h31(id + 1.7), h31(id + 4.3), h31(id + 8.9)) - 0.5) * 0.35;
+        float r = h31(id), len = mix(0.45, 1.0, r);
+        if (uH > len || length(f) > (1.0 - uH / len) * 0.62) discard;
+        diffuseColor.rgb *= mix(0.74, 1.08, uH / len) * mix(0.93, 1.07, r);`);
+  };
+  m.customProgramCacheKey = () => 'wkFaceFur';
+  return m;
+}
+function addFaceFur(model) {
+  let sk = null; model.traverse(o => { if (o.isSkinnedMesh && o.geometry.attributes._fur) sk = o; });
+  if (!sk) return null;
+  // nur Dreiecke mit Fell: eigene Indexliste über denselben Attributen
+  const g0 = sk.geometry, fa = g0.attributes._fur, idx = g0.index, keep = [];
+  for (let i = 0; i < idx.count; i += 3) { const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2); if (fa.getX(a) > .03 || fa.getX(b) > .03 || fa.getX(c) > .03) keep.push(a, b, c); }
+  const geo = new THREE.BufferGeometry(); for (const k in g0.attributes) geo.setAttribute(k, g0.attributes[k]); geo.setIndex(keep);
+  const uni = { uLen: { value: 0 }, uDen: { value: FACE_FUR.den } }, shells = [];
+  for (let i = 1; i <= FACE_FUR.shells; i++) {
+    const m = new THREE.SkinnedMesh(geo, faceFurMaterial(sk.material, i / FACE_FUR.shells, uni));
+    m.position.copy(sk.position); m.quaternion.copy(sk.quaternion); m.scale.copy(sk.scale); m.bind(sk.skeleton, sk.bindMatrix);
+    m.frustumCulled = false; m.castShadow = m.receiveShadow = false; m.userData.shell = true; m.visible = false; sk.parent.add(m); shells.push(m);
+  }
+  return { sk, uni, shells, tris: keep.length / 3, on: false };
+}
+function updateFaceFur(F) {
+  if (F.fur === undefined) F.fur = addFaceFur(foxModel);
+  const f = F.fur; if (!f) return;
+  const on = camera.position.distanceTo(foxPivot.position) < FACE_FUR.near;
+  if (on !== f.on) { f.on = on; for (const m of f.shells) m.visible = on; }
+  if (on) f.uni.uLen.value = FACE_FUR.len / f.sk.matrixWorld.getMaxScaleOnAxis(); // Weltlänge in Maße der Haut umrechnen
+}
+
 // Mitte des Gesichts (für die Gesichtskamera): zwischen den Augen, etwas darunter
 function facePoint(out) {
   const F = foxModel && foxModel.userData.face; if (!F || !F.ok) return null;
@@ -161,4 +215,4 @@ function facePoint(out) {
   out.y -= .06; return out;
 }
 
-export { EXPR, face, facePoint, setExpr, setFaceTest, updateFace };
+export { EXPR, FACE_FUR, face, facePoint, setExpr, setFaceTest, updateFace };
