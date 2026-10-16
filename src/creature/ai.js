@@ -268,12 +268,12 @@ function updateFox(dt, t) {
   }
 }
 // Am Hang (z. B. auf dem Hügel des Schreins) dem Boden folgen: Höhe unter Brust und Hüfte bzw. links und rechts messen,
-// das Tier danach neigen (weich, höchstens etwa 25°) und so hoch setzen, dass weder Kopf noch Hinterteil im Boden stecken
+// das Tier danach neigen (weich, höchstens etwa 18°) und so hoch setzen, dass weder Kopf noch Hinterteil im Boden stecken
 function groundFit(dt, C) {
   const fx = Math.sin(fox.vh ?? fox.h), fz = Math.cos(fox.vh ?? fox.h), lf = C.h * .55, lb = C.h * .45, w = C.h * .18;
   const hc = surfaceAt(fox.x, fox.z), hf = surfaceAt(fox.x + fx * lf, fox.z + fz * lf), hb = surfaceAt(fox.x - fx * lb, fox.z - fz * lb);
   const hl = surfaceAt(fox.x + fz * w, fox.z - fx * w), hr = surfaceAt(fox.x - fz * w, fox.z + fx * w);
-  const lim = .45, k = 1 - Math.exp(-dt * 8);
+  const lim = .32, k = 1 - Math.exp(-dt * 8); // steiler neigt sie sich nicht, den Rest gleichen die Pfoten aus (body.js)
   const pitch = clamp(-Math.atan2(hf - hb, lf + lb), -lim, lim), roll = clamp(Math.atan2(hl - hr, 2 * w) * .6, -.25, .25);
   fox.pitch = (fox.pitch || 0) + (pitch - (fox.pitch || 0)) * k; fox.roll = (fox.roll || 0) + (roll - (fox.roll || 0)) * k;
   return Math.max(hc, hb + (hf - hb) * lb / (lf + lb)); // Höhe der Linie Hüfte–Brust über dem Mittelpunkt

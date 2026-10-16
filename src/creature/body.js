@@ -156,9 +156,29 @@ function setGlow(k) {
   } });
 }
 
+// Pfoten auf den Boden setzen: Das Tier steht auf einer geneigten Ebene (ai.js, groundFit), der Boden unter jeder
+// Pfote liegt aber höher oder tiefer. Die Fußknochen (IK-Knochen des Quaternius-Skeletts, an denen Pfote und
+// Unterbein hängen) werden um diesen Unterschied senkrecht zur Ebene verschoben, höchstens um ein Viertel der Tierhöhe.
+const FEET = ['IKFrontLegL', 'IKFrontLegR', 'IKBackLegL', 'IKBackLegR'], FOOT_LIFT = .02;
+const fw = new THREE.Vector3(), fl = new THREE.Vector3(), pInv = new THREE.Matrix4();
+function plantFeet() {
+  if (!foxModel) return; const C = CREATURES[fox.kind], lim = C.h * .25;
+  foxPivot.updateMatrixWorld(); pInv.copy(foxPivot.matrixWorld).invert();
+  for (const n of FEET) {
+    const b = bone(n); if (!b) continue; const u = b.userData;
+    if (u.ftOut && b.position.equals(u.ftOut)) b.position.copy(u.ftBase); // von der Animation nicht neu gesetzt: Basis
+    (u.ftBase || (u.ftBase = new THREE.Vector3())).copy(b.position);
+    b.getWorldPosition(fw);
+    fl.set(fw.x, surfaceAt(fw.x, fw.z) + FOOT_LIFT, fw.z).applyMatrix4(pInv); // Boden unter der Pfote im Raum des Tiers
+    const d = Math.max(-lim, Math.min(lim, fl.y)); if (Math.abs(d) < .005) { (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position); continue; }
+    fw.addScaledVector(fl.set(0, d, 0).applyQuaternion(foxPivot.quaternion), 1); // um d entlang der Hochachse des Tiers
+    b.parent.worldToLocal(b.position.copy(fw));
+    (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position);
+  }
+}
 function updateBody(dt, t) {
   const vh = renderer.domElement.height;
-  applyOver(dt); updateBack(dt, t); updateDrops(dt);
+  applyOver(dt); plantFeet(); updateBack(dt, t); updateDrops(dt);
   updateCloud(DUST, dt, vh, true); updateCloud(SPARK, dt, vh, false);
 }
 
