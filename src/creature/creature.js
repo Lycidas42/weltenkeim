@@ -274,6 +274,7 @@ function updateMouthTree() {
   const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
   if (C.acts.tree === 'drag') { dragTree(o, s, C); return; }
   if (C.acts.tree === 'push') { pushTree(o, s, C); return; }
+  if (C.acts.tree === 'horns') { hornTree(o, s, C); return; }
   head.getWorldPosition(mouthV); mouthF.set(Math.sin(foxPivot.rotation.y), 0, Math.cos(foxPivot.rotation.y));
   mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
   // Krone auf die von der Kamera abgewandte Seite (mit etwas Trägheit, damit sie nicht hin und her springt)
@@ -322,6 +323,20 @@ function pushTree(o, s, C) {
   o.position.copy(mouthV).addScaledVector(dragD, -L * .3); // die Hörner sitzen etwa am ersten Drittel des Stamms
   o.visible = true;
   dragTip.copy(o.position).addScaledVector(dragD, L); fox.dragTip = dragTip;
+}
+// Auf den Hörnern (Stier): Der Baum liegt quer oben auf dem Kopf, etwa im Gleichgewicht (die schwere Krone näher am
+// Kopf), und schaukelt mit dem Kopf mit. Nichts schleift am Boden.
+function hornTree(o, s, C) {
+  s *= growK(); const head = foxModel.userData.head; head.getWorldPosition(mouthV);
+  const fh = foxPivot.rotation.y; mouthF.set(Math.sin(fh), 0, Math.cos(fh)); pushS.set(Math.cos(fh), 0, -Math.sin(fh));
+  const dc = pushS.x * (camera.position.x - fox.x) + pushS.z * (camera.position.z - fox.z);
+  if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
+  const kw = 1.8, kl = 3.6, L = TREE_H * s * kl;
+  mouthV.addScaledVector(mouthF, C.h * .02).y += C.h * .1; // zwischen den Hörnern
+  dragD.copy(pushS).multiplyScalar(cs); dragD.y = .04 * Math.sin(performance.now() * .005); dragD.normalize(); // wippt leicht
+  o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
+  o.position.copy(mouthV).addScaledVector(dragD, -L * .38);
+  o.visible = true; fox.dragTip = null;
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 

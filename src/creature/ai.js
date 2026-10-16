@@ -236,7 +236,7 @@ function playSpot() {
 }
 function updateFox(dt, t) {
   updateMind();
-  const C = CREATURES[fox.kind], drag = fox.carry && C.acts.tree !== 'mouth', spd = C.walk * (drag ? .7 : gear.log ? .75 : gear.cart ? .8 : 1);
+  const C = CREATURES[fox.kind], drag = fox.carry && (C.acts.tree === 'drag' || C.acts.tree === 'push'), spd = C.walk * (drag ? .7 : fox.carry && C.acts.tree === 'horns' ? .85 : gear.log ? .75 : gear.cart ? .8 : 1);
   // eine laufende Einmal-Animation (Lob/Tadel) nicht vom Zustand überschreiben lassen
   const anim = n => { if (fox.once <= 0) foxAnim(n); };
   if (fox.once > 0) fox.once -= dt;

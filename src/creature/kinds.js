@@ -18,12 +18,12 @@ const CREATURES = {
 // Aussehen aus dem Theme dazunehmen: Datei, Fell-Modell (hd), Kopfknochen, Augen, Liegepose, eigene Reaktionen, Lauftempo
 for (const id in CREATURES) Object.assign(CREATURES[id], theme.models['creature.' + id]);
 // Was jede Gestalt mit ihrem Körper tut (kreatur.md 3.13): tree = wie sie einen Baum bringt ('drag' im Maul schleifen,
-// 'push' mit dem Kopf schieben, 'mouth' quer im Maul), toss = Waren selbst aufladen, self/load = Tragkraft allein bzw.
+// 'push' mit dem Kopf schieben, 'horns' quer auf den Hörnern tragen, 'mouth' quer im Maul), toss = Waren selbst aufladen, self/load = Tragkraft allein bzw.
 // von einem Bewohner beladen, riders = Plätze für Reiter, rite = Geste beim Ritual ('tail' Schwanzbogen, 'stomp'
 // Aufstampfen), rites = welche Rituale, help = eigene Hilfen (Fuchs: geschickt und schlau, Stier: rohe Kraft)
 const ACTS = {
   fox: { tree: 'drag', toss: true, self: 3, load: 5, riders: 1, rite: 'tail', rites: ['rain', 'haste', 'move'], help: ['sweep', 'plant', 'forage', 'pest'] },
-  bull: { tree: 'push', toss: false, self: 0, load: 8, riders: 2, rite: 'stomp', rites: ['rain', 'haste'], help: ['plow', 'rock'] },
+  bull: { tree: 'horns', toss: false, self: 0, load: 8, riders: 2, rite: 'stomp', rites: ['rain', 'haste'], help: ['plow', 'rock'] },
 };
 const ACT_DEF = { tree: 'mouth', toss: true, self: 3, load: 5, riders: 1, rite: 'tail', rites: ['rain', 'haste'], help: [] };
 for (const id in CREATURES) CREATURES[id].acts = Object.assign({}, ACT_DEF, ACTS[id]);

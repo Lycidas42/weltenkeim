@@ -196,7 +196,7 @@ function updateRitual(dt, t) {
   }
 }
 // Lichtranken: drei leuchtende Ranken von der Schwanzspitze zum Felsen, die sich winden. Der Felsen hebt sich, schwebt
-// ein Stück vom Dorf weg und senkt sich wieder (Felsen werden nicht gespeichert: nach dem Neuladen liegt er wie vorher)
+// ein Stück vom Dorf weg und senkt sich wieder (die neue Lage wird gespeichert, S.rocks)
 const vineMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false });
 const vines = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), vineMat); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
 const MOVE_T = { grow: .6, up: 1.1, go: 1.6, down: .7 }, rockTop = new THREE.Vector3();

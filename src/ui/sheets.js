@@ -283,7 +283,7 @@ function foxDoing() {
   switch (fox.state) {
     case 'walk':
       if (fox.next === 'shrine' && fox.morph) return `läuft zum Schrein, um die Gestalt ${CREATURES[fox.morph].label} anzunehmen`;
-      if (fox.next === 'store') { const T = CREATURES[fox.kind].acts.tree; return T === 'drag' ? 'schleift einen Baum im Maul zum Lager' : T === 'push' ? 'schiebt einen Baum mit den Hörnern zum Lager' : 'trägt einen Baum im Maul zum Lager'; }
+      if (fox.next === 'store') { const T = CREATURES[fox.kind].acts.tree; return T === 'drag' ? 'schleift einen Baum im Maul zum Lager' : T === 'push' ? 'schiebt einen Baum mit den Hörnern zum Lager' : T === 'horns' ? 'trägt einen Baum auf den Hörnern zum Lager' : 'trägt einen Baum im Maul zum Lager'; }
       if (fox.next === 'plow') return 'läuft zum Hof, um die Felder zu pflügen';
       if (fox.next === 'shove') return 'läuft zu einem Felsen, um ihn wegzuschieben';
       if (fox.next === 'sweep') return 'läuft zum Schrein, um den Platz zu fegen';

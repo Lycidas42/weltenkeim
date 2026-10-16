@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rnd, smooth } from '../core/util.js';
+import { S, onSave } from '../core/state.js';
 import { noise } from '../core/noise.js';
 import { dummy, scene } from '../core/render.js';
 import { weather } from './sky.js';
@@ -25,12 +26,21 @@ const keepFree = (x, z, r = 0) => Math.hypot(x, z) < 7 || onFarm(x, z, .5 + r) |
 const rocks = [];
 const rockMeshes = ROCK_GEOS.map(g => { const m = new THREE.InstancedMesh(g, plantMat, 60); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; });
 function addRock(x, z, s) { const h = heightAt(x, z); if (h < .05 || keepFree(x, z, s) || treeNear(x, z, s + .35)) return false; rocks.push({ x, z, v: rocks.length % ROCK_GEOS.length, s, r: Math.random() * 6.28, tx: rnd(.15), tz: rnd(.15), tint: .85 + Math.random() * .25 }); return true; }
-for (let tries = 0; tries < 3000 && rocks.length < 24; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
-for (let tries = 0; tries < 3000 && rocks.length < 84; tries++) { // mittlere Felsen, gern in Gruppen um die großen
-  const o = Math.random() < .55 ? rocks[Math.floor(Math.random() * 24)] : null, a = Math.random() * 6.28, r = o ? o.s + .4 + Math.random() * 1.2 : 0;
-  addRock(o ? o.x + Math.cos(a) * r : rnd(HALF * .88), o ? o.z + Math.sin(a) * r : rnd(HALF * .88), .2 + Math.random() * .3);
+// Felsen bleiben, wo sie liegen: beim ersten Start zufällig verteilt, danach aus dem Spielstand (S.rocks), damit auch
+// verschobene Felsen (Kreatur, kreatur.md 3.13) nach dem Neuladen am neuen Platz liegen
+const okRock = a => Array.isArray(a) && a.length >= 8 && a.every(n => typeof n === 'number' && isFinite(n));
+if (Array.isArray(S.rocks) && S.rocks.length && S.rocks.every(okRock)) {
+  for (const a of S.rocks) if (rocks.length < 84) rocks.push({ x: a[0], z: a[1], v: Math.abs(a[2] | 0) % ROCK_GEOS.length, s: a[3], r: a[4], tx: a[5], tz: a[6], tint: a[7] });
+} else {
+  for (let tries = 0; tries < 3000 && rocks.length < 24; tries++) addRock(rnd(HALF * .88), rnd(HALF * .88), .55 + Math.random() * .55); // große Findlinge
+  for (let tries = 0; tries < 3000 && rocks.length < 84; tries++) { // mittlere Felsen, gern in Gruppen um die großen
+    const o = Math.random() < .55 ? rocks[Math.floor(Math.random() * 24)] : null, a = Math.random() * 6.28, r = o ? o.s + .4 + Math.random() * 1.2 : 0;
+    addRock(o ? o.x + Math.cos(a) * r : rnd(HALF * .88), o ? o.z + Math.sin(a) * r : rnd(HALF * .88), .2 + Math.random() * .3);
+  }
 }
 { const cnt = ROCK_GEOS.map(() => 0); for (const r of rocks) rockMeshes[r.v].setColorAt(cnt[r.v]++, COL.setScalar(r.tint)); }
+const r3 = n => Math.round(n * 1000) / 1000;
+onSave(() => { S.rocks = rocks.map(r => [r3(r.x), r3(r.z), r.v, r3(r.s), r3(r.r), r3(r.tx), r3(r.tz), r3(r.tint)]); });
 // Büsche: gern am Waldrand, seltener auf offener Wiese
 const bushes = [];
 // kleine Büsche ohne eigenen Schatten (spart Rechenzeit)
