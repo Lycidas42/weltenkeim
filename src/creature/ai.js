@@ -601,7 +601,7 @@ function foxToShrine(id) {
   noteChoice('shrine', 'shrine', `am Schrein die Gestalt ${CREATURES[id].label} annehmen`, [{ key: 'player', label: 'du hast es am Schrein so gewählt', weight: 1 }]);
 }
 
-// Testleiste (ui/quadtest.js): eine Handlung sofort beginnen. 'tree' Baum schleifen, 'self' Waren selbst aufladen,
+// Zum Ausprobieren in der Konsole (__wk.foxDo; auf dem Branch claude/vierbeiner-test auch die Testleiste): eine Handlung sofort beginnen. 'tree' Baum schleifen, 'self' Waren selbst aufladen,
 // 'villager' von einem Bewohner beladen lassen, 'sweep' Schwanz fegt. Liefert einen Text, wenn es nicht geht.
 function foxDo(kind) {
   foxDrop(); fox.once = 0;

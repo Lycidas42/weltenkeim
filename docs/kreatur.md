@@ -489,7 +489,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
    - **Magie:** Ritual auch für **Eile** (das Licht fliegt dorthin, wo die meisten Bewohner sind). **Lichtranken:**
      Drei leuchtende Ranken wachsen aus der Schwanzspitze, heben einen Felsen an und setzen ihn ein Stück vom Dorf
      entfernt ab (kostet 15 Glaube; die Lage der Felsen wird gespeichert, `S.rocks`).
-   - **Testleiste:** Charakterbogen → „Testen“: alle Animationen einzeln, zwölf Handlungen nach Stufen, Ausrüstung
+   - **Testleiste (nur auf dem Branch `claude/vierbeiner-test`, nicht auf `develop`):** Charakterbogen → „Testen“: alle Animationen einzeln, zwölf Handlungen nach Stufen, Ausrüstung
      zum An- und Ablegen.
    - **Fähigkeiten je Gestalt** in `kinds.js` (`acts`): wie sie einen Baum bringt, ob sie selbst auflädt, Tragkraft
      allein und beladen, Plätze für Reiter, Geste beim Ritual, welche Rituale und eigene Hilfen. Die Testleiste zeigt
@@ -516,7 +516,7 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
    - **Felsen im Spielstand** (`S.rocks`): beim ersten Start zufällig verteilt, danach gespeichert; verschobene Felsen
      bleiben am neuen Platz. Bäume (auch eingegrabene Setzlinge) werden bisher nicht gespeichert.
    - **Zweck des Felsenschiebens fehlt noch:** Felsen liegen nur außerhalb des Dorfes und stören nichts.
-   - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste (im
+   - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste bzw. auf `develop` über die Konsole (`__wk.startRitual`; im
      normalen Verhalten erst mit dem Lernen, 3.9), Pflug, Lernen nach Tierart (E), andere Rassen.
 2. Ankerpunkte und Verben für die übrigen Rassen.
 3. Ausrüstung aus der Sattlerei (B), sobald der Jäger da ist.

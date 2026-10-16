@@ -55,7 +55,6 @@ import { foxUnder, placeFoxUI } from './ui/ring.js';
 import { carryGrabbed, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer } from './hand/input.js';
 import { placeFieldTags, placeFoodSign, placeForestUI, placeHutTags, updateHud } from './ui/hud.js';
 import { SLOTS, setSlot, slotState } from './core/colors.js';
-import './ui/quadtest.js';
 
 setInterval(save, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });

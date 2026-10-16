@@ -33,7 +33,6 @@ const APP = [
   './src/ui/feedback.js',
   './src/ui/hud.js',
   './src/ui/ring.js',
-  './src/ui/quadtest.js',
   './src/ui/sheets.js',
   './src/village/ai.js',
   './src/village/build.js',
