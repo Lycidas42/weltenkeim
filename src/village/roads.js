@@ -42,10 +42,15 @@ function mark(x, z, d) {
 }
 // Zu breite Pflasterflächen (aus der Zeit vor der Breitengrenze): Punkte abseits der Straßen, um die herum zu viel
 // gepflastert ist, werden wieder Erde; die Steine kommen zurück ins Lager (etwa ein Stein je drei Punkte)
+// Maßstab ist die Lage vor dem Rückbau: Ein schmaler Weg hat höchstens etwa ROAD_FILL gepflasterte Punkte im 5×5-Feld,
+// eine Fläche mehr (auch an ihrem Rand). Was danach abseits der Straßen fast allein liegt, kommt ebenfalls weg.
 function trim() {
-  const drop = [];
-  for (let k = 2 * N + 2; k < PAVE.length - 2 * N - 2; k++) if (PAVE[k] && PLAN[k] < 0 && paveFill(k) > ROAD_FILL + 2) drop.push(k);
+  const drop = [], lo = 2 * N + 2, hi = PAVE.length - 2 * N - 2;
+  for (let k = lo; k < hi; k++) if (PAVE[k] && PLAN[k] < 0 && paveFill(k) > ROAD_FILL + 1) drop.push(k);
   for (const k of drop) unpave(k);
+  const lone = [];
+  for (let k = lo; k < hi; k++) { if (!PAVE[k] || PLAN[k] >= 0) continue; let n = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) n += PAVE[k + dj * N + di]; if (n <= 2) lone.push(k); }
+  for (const k of lone) unpave(k); drop.push(...lone);
   if (drop.length) S.stone += Math.round(drop.length / 3);
 }
 // Nächste Stelle zum Pflastern auf einer geplanten Straße, die dem Lager am nächsten ist; skip: dort pflastert schon jemand
@@ -60,6 +65,9 @@ function roadSpot(skip = []) {
   }
   if (best < 0) return null; const i = best % N, j = (best - i) / N; return { x: -HALF + i * CELL, z: -HALF + j * CELL, plan: true };
 }
+// jede zweite Sekunde: Straßen planen, sobald die Wegsuche bereit ist (beim ersten Mal auch der Rückbau)
+let roadT = 0;
+function updateRoads(dt) { if ((roadT -= dt) > 0) return; roadT = 2; ensurePlan(); }
 const onRoad = k => PLAN[k] >= 0; // für paveAt: auf geplanten Straßen wird ohne Rücksicht auf Abnutzung gepflastert
 
-export { PLAN, ensurePlan, onRoad, roadSpot };
+export { PLAN, ensurePlan, onRoad, roadSpot, updateRoads };

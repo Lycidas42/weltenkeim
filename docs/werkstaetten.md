@@ -82,8 +82,10 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
   klopfen den Stein fest („Weg gepflastert“). Ein Stein pflastert die Punkte im Umkreis von 0,6 Einheiten.
 - **Breite:** Auch Trampelpfade bleiben schmal (zwei bis drei Geländepunkte): Ein Punkt wird nur gepflastert, wenn im
   5×5-Feld um ihn höchstens 10 Punkte schon gepflastert sind (`ROAD_FILL`).
-- **Rückbau:** Breitere Pflasterflächen aus älteren Spielständen werden beim ersten Planen nach dem Laden auf
-  Straßenbreite zurückgebaut; je drei Punkte kommt ein Stein zurück ins Lager.
+- **Rückbau:** Breitere Pflasterflächen aus älteren Spielständen werden gleich nach dem Laden (sobald die Wegsuche
+  bereit ist, `updateRoads`) zurückgebaut: Punkte abseits der Straßen, um die im 5×5-Feld mehr als 12 Punkte
+  gepflastert sind, danach fast allein liegende Reste. Je drei Punkte kommt ein Stein zurück ins Lager; der Boden
+  ist danach kurz Erde und wächst wieder zu.
 - **Bewohner nutzen die Straße:** In der Wegsuche kostet ein Schritt auf Pflaster nur gut die Hälfte (`ROAD_COST`),
   und Abkürzungen verlassen eine gepflasterte Strecke nicht. Auf Pflaster gehen sie zudem um ein Drittel schneller.
 - **Aussehen:** wie bei einer Römerstraße je Geländepunkt vier flache, leicht unregelmäßige Steine, die der Neigung

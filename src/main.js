@@ -38,6 +38,7 @@ import { sharks, updateFish, updateSharks } from './wildlife/sea.js';
 import { birds, updateBirds } from './wildlife/birds.js';
 import { updateTracks } from './wildlife/tracks.js';
 import { FOOD_COL, MEAL, days, eatLunch, food, growthState, pickMeal, portions, prayMul, takePortions, updateFood, workMul } from './village/food.js';
+import { updateRoads } from './village/roads.js';
 import { arrows, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish } from './village/ai.js';
 import { reconcileJobs } from './village/jobs.js';
 import { placeWishUI, startWish, updateWish } from './village/wishes.js';
@@ -86,6 +87,7 @@ function tick(dt, t) {
   // villagers
   for (const v of villagers) updateVillager(v, dt, t);
   updateWear(dt);
+  updateRoads(dt);
   carryGrabbed();
   renderVillagers(dt, t);
   updateArrows(dt); updateFishingLines(t);

@@ -62,7 +62,7 @@ const ROAD_FILL = 11;
 function paveFill(k) { let n = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) n += PAVE[k + dj * N + di] || 0; return n; }
 const roomForRoad = k => paveFill(k) < ROAD_FILL;
 // Pflaster wieder entfernen (zu breite Flächen, village/roads.js): der Pfad bleibt ausgetreten
-function unpave(k) { if (!PAVE[k]) return; PAVE[k] = 0; WEAR[k] = 25; wearDirty.add(k); stonesDirty = true; }
+function unpave(k) { if (!PAVE[k]) return; PAVE[k] = 0; WEAR[k] = 7; wearDirty.add(k); stonesDirty = true; }
 // Ein Stein pflastert die ausgetretenen Punkte im Umkreis r (folgt so der Form des Pfads); liefert die Anzahl.
 // pick: eigene Auswahl der Punkte (geplante Straßen, village/roads.js) statt Abnutzung und Breitengrenze
 function paveAt(x, z, r = .6, pick = null) {
