@@ -7,7 +7,7 @@ import { clock, scene } from '../core/render.js';
 import { addGlaube, addLogs, floatText, toast } from '../ui/feedback.js';
 import { streamDist, surfaceAt } from '../world/terrain.js';
 import { CREATURES, fox } from './kinds.js';
-import { CENTER, LAGER, SHRINE_POS, shrinePt } from '../village/layout.js';
+import { CENTER, LAGER, PLAZA, SHRINE_POS, shrinePt } from '../village/layout.js';
 import { FALL_T, addTree, chopTree, fallTree, treeNear, trees } from '../world/trees.js';
 import { huts, lager, lagerDrop, localPt } from '../village/huts.js';
 import { hutWork } from '../village/build.js';
@@ -67,7 +67,7 @@ function foxChoose() {
     else { fox.tree = best; best.reserved = 'fox'; const ang = Math.atan2(fox.x - best.x, fox.z - best.z); foxWalk(best.x + Math.sin(ang) * .9, best.z + Math.cos(ang) * .9, 'tree'); }
   }
   fox.act = a;
-  if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); noteChoice('play', 'play', 'mit dem Dorf spielen', why); }
+  if (a === 'play') { fox.pc = playSpot(); foxWalk(fox.pc.x - (fox.pc.r || 1.6), fox.pc.z, 'play'); noteChoice('play', 'play', 'mit dem Dorf spielen', why); }
   else noteChoice(a, a === 'help' ? 'tree' : 'mischief', a === 'help' ? 'Holz fürs Dorf holen' : 'einen Baum umwerfen', why);
 }
 // Tragen: Hütte mit wartenden Waren suchen, bis zu 3 Stück auf einmal (die meisten zuerst), ins Lager bringen
@@ -163,7 +163,7 @@ function foxForageGo(why = []) {
 }
 // Schädlinge: einem Hasen nachrennen, der am Feld knabbert
 function foxChaseGo(h, why = []) {
-  fox.prey = h; fox.state = 'chase'; fox.timer = 12; fox.act = 'help';
+  fox.prey = h; fox.state = 'chase'; fox.timer = 20; fox.act = 'help'; fox.chaseT = 0;
   noteChoice('help', 'pest', 'den Hasen vom Feld jagen', [...why, { key: 'pest', label: 'ein Hase knabbert am Feld', weight: 1 }]);
 }
 // Reiten: ein freier Bewohner in der Nähe steigt beim Spielen auf den Rücken
@@ -199,8 +199,11 @@ function restSpot() {
   return { x: fox.x, z: fox.z };
 }
 // freier Spielplatz: ein Kreis (Radius 1,6) nahe der Dorfmitte, auf dem nichts im Weg steht
+// Spielen: um die Dorflinde herum
+const PLAY_R = 1.65; // der Brunnen steht etwa 2,6 von der Linde entfernt
 function playSpot() {
   if (!navReady) buildNav();
+  if (PLAZA) return { x: PLAZA.x, z: PLAZA.z, r: PLAY_R };
   const free = (x, z) => { for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; if (blockedAt(navF, x + Math.cos(a) * 1.6, z + Math.sin(a) * 1.6)) return false; } return true; };
   for (let r = 0; r < 9; r += .75) for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2 + r, x = CENTER.x + Math.cos(a) * r, z = CENTER.z + Math.sin(a) * r; if (free(x, z)) return { x, z }; }
   return CENTER;
@@ -259,7 +262,7 @@ function updateFox(dt, t) {
         const id = fox.morph; fox.morph = null; noteDone('shrine', `am Schrein die Gestalt ${CREATURES[id].label} angenommen`); emit('foxTransform', id);
       }
       else if (fox.next === 'rest') { fox.state = 'rest'; fox.timer = 8 + Math.random() * 8; foxOnce('lieDown'); }
-      else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); if (fox.wantRider || Math.random() < .5) mount(fox.wantRider); fox.wantRider = false; }
+      else if (fox.next === 'play') { fox.state = 'play'; fox.playT = 0; fox.playDir = Math.random() < .5 ? 1 : -1; fox.jumpT = .8; fox.playA = Math.atan2(fox.z - fox.pc.z, fox.x - fox.pc.x); if (fox.wantRider || Math.random() < .5) mount(fox.wantRider); fox.wantRider = false; }
     } break;
     case 'toss': { // Ware ins Maul nehmen (Fressen-Bewegung), mit einem Kopfwurf auf den Rücken
       anim(fox.timer > .55 ? 'eat' : 'idle'); const before = fox.timer; fox.timer -= dt;
@@ -299,7 +302,8 @@ function updateFox(dt, t) {
     case 'chase': { // einem Hasen nachrennen, bis er die Flucht ergreift
       anim('run'); fox.timer -= dt; const h = fox.prey;
       if (!h || !wild.includes(h) || h.state === 'dead' || fox.timer <= 0) { fox.prey = null; foxIdle(1); break; }
-      moveFree(fox, h.x, h.z, C.run * 1.15 * dt, navF);
+      if ((fox.chaseT = (fox.chaseT || 0) - dt) <= 0) { fox.chaseT = .5; setGoal(fox, h.x, h.z, navF); } // Weg um Häuser und Zäune herum, laufend neu
+      followPath(fox, C.run * 1.15 * dt);
       const hd = Math.hypot(h.x - fox.x, h.z - fox.z);
       if (hd < 4.5 || (h.state !== 'nibble' && !h.field && hd < 7)) { // Felder sind eingezäunt: vom Zaun aus reicht es, der Hase flieht
         scareAway(h, fox.x, fox.z); fox.prey = null; fox.signalT = 1.4;
@@ -332,11 +336,18 @@ function updateFox(dt, t) {
     } break;
     case 'play': {
       anim('run'); fox.playT += dt;
-      // im Kreis um einen freien Platz; was im Weg steht, wird nicht durchlaufen
-      fox.playA += dt * 1.9; const pc = fox.pc || CENTER, px = pc.x + Math.cos(fox.playA) * 1.6, pz = pc.z + Math.sin(fox.playA) * 1.6;
-      moveFree(fox, px, pz, C.run * 1.6 * dt, navF);
+      // tollt im Kreis um die Linde: mal schneller, mal langsamer, springt ab und zu hoch und kehrt dabei manchmal um.
+      // Die Blickrichtung folgt immer der Laufrichtung (Tangente am Kreis).
+      const pc = fox.pc || CENTER, R = pc.r || 1.6, dir = fox.playDir || (fox.playDir = 1);
+      const sp = C.run * (1.05 + .35 * Math.sin(fox.playT * 2.3)) / R; fox.playA += dir * sp * dt;
+      fox.x = pc.x + Math.cos(fox.playA) * R; fox.z = pc.z + Math.sin(fox.playA) * R;
+      fox.h = Math.atan2(-Math.sin(fox.playA) * dir, Math.cos(fox.playA) * dir);
+      if ((fox.jumpT = (fox.jumpT ?? 1) - dt) <= 0 && fox.hop <= 0) { // Freudensprung
+        fox.hop = .5; fox.jumpT = 1 + Math.random() * 1.4;
+        if (Math.random() < .3) fox.playDir = -dir; // im Sprung herumwirbeln und andersherum weiter
+      }
       if (Math.floor(fox.playT) !== Math.floor(fox.playT - dt)) addGlaube(1.5, fox.x, 1.4, fox.z);
-      if (fox.playT > 5) { if (fox.rider) fox.desc = 'einen Bewohner auf dem Rücken reiten lassen'; foxFinish('play', 'play'); }
+      if (fox.playT > 7) { if (fox.rider) fox.desc = 'einen Bewohner auf dem Rücken reiten lassen'; foxFinish('play', 'play'); }
     } break;
   }
   if (fox.hop > 0) fox.hop = Math.max(0, fox.hop - dt);
@@ -453,7 +464,7 @@ function foxDo(kind) {
   if (kind === 'sweep') { foxSweepGo(why); return ''; }
   if (kind === 'plant') return foxPlantGo(why) ? '' : 'Kein Platz am Waldrand gefunden.';
   if (kind === 'forage') return foxForageGo(why) ? '' : 'Kein Busch am Wald in der Nähe.';
-  if (kind === 'ride') { fox.pc = playSpot(); fox.act = 'play'; fox.wantRider = true; foxWalk(fox.pc.x - 1.6, fox.pc.z, 'play'); noteChoice('play', 'play', 'mit einem Bewohner auf dem Rücken spielen', why); return ''; }
+  if (kind === 'ride') { fox.pc = playSpot(); fox.act = 'play'; fox.wantRider = true; foxWalk(fox.pc.x - (fox.pc.r || 1.6), fox.pc.z, 'play'); noteChoice('play', 'play', 'mit einem Bewohner auf dem Rücken spielen', why); return ''; }
   if (kind === 'pest') { // ein Hase soll knabbern: der nächste Hase setzt sich an ein wachsendes Feld (sonst irgendeins)
     let h = wild.find(a => a.state === 'nibble');
     if (!h) { const fl = fields.find(f => f.state === 'grow') || fields[0], hs = wild.filter(a => a.kind === 'hase' && a.state !== 'dead'); if (!fl || !hs.length) return 'Kein Feld oder kein Hase da.';
