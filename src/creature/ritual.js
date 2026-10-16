@@ -15,7 +15,8 @@ import { trees } from '../world/trees.js';
 import { CREATURES, fox } from './kinds.js';
 import { foxAnim, foxOnce, foxPivot } from './creature.js';
 import { anchor, dust, footExtra, over, overOff, setGlow, spark } from './body.js';
-import { foxDrop, foxIdle } from './ai.js';
+import { foxDrop, foxIdle, restSpot } from './ai.js';
+import { followPath, navF, setGoal } from '../world/nav.js';
 import { castHaste, castRain } from '../hand/miracles.js';
 import { rocks } from '../world/nature.js';
 import { buildNav, nearBuilding } from '../world/nav.js';
@@ -134,9 +135,14 @@ function startRitual(kind = 'rain', at = null) {
   R.x = p.x; R.z = p.z; R.kind = kind; R.rock = p.rock || null; R.move = null;
   fox.state = 'ritual'; fox.h = Math.atan2(R.x - fox.x, R.z - fox.z); fox.once = 0;
   R.style = C0().acts.rite; R.stomp = R.style === 'stomp' || R.style === 'antler'; R.howl = R.style === 'howl'; R.t = 0; R.ringT = 0;
-  if (R.stomp) R.phase = 'charge'; else { R.phase = 'sit'; foxOnce('sitDown'); }
+  // erst an einen Platz, an dem rundum Raum ist (Kopf und Hals ragen beim Aufladen weit vor, sonst stecken sie in Häusern)
+  R.spot = restSpot(.85); if (Math.hypot(R.spot.x - fox.x, R.spot.z - fox.z) > .15) { R.phase = 'go'; setGoal(fox, R.spot.x, R.spot.z, navF); } else startCharge();
   noteChoice('help', 'miracle', kind === 'move' ? 'einen Felsen versetzen' : `${m.label} wirken`, [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }]);
   return '';
+}
+function startCharge() {
+  fox.h = Math.atan2(R.x - fox.x, R.z - fox.z); R.t = 0;
+  if (R.stomp) R.phase = 'charge'; else { R.phase = 'sit'; foxOnce('sitDown'); }
 }
 function endRitual() {
   R.phase = null; overOff('ritual'); overOff('ritualTail'); overOff('stomp'); overOff('howl'); delete footExtra.IKFrontLegL; delete footExtra.IKFrontLegR; shock.visible = false; setGlow(0); rune.visible = false; vines.forEach(v => v.visible = false);
@@ -150,7 +156,9 @@ function updateRitual(dt, t) {
   if (fox.state !== 'ritual') { endRitual(); return; } // unterbrochen (z. B. von der Hand gegriffen)
   const C = CREATURES[fox.kind]; R.t += dt;
   const g = surfaceAt(fox.x, fox.z);
-  if (R.phase === 'sit') { // hinsetzen, dann aufladen
+  if (R.phase === 'go') { // zum freien Platz laufen, dann aufladen
+    foxAnim('walk'); if (followPath(fox, C.walk * dt) || R.t > 12) startCharge();
+  } else if (R.phase === 'sit') { // hinsetzen, dann aufladen
     if (R.t > .7) { R.phase = 'charge'; R.t = 0; foxAnim('sit'); fox.once = 0; }
   } else if (R.phase === 'charge') {
     const k = Math.min(1, R.t / CHARGE_T);

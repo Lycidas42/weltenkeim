@@ -265,9 +265,9 @@ function unload() {
   }
 }
 // Liegeplatz: rundum frei im Umkreis der halben Körperlänge (Gebäude, Bäume, Felsen, Wasser)
-function restSpot() {
+function restSpot(k = .5) { // k: freier Umkreis in Tierhöhen (Liegen .5, Aufladen mit erhobenem Kopf mehr)
   if (!navReady) buildNav();
-  const R = CREATURES[fox.kind].h * .5, room = (x, z) => { if (blockedAt(navV, x, z)) return false; for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (blockedAt(navV, x + Math.cos(a) * R, z + Math.sin(a) * R) || blockedAt(navV, x + Math.cos(a) * R * .5, z + Math.sin(a) * R * .5)) return false; } return true; };
+  const R = CREATURES[fox.kind].h * k, room = (x, z) => { if (blockedAt(navV, x, z)) return false; for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (blockedAt(navV, x + Math.cos(a) * R, z + Math.sin(a) * R) || blockedAt(navV, x + Math.cos(a) * R * .5, z + Math.sin(a) * R * .5)) return false; } return true; };
   if (room(fox.x, fox.z)) return { x: fox.x, z: fox.z };
   for (let r = .5; r < 8; r += .5) for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = fox.x + Math.cos(a) * r, z = fox.z + Math.sin(a) * r; if (room(x, z)) return { x, z }; }
   return { x: fox.x, z: fox.z };
@@ -667,4 +667,4 @@ function foxDrop() {
   fox.trans = null; fox.carryG = 0; fox.patrol = null; fox.esc = null;
   gear.cart = false; gear.plow = false; gear.log = false; gear.basket = 0; fox.forage = null; fox.plowRun = null; fox.rockJob = null; fox.dig = null; fox.prey = null; dismount();
 }
-export { foxCast, foxDo, foxDrop, foxHaul, foxToShrine, foxIdle, reinforce, updateFox };
+export { foxCast, foxDo, foxDrop, foxHaul, restSpot, foxToShrine, foxIdle, reinforce, updateFox };

@@ -93,7 +93,7 @@ const POSES = {
   // Hinlegen wie ein Hund (Sphinx-Haltung, Vorderpfoten nach vorn)
   paw: {
     rot: { Back: [8, 0, 0], FrontShoulderL: [-65, 0, 0], FrontShoulderR: [-65, 0, 0], FrontLowerLegL: [-15, 0, 0], FrontLowerLegR: [-15, 0, 0], BackLegL: [-75, 0, -12], BackLegR: [-75, 0, 12], BackLowerLegL: [-45, 0, 0], BackLowerLegR: [-45, 0, 0], Neck1: [-22, 0, 0], Head: [10, 0, 0], Tail1: [-28, 0, 0], Tail2: [-10, 15, 0], Tail3: [0, 20, 0], Tail5: [0, 25, 0], Tail7: [0, 25, 0] },
-    pos: { Body: [0, -.47, 0], IKBackLegL: [.04, 0, .25], IKBackLegR: [-.04, 0, .25], IKFrontLegL: [.02, 0, .45], IKFrontLegR: [-.02, 0, .45] },
+    pos: { Body: [0, -.43, 0], IKBackLegL: [.04, 0, .25], IKBackLegR: [-.04, 0, .25], IKFrontLegL: [.02, 0, .45], IKFrontLegR: [-.02, 0, .45] }, // nicht ganz so tief, sonst liegen die Hinterläufe im Boden
   },
   // Hinlegen wie Huftiere (Beine untergeschlagen)
   hoof: {
@@ -348,7 +348,7 @@ function hornTree(o, s, C) {
   else { head.getWorldPosition(mouthV); mouthV.addScaledVector(mouthF, C.h * .02).y += C.h * .1; }
   const nk = narrowK(C); dragD.copy(pushS).multiplyScalar(cs * (1 - nk)).addScaledVector(mouthF, -nk); dragD.y = .04 * Math.sin(performance.now() * .005); dragD.normalize(); // wippt leicht; zwischen Häusern längs über den Rücken
   o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
-  o.position.copy(mouthV).addScaledVector(dragD, -L * .38);
+  o.position.copy(mouthV).addScaledVector(dragD, -L * .38 * (1 - nk)); // quer: Krone näher am Kopf; längs: ab dem Kopf nur nach hinten (nichts vor den Augen)
   o.visible = true; fox.dragTip = null;
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
