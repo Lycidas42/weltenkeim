@@ -119,8 +119,16 @@ function updateFace(dt, t) {
   } else { L.tx = 0; L.ty = 0; }
   if (c.away > .05) L.tx = THREE.MathUtils.clamp(-Math.sign(L.tx || 1) * .9, -1.1, 1.1) * c.away + L.tx * (1 - c.away); // beleidigt: wegschauen
   L.yaw = smoothTo(L.yaw, L.tx, dt, 4); L.pitch = smoothTo(L.pitch, L.ty, dt, 4);
+  // Zusätzlich zur Animation drehen. Hat die laufende Animation für einen Knochen keine Spur (beim Export fallen
+  // unveränderte Spuren weg, z. B. der Kopf beim Einrollen), setzt der Mixer ihn nicht neu: dann vom Stand vor der
+  // letzten Zusatzdrehung ausgehen, sonst summiert sie sich Bild für Bild auf und der Kopf dreht sich im Kreis.
+  for (const b of [F.neck, F.head]) if (b) {
+    const u = b.userData; if (u.faceOut && b.quaternion.equals(u.faceOut)) b.quaternion.copy(u.faceBase);
+    (u.faceBase || (u.faceBase = new THREE.Quaternion())).copy(b.quaternion);
+  }
   if (F.neck) { rotModel(F.neck, AX.y, L.yaw * .4); rotModel(F.neck, AX.x, L.pitch * .35 + c.pitch * .4); }
   if (F.head) { rotModel(F.head, AX.y, L.yaw * .6); rotModel(F.head, AX.x, L.pitch * .65 + c.pitch * .6); rotModel(F.head, AX.z, c.roll); }
+  for (const b of [F.neck, F.head]) if (b) (b.userData.faceOut || (b.userData.faceOut = new THREE.Quaternion())).copy(b.quaternion);
 
   // Ohren: vor/zurück, zur Seite, Öffnung drehen; dazu ab und zu ein Zucken
   F.ears.forEach((e, i) => {

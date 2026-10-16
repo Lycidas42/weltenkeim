@@ -23,7 +23,7 @@ MANNEQUIN = os.path.join(RAW, 'Universal_Animation_Library_2_Standard_', 'Univer
 # Arten: Farben (sRGB-Hex) und Formen. light = Bauch/Schnauze/Schwanzspitze, dark = Pfoten/Ohrspitzen/Nase.
 ART = {
     'fox': {'file': 'Foxfolk.glb', 'fur': 'c96a33', 'light': 'f6ecdc', 'dark': '3d2c25',
-            'snout': (0.078, 0.30), 'ears': {'r': 0.10, 'h': 0.24, 'spread': 0.085}, 'tail': 'bushy', 'ruff': True, 'iris': 'c98a2a', 'brow': 'e9c79a', 'cup': '4a3328', 'tear': True},
+            'snout': (0.078, 0.25), 'ears': {'r': 0.10, 'h': 0.24, 'spread': 0.085}, 'tail': 'bushy', 'ruff': True, 'iris': 'c98a2a', 'brow': 'e9c79a', 'cup': '4a3328', 'tear': True},
     'bear': {'file': 'Bearfolk.glb', 'fur': '6a4530', 'light': 'c9a27a', 'dark': '2e2019', 'belly': 1.25, 'limbs': 1.4, 'legs': 1.12, 'head': 1.18,
              'snout': (0.10, 0.12), 'ears': {'round': 0.065}, 'tail': 'stub'},
     # weitere Arten: Hase (lange Ohren), Waschbär (Maske) …
@@ -153,7 +153,7 @@ def build(kind='fox', out=None):
     # Rumpf: als Profil entlang der Wirbelsäule, siehe unten nach loft()
     hk, lk, gk = A.get('head', 1.0), A.get('limbs', 1.0), A.get('legs', 1.0)
     hp = lambda x, y, z: (x * hk, y * hk, 1.76 + (z - 1.76) * hk)   # Punkt am Kopf, mit der Kopfgröße skaliert
-    ellip(hp(0, 0.01, 1.785), (0.20 * hk, 0.165 * hk, 0.15 * hk)); ellip((0, -0.06, 1.70), (0.105 * hk, 0.12 * hk, 0.09 * hk))     # Kopf (oben breit), Wangen schmaler: Dreieck zur Schnauze
+    ellip(hp(0, -0.005, 1.78), (0.20 * hk, 0.14 * hk, 0.138 * hk)); ellip(hp(0, -0.085, 1.765), (0.1 * hk, 0.08 * hk, 0.07 * hk)); ellip(hp(0, -0.075, 1.605), (0.075 * hk, 0.085 * hk, 0.05 * hk)); ellip((0, -0.06, 1.70), (0.105 * hk, 0.12 * hk, 0.09 * hk))     # Kopf (oben breit, flacher Schädel), Stirnübergang zur Schnauze, Kinn/Kehle; Wangen schmaler: Dreieck zur Schnauze
     # Schnauze als flacher Keil (breiter als hoch): an der Stirn fast so breit wie der Augenabstand, spitz zur Nase.
     # Als runder Kegel sah sie von oben wie ein Rohr zwischen den Augen aus.
     sr, sl = A['snout']; cone(hp(0, -0.09, 1.715), hp(0, -0.10 - sl, 1.69), sr * 1.6 * hk, .27, .55)                           # Oberkiefer, stumpfes Ende
@@ -345,8 +345,9 @@ def build(kind='fox', out=None):
         ca.data[v.index].color = (*c, 1)
         # Fellmaske fürs Schalenfell der Nahsicht (0 = kein Fell, 1 = lang): erst nur das Gesicht
         if fur is not None:
-            f_ = smooth(1.56, 1.62, z) * (0.3 if (z > 1.88 and ax > 0.06) else 1.0)
-            f_ *= 1.0 if (ax > 0.08 and z < 1.73) else (0.35 if y < -0.13 else 0.6)            # Wangen lang, Schnauze kurz, Stirn mittel
+            f_ = smooth(1.5, 1.57, z) * (0.3 if (z > 1.88 and ax > 0.06) else 1.0)
+            jz_ = hp(0, 0, JAW_Z)[2]   # Wangen lang, Schnauze oben kurz, unter Schnauze und Kinn mittel (helles Kinnfell), Stirn mittel
+            f_ *= 1.0 if (ax > 0.08 and z < 1.73) else ((0.35 if z > jz_ + 0.012 else 0.6) if y < -0.13 else 0.6)
             # Hals rundum und Brustlatz (nur vorn am Rumpf, nicht an den Armen)
             f_ = max(f_, smooth(1.44, 1.5, z) * smooth(1.66, 1.6, z) * smooth(0.2, 0.14, ax) * .7, belly * smooth(1.12, 1.2, z) * .9)
             for s_ in (1, -1):
@@ -413,7 +414,7 @@ def build(kind='fox', out=None):
              # Unterkiefer am Kieferknochen (öffnet sich im Spiel), dahinter der dunkle Mundraum am Kopf
              # Unterkiefer als Keil unter der Schnauze, vorn schmal; dazwischen der dunkle Mundraum, auf dem Kiefer die Zunge,
              # oben zwei kleine Eckzähne: geöffnet sieht man ein Maul statt eines Klotzes
-             part('Jaw', hp(0, -0.10, JAW_Z - 0.026), hp(0, -0.10 - sl * .8, JAW_Z - 0.004), sr * .95 * hk, .42, .5, A['light'], .8, 'jaw'),
+             part('Jaw', hp(0, -0.09, JAW_Z - 0.03), hp(0, -0.10 - sl * .8, JAW_Z - 0.006), sr * 1.0 * hk, .42, .72, A['light'], .8, 'jaw'),
              part('Tongue', hp(0, -0.12, JAW_Z - 0.008), hp(0, -0.10 - sl * .74, JAW_Z + 0.004), sr * .55 * hk, .55, .3, 'c4636a', .5, 'jaw'),
              part('Mouth', hp(0, -0.11, JAW_Z - 0.012), hp(0, -0.10 - sl * .87, JAW_Z + 0.008), sr * .7 * hk, .35, .35, '3a1c1a', .7),
              *[part('Fang' + k, hp(sx * 0.02, -0.10 - sl * .8, JAW_Z + 0.014), hp(sx * 0.02, -0.10 - sl * .79, JAW_Z - 0.006), 0.0055 * hk, .1, 1, 'f2ede2', .3) for sx, k in ((1, 'L'), (-1, 'R'))],

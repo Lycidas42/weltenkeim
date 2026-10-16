@@ -150,6 +150,10 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
   dem Ellbogen, Beine ab dem Knie) statt Handschuhen. Rumpf ebenfalls als Profil entlang der Wirbelsäule (Becken, schlanke Taille, gewölbte
   Brust mit Fellbausch, Schultern, Hals); weißer Brustlatz, nach unten schmaler; Schalenfell auch an Hals und Brustlatz;
   Schwanz als durchgehendes Profil statt Kugelkette.
+- **Kopf von der Seite:** Schädel flacher und kürzer nach hinten, Übergang Stirn–Schnauze, Kinn und Kehle unter dem
+  kräftigeren Unterkiefer; Schnauze kürzer (0,25); Kinnfell. Falle: Animationen ohne Spur für Kopf/Hals (beim Export
+  weggefallen, weil unverändert) setzen den Knochen nicht neu, Zusatzdrehungen in `face.js` summierten sich dann auf
+  (Kopf drehte sich beim Dösen); jetzt wird vom Stand vor der letzten Zusatzdrehung gerechnet.
 - **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Fell auf der Stirn noch körnig,
   Geräusche.
 - **Lokal testen:** Läuft kein Server, zeigt der Service Worker den letzten Stand aus dem Cache (sieht aus wie „alt“).
