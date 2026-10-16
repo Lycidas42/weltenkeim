@@ -147,7 +147,9 @@ Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
 - **Körper (16.10., Abend):** Gliedmaßen als Profile entlang der Knochen (`loft` im Bauskript) statt Röhren:
   kräftige Schulter, Unterarm mit Fellbausch, Pfote mit Fingern an den Fingerknochen; Oberschenkel massig, schlankes
   Knie, Wade, Sprunggelenk, lange Hinterpfote mit Zehenballen. Schwarzbraune „Strümpfe“ mit weichem Verlauf (Arme ab
-  dem Ellbogen, Beine ab dem Knie) statt Handschuhen. Als Nächstes: Oberkörper (Brustlatz, Taille) und Brustfell.
+  dem Ellbogen, Beine ab dem Knie) statt Handschuhen. Rumpf ebenfalls als Profil entlang der Wirbelsäule (Becken, schlanke Taille, gewölbte
+  Brust mit Fellbausch, Schultern, Hals); weißer Brustlatz, nach unten schmaler; Schalenfell auch an Hals und Brustlatz;
+  Schwanz als durchgehendes Profil statt Kugelkette.
 - **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Fell auf der Stirn noch körnig,
   Geräusche.
 - **Lokal testen:** Läuft kein Server, zeigt der Service Worker den letzten Stand aus dem Cache (sieht aus wie „alt“).

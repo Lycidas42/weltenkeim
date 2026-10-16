@@ -150,8 +150,7 @@ def build(kind='fox', out=None):
         o.location = base + d / 2; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized()); parts.append(o)
     k = A.get('belly', 1.0)
     # Bauch endet über den Oberschenkeln, darunter ein schmales Becken: sonst wachsen Bauch und Beine zu einem Rock zusammen
-    ellip((0, 0.01, 1.22), (0.21 * k, 0.18 * k, 0.26)); ellip((0, -0.01, 1.40), (0.20 * k, 0.16 * k, 0.14)); ellip((0, 0, 1.55), (0.09, 0.09, 0.08))  # Bauch, Brust, Hals
-    ellip((0, 0.02, 0.99), (0.16 * k, 0.14 * k, 0.09))                                                                           # Becken
+    # Rumpf: als Profil entlang der Wirbelsäule, siehe unten nach loft()
     hk, lk, gk = A.get('head', 1.0), A.get('limbs', 1.0), A.get('legs', 1.0)
     hp = lambda x, y, z: (x * hk, y * hk, 1.76 + (z - 1.76) * hk)   # Punkt am Kopf, mit der Kopfgröße skaliert
     ellip(hp(0, 0.01, 1.785), (0.20 * hk, 0.165 * hk, 0.15 * hk)); ellip((0, -0.06, 1.70), (0.105 * hk, 0.12 * hk, 0.09 * hk))     # Kopf (oben breit), Wangen schmaler: Dreieck zur Schnauze
@@ -174,14 +173,21 @@ def build(kind='fox', out=None):
         else: cone(hp(s * 0.10, 0.01, 1.88), hp(s * (0.10 + E['spread']), 0.03, 1.88 + E['h']), E['r'] * hk, .15, .55)  # flach wie ein echtes Ohr: Drehen sieht man
     # Gliedmaßen als Profile entlang der Knochen statt Röhren: prof = [(t, Breite, Tiefe, Versatz)] von a nach b,
     # Versatz in Blickrichtung (−y vorn, +y hinten); dazwischen dicht überlappende Ellipsoide, die das Verschmelzen glättet
-    def loft(a, b, prof, side_ax='x'):
+    def loft(a, b, prof, side_ax='x', vr=None):  # vr: Länge der Ellipsoide entlang der Achse als Anteil (Rumpf: kurz, sonst bauchig an den Enden)
         a, b = Vector(a), Vector(b); L = (b - a).length; n = max(6, int(L / 0.022))
         for i in range(n + 1):
             t = i / n; k = next(j for j in range(len(prof) - 1) if prof[j][0] <= t <= prof[j + 1][0] or j == len(prof) - 2)
             (t0, w0, d0, o0), (t1, w1, d1, o1) = prof[k], prof[k + 1]; u = smooth(0, 1, (t - t0) / max(1e-6, t1 - t0))
             w, dp, o = w0 + (w1 - w0) * u, d0 + (d1 - d0) * u, o0 + (o1 - o0) * u
-            c = a + (b - a) * t + Vector((0, o, 0)); r = max(w, dp)
+            c = a + (b - a) * t + Vector((0, o, 0)); r = max(w, dp) * (vr or 1)
             ellip(c, (w, dp, r) if side_ax == 'x' else (r, dp, w), 16)
+    # Rumpf von unten nach oben: Becken, schlanke Taille, gewölbte Brust (vorn), runde Schultern, schlanker Hals
+    # (t, Breite, Tiefe, Versatz: − = nach vorn); dazu ein Fellbausch vorn auf der Brust
+    loft((0, 0.03, 0.93), (0, 0.0, 1.62), [(0, .16 * k, .14 * k, 0.0), (.1, .175 * k, .15 * k, 0.005), (.29, .155 * k, .135 * k, 0.0), (.49, .185 * k, .165 * k, -0.018),
+                                           (.65, .205 * k, .175 * k, -0.03), (.78, .2 * k, .145 * k, -0.012), (.87, .115, .105, 0.0), (1, .09, .088, 0.0)], 'x', .55)
+    ellip((0, -0.085, 1.35), (0.13 * k, 0.095 * k, 0.12), 24)
+    T_ = TAILS[A['tail']]  # Schwanz als durchgehendes Profil durch die Stützpunkte (sonst wie aufgefädelte Kugeln)
+    for (x0, y0, z0, r0), (x1, y1, z1, r1) in zip(T_, T_[1:]): loft((x0, y0, z0), (x1, y1, z1), [(0, r0 * .9, r0, 0), (1, r1 * .9, r1, 0)])
     for s in ('l', 'r'):
         sx = 1 if s == 'l' else -1
         ua, la, hd = B['upperarm_' + s], B['lowerarm_' + s], B['hand_' + s]
@@ -203,7 +209,6 @@ def build(kind='fox', out=None):
         # Hinterpfote: lang, vorn auf den Zehen, mit vier Zehenballen
         ellip((ft[0].x, -0.07, 0.045), (0.06 * gk, 0.135 * gk, 0.044 * gk), 20)
         for zx, zy in ((-0.032, -0.165), (-0.011, -0.183), (0.011, -0.183), (0.032, -0.165)): ellip((ft[0].x + zx * gk, zy, 0.03), (0.021 * gk, 0.03 * gk, 0.026 * gk), 12)
-    for x, y, z, r in TAILS[A['tail']]: ellip((x, y, z), (r * .9, r, r), 20)
 
     bpy.ops.object.select_all(action='DESELECT')
     for o in parts: o.select_set(True)
@@ -302,7 +307,9 @@ def build(kind='fox', out=None):
     ca = me.color_attributes['Col']; fur = me.attributes['_FUR'] if fur is not None else None  # nach dem Anlegen neu holen (Verweise werden ungültig)
     for v in me.vertices:
         x, y, z = v.co; ax = abs(x)
-        belly = smooth(1.15, .8, (x / .135) ** 2 + ((z - 1.22) / .27) ** 2) * smooth(-0.03, -0.11, y)
+        # Brustlatz: weiß von der Kehle über die Brust, zum Bauch hin schmaler (Breite bw je Höhe)
+        bw = 0.055 if z < 1.1 else (0.055 + (z - 1.1) / 0.2 * 0.045 if z < 1.3 else min(0.12, 0.1 + (z - 1.3) / 0.2 * 0.02))
+        belly = smooth(bw + 0.018, bw - 0.012, ax) * smooth(-0.02, -0.07, y) * smooth(.95, 1.0, z) * smooth(1.66, 1.6, z)
         muzzle = smooth(-0.12, -0.17, y) * smooth(1.70, 1.675, z) * smooth(1.58, 1.62, z)          # Unterseite der Schnauze, oben bleibt Fell
         cheek = smooth(1.0, .55, ((ax - .085) / .075) ** 2 + ((y + .09) / .1) ** 2 + ((z - 1.665) / .065) ** 2)  # Wangenfell
         throat = smooth(1.0, .6, (x / .11) ** 2 + ((z - 1.56) / .12) ** 2) * smooth(-0.0, -0.07, y)     # Kehle bis zum Unterkiefer
@@ -340,6 +347,8 @@ def build(kind='fox', out=None):
         if fur is not None:
             f_ = smooth(1.56, 1.62, z) * (0.3 if (z > 1.88 and ax > 0.06) else 1.0)
             f_ *= 1.0 if (ax > 0.08 and z < 1.73) else (0.35 if y < -0.13 else 0.6)            # Wangen lang, Schnauze kurz, Stirn mittel
+            # Hals rundum und Brustlatz (nur vorn am Rumpf, nicht an den Armen)
+            f_ = max(f_, smooth(1.44, 1.5, z) * smooth(1.66, 1.6, z) * smooth(0.2, 0.14, ax) * .7, belly * smooth(1.12, 1.2, z) * .9)
             for s_ in (1, -1):
                 ex_, ey_, ez_ = hp(EY['x'] * s_, EY['y'], EY['z']); f_ *= smooth(1.0, 2.2, ((x - ex_) / 0.04) ** 2 + ((z - ez_) / 0.032) ** 2 + ((y - ey_) / 0.06) ** 2)
             f_ *= smooth(-0.10 - sl * .97, -0.10 - sl * .85, y)                                                    # Nasenspitze frei
