@@ -13,7 +13,7 @@ import { surfaceAt } from '../world/terrain.js';
 
 // Ankerpunkte: [Knochen, x, y, z]; Versatz in Einheiten der Tierhöhe im Raum des Tiers (+Z vorn, +Y oben).
 // Die Werte je Gestalt stehen im Theme (anchors), dies ist der Rückfall für das Quaternius-Skelett.
-const ANCH_DEF = { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], chest: ['Torso3', 0, -.02, .02], tail: ['Tail8', 0, -.01, -.07] };
+const ANCH_DEF = { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], chest: ['Torso3', 0, -.02, .02], girth: ['Torso', 0, -.12, 0], tail: ['Tail8', 0, -.01, -.07] };
 const off = new THREE.Vector3();
 function bone(name) {
   if (!foxModel) return null; const u = foxModel.userData, c = u.bones || (u.bones = {});
@@ -63,8 +63,24 @@ function resetOver() { for (const k in layers) delete layers[k]; touched = []; }
 // Last auf dem Rücken: Plätze links und rechts (wie Satteltaschen), darüber gestapelt. Versatz wie bei den Ankern.
 const BACK_SLOTS = [[.13, -.02, .06], [-.13, -.02, .06], [.13, -.02, -.12], [-.13, -.02, -.12], [0, .08, -.03]];
 const SACK = 1.9, CRATE = .95;
-const backItems = BACK_SLOTS.map((_, i) => { const o = shadowify(model(i === 4 ? 'prop.crate' : 'prop.sack').scene.clone(true)); o.visible = false; scene.add(o); return o; });
-const back = { n: 0, shake: 0 };
+// Jeder Platz hält einen Sack (oben eine Kiste) oder ein Bündel Stämme; welches, steht in back.kinds (Ware je Platz)
+const barkB = new THREE.MeshStandardMaterial({ color: 0x7a5434, roughness: .95 }), cutB = new THREE.MeshStandardMaterial({ color: 0xd8b98a, roughness: .9 }), ropeB = new THREE.MeshStandardMaterial({ color: 0xc9b07a, roughness: 1 });
+function logBundle() { // drei Stämme längs zum Körper, zweimal geschnürt
+  const g = new THREE.Group();
+  for (const [x, y] of [[-.026, 0], [.026, 0], [0, .044]]) {
+    const l = new THREE.Mesh(new THREE.CylinderGeometry(.027, .029, .26, 7), barkB); l.rotation.x = Math.PI / 2; l.position.set(x, y, 0); l.castShadow = true; g.add(l);
+    for (const sz of [-1, 1]) { const c = new THREE.Mesh(new THREE.CircleGeometry(.027, 7), cutB); c.position.set(x, y, sz * .131); c.rotation.y = sz > 0 ? 0 : Math.PI; g.add(c); }
+  }
+  for (const z of [-.07, .07]) { const r = new THREE.Mesh(new THREE.TorusGeometry(.06, .006, 4, 12), ropeB); r.position.set(0, .015, z); g.add(r); }
+  return g;
+}
+const backItems = BACK_SLOTS.map((_, i) => {
+  const o = new THREE.Group(), goods = shadowify(model(i === 4 ? 'prop.crate' : 'prop.sack').scene.clone(true)), logs = logBundle();
+  if (i === 4) logs.scale.setScalar(SACK / CRATE); else logs.position.y = -.035; // an der Seite hängt das Bündel etwas tiefer
+  o.add(goods, logs); o.userData.goods = goods; o.userData.logs = logs; o.visible = false; scene.add(o); return o;
+});
+function itemKind(i, kind) { const o = backItems[i]; o.userData.goods.visible = kind !== 'logs'; o.userData.logs.visible = kind === 'logs'; }
+const back = { n: 0, shake: 0, kinds: [] };
 const bp = new THREE.Vector3(), bq = new THREE.Quaternion(), bTilt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 // Sitzplatz Nummer i für einen Reiter (bei zwei Plätzen vorn und hinten auf dem Rücken)
 function seat(i, n, out) { anchor('back', out); if (n > 1) out.add(off.set(0, 0, (i ? -.13 : .1) * CREATURES[fox.kind].h).applyQuaternion(foxPivot.quaternion)); out.y += .03; return out; }
@@ -100,8 +116,9 @@ function updateBack(dt, t) {
 }
 // eine Ware vom Maul in den nächsten freien Platz auf dem Rücken werfen
 const mp = new THREE.Vector3();
-function tossOnBack(done, from) {
+function tossOnBack(done, from, kind) {
   const i = back.n + flyers.filter(f => f.toBack).length; if (i >= backItems.length) { if (done) done(); return; }
+  back.kinds[i] = kind; itemKind(i, kind);
   const o = backItems[i]; o.userData.flying = true; if (from) mp.copy(from); else anchor('mouth', mp);
   fly(o, mp, v => backSlot(i, v), .42, .55 * CREATURES[fox.kind].h, () => { back.n = Math.max(back.n, i + 1); if (done) done(); }, itemScale(i));
   flyers[flyers.length - 1].toBack = true;
@@ -204,8 +221,8 @@ for (const sx of [-1, 1]) {
 mk(new THREE.BoxGeometry(.31, .012, .05), strapM, 0, .045, -.03, bags); // Gurt über den Rücken
 bags.visible = false; scene.add(bags);
 // Geschirr: Brustgurt; Karren: Kasten auf zwei Rädern mit Deichsel, die am Geschirr hängt
-const harness = new THREE.Group();
-mk(new THREE.TorusGeometry(.13, .016, 6, 18), strapM, 0, 0, 0, harness).rotation.y = Math.PI / 2;
+const harness = new THREE.Group(); // Bauchgurt quer um den Körper
+mk(new THREE.TorusGeometry(.13, .016, 6, 18), strapM, 0, 0, 0, harness);
 harness.visible = false; scene.add(harness);
 const cart = new THREE.Group(), cartBox = new THREE.Group(); cart.add(cartBox);
 mk(new THREE.BoxGeometry(.5, .04, .55), woodM, 0, .22, 0, cartBox);
@@ -249,9 +266,9 @@ function updateGear(dt) {
   cart.visible = towed === cart; plow.visible = towed === plow; harness.visible = !!towed;
   for (const s of shafts) s.visible = !!towed;
   if (towed) {
-    anchor('chest', gp); harness.position.copy(gp); harness.quaternion.copy(foxPivot.quaternion); harness.scale.setScalar(k);
+    anchor('girth', gp); harness.position.copy(gp); harness.quaternion.copy(foxPivot.quaternion); harness.scale.set(k * (C.backW || 1), k, k);
     // der Karren folgt wie ein Anhänger: Er bleibt im festen Abstand hinter dem Geschirr und dreht sich zur Zugrichtung
-    const len = k * 1.15, fx = Math.sin(fox.vh), fz = Math.cos(fox.vh);
+    const len = k * (C.tow || .95), fx = Math.sin(fox.vh), fz = Math.cos(fox.vh); // Abstand Gurt – Karrenmitte: der Karren läuft hinter dem Hinterteil
     if (!cartInit) { cartPos.set(gp.x - fx * len, 0, gp.z - fz * len); cartInit = true; }
     cartFwd.set(gp.x - cartPos.x, 0, gp.z - cartPos.z); const d = cartFwd.length() || 1; cartFwd.multiplyScalar(1 / d);
     const before = cartPos.clone(); cartPos.set(gp.x - cartFwd.x * len, 0, gp.z - cartFwd.z * len);
@@ -262,7 +279,7 @@ function updateGear(dt) {
     gear.towX = cartPos.x; gear.towZ = cartPos.z; // wo der Pflug gerade furcht (ai.js)
     for (const s of shafts) { // Deichsel vom Karren zum Geschirr
       const a = (towed === cart ? new THREE.Vector3(s.userData.sx * .2, .3, .26) : new THREE.Vector3(s.userData.sx * .03, .24, .3)).multiplyScalar(k * .95).applyAxisAngle(Y, cartH).add(towed.position);
-      const b = new THREE.Vector3(s.userData.sx * .13, -.02, 0).multiplyScalar(k).applyQuaternion(foxPivot.quaternion).add(gp);
+      const b = new THREE.Vector3(s.userData.sx * .15 * (C.backW || 1), -.03, 0).multiplyScalar(k).applyQuaternion(foxPivot.quaternion).add(gp); // außen am Gurt
       s.position.copy(a).add(b).multiplyScalar(.5); s.quaternion.setFromUnitVectors(Y, b.sub(a).normalize()); s.scale.set(k, a.distanceTo(s.position) * 2, k);
     }
   } else cartInit = false;

@@ -121,7 +121,7 @@ function startLoad(v, units, take) {
   const bx = withCart ? fox.x - Math.sin(fox.h) * C.h * 1.15 : fox.x, bz = withCart ? fox.z - Math.cos(fox.h) * C.h * 1.15 : fox.z; // wo die Last hinkommt
   helpLoad(v, {
     x: bx + sx * r * (withCart ? 1.1 : 1), z: bz + sz * r * (withCart ? 1.1 : 1), fx: bx, fz: bz, n: units.length, res: units[0],
-    onItem: () => { const k = units.shift(); if (k && take(k)) { fox.carryGoods[k] = (fox.carryGoods[k] || 0) + 1; tossOnBack(null, vHand.set(v.x, v.y + .5, v.z)); } },
+    onItem: () => { const k = units.shift(); if (k && take(k)) { fox.carryGoods[k] = (fox.carryGoods[k] || 0) + 1; tossOnBack(null, vHand.set(v.x, v.y + .5, v.z), k); } },
     onDone: () => { fox.loadDone = true; fox.loader = null; }, onAbort: () => { fox.loadDone = true; fox.loader = null; },
   });
 }
@@ -311,7 +311,7 @@ function updateFox(dt, t) {
     case 'toss': { // Ware ins Maul nehmen (Fressen-Bewegung), mit einem Kopfwurf auf den Rücken
       anim(fox.timer > .55 ? 'eat' : 'idle'); const before = fox.timer; fox.timer -= dt;
       if (before > .9 && fox.timer <= .9) { const k = fox.units[0]; if (k && fox.unitTake(k)) fox.mouthSack = true; else fox.units.length = 0; }
-      if (before > .45 && fox.timer <= .45 && fox.mouthSack) { fox.mouthSack = false; const k = fox.units.shift(); fox.carryGoods[k] = (fox.carryGoods[k] || 0) + 1; tossOnBack(); }
+      if (before > .45 && fox.timer <= .45 && fox.mouthSack) { fox.mouthSack = false; const k = fox.units.shift(); fox.carryGoods[k] = (fox.carryGoods[k] || 0) + 1; tossOnBack(null, null, k); }
       if (fox.timer <= 0) { if (fox.units.length) fox.timer = TOSS_T; else haulOn(); }
       break;
     }
