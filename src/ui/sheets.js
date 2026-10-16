@@ -153,6 +153,15 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeTimeMenu(); });
 // Name oben: erster Tipp startet die Nahsicht, ein weiterer öffnet den Charakterbogen
 $('btnFox').addEventListener('click', () => { if (observe && $('sheetFox').hidden) openSheet('sheetFox'); else if (!observe) setObserve(true); else closeSheets(); });
 $('btnInfo').addEventListener('click', () => openSheet('sheetInfo'));
+// Obere Leisten ein- und ausklappen (am Handy verdecken sie viel vom Bild); die Wahl merkt sich das Gerät
+const HUD_KEY = 'wk-hud-mini';
+function setHudMini(on) {
+  document.querySelector('header.top').classList.toggle('mini', on); $('app').classList.toggle('hud-mini', on); // eingeklappt auch ohne Hinweistext
+  $('btnHud').setAttribute('aria-expanded', String(!on)); $('btnHud').setAttribute('aria-label', on ? 'Leisten ausklappen' : 'Leisten einklappen');
+  try { localStorage.setItem(HUD_KEY, on ? '1' : '0'); } catch (err) {}
+}
+$('btnHud').addEventListener('click', () => setHudMini(!document.querySelector('header.top').classList.contains('mini')));
+try { if (localStorage.getItem(HUD_KEY) === '1') setHudMini(true); } catch (err) {}
 // Folgen: die Kamera bleibt beim Tiergeist, bis der Chip oben oder der Knopf im Panel es beendet
 let follow = false;
 function setFollow(on) { follow = on; if (!on) observe = false; renderFollow(); }
