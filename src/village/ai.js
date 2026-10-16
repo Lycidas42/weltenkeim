@@ -249,8 +249,18 @@ function startSaw(v) {
   const hs = v.hut, sw = localPt(hs, .28, .12); v.h = Math.atan2(sw.x - v.x, sw.z - v.z);
   if (hs.logs >= 1) { hs.logs--; v.carry = 1; v.state = 'saw'; v.timer = 2.4; } else idle(v, 1); // wartet auf Stämme
 }
+// Ein Bewohner belädt die Kreatur (kreatur.md 3.13 B): geht neben sie und hebt die Waren nacheinander auf ihren Rücken.
+// job = { x, z (wo er steht), fx, fz (wo die Kreatur liegt), n, res, onItem(), onDone(), onAbort() }
+const LOAD_T = 1.1;
+function helpLoad(v, job) {
+  if (v.tree) { v.tree.reserved = null; v.tree = null; }
+  v.load = job; walk(v, job.x, job.z, 'loadFox');
+}
+// abgebrochen (gegriffen, geflohen, eingeschlafen): die Kreatur wartet nicht länger
+function dropLoad(v) { const j = v.load; if (!j) return; v.load = null; v.carry = 0; if (j.onAbort) j.onAbort(); }
 function arrive(v) {
   switch (v.next) {
+    case 'loadFox': if (v.load) { v.state = 'loadFox'; v.timer = LOAD_T; v.carry = RES[v.load.res] ? RES[v.load.res][2] : 8; v.h = Math.atan2(v.load.fx - v.x, v.load.fz - v.z); } else idle(v, .3); break;
     case 'tree': if (v.tree && v.tree.alive) { v.state = 'chop'; v.timer = 2.4; v.cp = 0; v.h = Math.atan2(v.tree.x - v.x, v.tree.z - v.z); } else { if (v.tree) v.tree.reserved = null; v.tree = null; idle(v, .4); } break;
     case 'store': v.carry = 0; addLogs(1, v.x, v.y + .2, v.z); idle(v, .4); break;
     case 'saw': if (v.role === 'sawyer' && v.hut) startSaw(v); else idle(v, .4); break;
@@ -313,6 +323,7 @@ function arrive(v) {
   }
 }
 function updateVillager(v, dt, t) {
+  if (v.load && !(v.state === 'loadFox' || (v.state === 'walk' && v.next === 'loadFox'))) dropLoad(v);
   if (v.haste > 0) v.haste -= dt;
   if (v.cheer > 0) v.cheer -= dt;
   const sp = .95 * (v.haste > 0 ? 2.3 : 1) * (v.stalk && v.state === 'walk' && v.next === 'aim' ? .55 : 1); // anpirschen: langsamer
@@ -392,6 +403,13 @@ function updateVillager(v, dt, t) {
       break;
     }
     case 'sleep': if (S.hour >= v.wake && S.hour < BED) idle(v, .2 + Math.random()); break;
+    case 'loadFox': { // anheben, über den Rücken schwingen, ablegen; dann das nächste Stück
+      const j = v.load; if (!j) { idle(v, .3); break; }
+      v.h = Math.atan2(j.fx - v.x, j.fz - v.z); v.timer -= dt;
+      if (v.timer < LOAD_T * .35 && v.carry) { v.carry = 0; j.onItem(); }
+      if (v.timer <= 0) { if (--j.n > 0) { v.timer = LOAD_T; v.carry = RES[j.res] ? RES[j.res][2] : 8; } else { v.load = null; j.onDone(); idle(v, .5); } }
+      break;
+    }
     case 'flee': v.timer -= dt; if (moveFree(v, v.tx, v.tz, 2.2 * dt, navV) === true || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
     case 'grabbed': return;
@@ -420,4 +438,4 @@ const wish = { kind: null, t: 0, dur: 90, by: null, cool: 25, checkT: 0, at: SHR
 const begSpot = () => shrinePt(rnd(.25), 1.95 + Math.random() * .15);
 function goBeg(v) { const p = begSpot(); walk(v, p.x, p.z, 'beg'); }
 
-export { JOB, MILL_BUF, REEL_T, arrows, goBeg, hauling, idle, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };
+export { JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, goBeg, hauling, helpLoad, idle, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };

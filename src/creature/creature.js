@@ -9,6 +9,7 @@ import { loadModel, model, shadowify } from '../assets/models.js';
 import { TK } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H } from '../world/trees.js';
+import { surfaceAt } from '../world/terrain.js';
 
 const ANIM_PAT = { idle: /^Idle$/, idle2: /^Idle_2$/, eat: /^Eating$/, walk: /^Walk$/, run: /^Gallop$/, attack: /^Attack/, hit: /^Idle_HitReact/, jump: /^Jump/ };
 // fehlt eine Animation, wird eine vorhandene mit anderem Tempo genutzt
@@ -41,7 +42,7 @@ function buildRig(id, gltf, fur = false) {
   if (acts.walk) acts.walk.timeScale = C.ws;
   if (C.rest && acts.idle) for (const [k, clip] of Object.entries(buildPoseClips(model, acts.idle.getClip(), C.rest))) acts[k] = mixer.clipAction(clip);
   if (C.react && acts.idle) for (const [k, clip] of Object.entries(buildReactClips(model, acts.idle.getClip()))) acts[k] = mixer.clipAction(clip);
-  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'cast', 'praise', 'scold']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
+  for (const k of ['hit', 'jump', 'lieDown', 'standUp', 'sitDown', 'cast', 'praise', 'scold']) if (acts[k]) { acts[k].setLoop(THREE.LoopOnce); acts[k].clampWhenFinished = true; }
   // Augen in der Idle-Pose ausrichten, weil der Kopf dort anders steht als in der Ruhepose
   if (C.eyes && head && acts.idle && !model.userData.eyes) { model.userData.eyes = true; acts.idle.reset().play(); mixer.update(0); addEyes(model, head, C.eyes); acts.idle.stop(); }
   return { model, mixer, acts, cur: null, id, dims };
@@ -107,6 +108,8 @@ const POSES = {
 const FOX_HIP = 1.07; // Beckenhöhe des Fuchses, auf die sich pos bezieht
 const NO_POSE = { rot: {}, pos: {} };
 const withPose = (p, rot = {}) => ({ rot: Object.assign({}, p.rot, rot), pos: p.pos });
+// Aufladen eines Wunders (kreatur.md 3.13 C): liegen wie eine Sphinx, Kopf erhoben, Blick nach oben, Schwanz um den Körper
+POSES.sit = withPose(POSES.paw, { Neck1: [-38, 0, 0], Head: [-12, 0, 0], Tail1: [-28, 0, 0], Tail2: [-10, 40, 0], Tail3: [0, 40, 0], Tail5: [0, 35, 0], Tail7: [0, 30, 0] });
 // keys: [{ t, pose }] -> AnimationClip, ausgehend von der ersten Frame der Basis-Animation
 function poseClip(model, baseClip, name, keys) {
   resetBones(model);
@@ -143,6 +146,8 @@ function buildPoseClips(model, baseClip, rest) {
     lieDown: poseClip(model, baseClip, 'lieDown', [{ t: 0, pose: NO_POSE }, { t: .9, pose: L }]),
     lie: poseClip(model, baseClip, 'lie', [{ t: 0, pose: L }, { t: 2.5, pose: withPose(L, { Head: [L.rot.Head[0] + 4, 14, 0] }) }, { t: 4, pose: withPose(L, { Head: [L.rot.Head[0] - 2, -10, 0] }) }, { t: 6, pose: L }]),
     standUp: poseClip(model, baseClip, 'standUp', [{ t: 0, pose: L }, { t: .7, pose: NO_POSE }]),
+    sitDown: poseClip(model, baseClip, 'sitDown', [{ t: 0, pose: NO_POSE }, { t: .7, pose: POSES.sit }]),
+    sit: poseClip(model, baseClip, 'sit', [{ t: 0, pose: POSES.sit }, { t: 1.5, pose: withPose(POSES.sit, { Neck1: [-42, 0, 0] }) }, { t: 3, pose: POSES.sit }]),
     cast: poseClip(model, baseClip, 'cast', [{ t: 0, pose: NO_POSE }, { t: .55, pose: R }, { t: 1.1, pose: withPose(R, { Head: [-28, 8, 0] }) }, { t: 1.7, pose: withPose(R, { Head: [-28, -8, 0] }) }, { t: 2.3, pose: NO_POSE }]),
   };
 }
@@ -258,7 +263,7 @@ const mouthQ = new THREE.Quaternion(), mouthZ = new THREE.Quaternion().setFromAx
 const mouthSack = shadowify(model('prop.sack').scene.clone(true)); mouthSack.visible = false; scene.add(mouthSack);
 function updateMouthTree() {
   mouthTrees.forEach(o => o.visible = false); mouthSack.visible = false;
-  if (fox.carryGoods && foxModel) { // Sack mit Waren im Maul
+  if (fox.mouthSack && foxModel) { // Sack mit Waren im Maul (danach liegt er auf dem Rücken, body.js)
     const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
     if (head) { head.getWorldPosition(mouthV); const fh = foxPivot.rotation.y; mouthV.x += Math.sin(fh) * C.h * .17; mouthV.z += Math.cos(fh) * C.h * .17; mouthV.y -= C.h * .2; mouthSack.position.copy(mouthV); mouthSack.rotation.set(0, fh, 0); mouthSack.scale.setScalar(1.5 * C.h / 1.45); mouthSack.visible = true; }
     return;
@@ -267,6 +272,7 @@ function updateMouthTree() {
   const C = CREATURES[fox.kind], head = foxModel.userData.head || (foxModel.userData.head = foxModel.getObjectByName(C.head || 'Head'));
   if (!head) return;
   const o = mouthTrees[fox.carryType || 0], s = ST * .55 * C.h / 1.45;
+  if (C.carry === 'drag') { dragTree(o, s, C); return; }
   head.getWorldPosition(mouthV); mouthF.set(Math.sin(foxPivot.rotation.y), 0, Math.cos(foxPivot.rotation.y));
   mouthV.addScaledVector(mouthF, C.h * .21).y -= C.h * .07;          // vor den Kopf, auf Maulhöhe
   // Krone auf die von der Kamera abgewandte Seite (mit etwas Trägheit, damit sie nicht hin und her springt)
@@ -276,6 +282,25 @@ function updateMouthTree() {
   o.quaternion.copy(mouthQ); o.scale.setScalar(s);
   o.position.copy(mouthV).addScaledVector(side, -TREE_H * s * .1 * cs); // Krone zeigt nach +x: das Maul packt den Stamm knapp über dem Wurzelende, die Krone liegt seitlich neben dem Kopf
   o.visible = true;
+}
+// Schleifen (kreatur.md 3.13 A): Das Maul packt den Stamm am Wurzelende, der Baum liegt schräg nach hinten und seitlich
+// neben dem Körper, die Krone schleift über den Boden. Die Krone liegt auf der von der Kamera abgewandten Seite.
+const dragUp = new THREE.Vector3(0, 1, 0), dragD = new THREE.Vector3(), dragS = new THREE.Vector3(), dragTip = new THREE.Vector3();
+function dragTree(o, s, C) {
+  const head = foxModel.userData.head; head.getWorldPosition(mouthV);
+  const fh = foxPivot.rotation.y; mouthF.set(Math.sin(fh), 0, Math.cos(fh)); dragS.set(Math.cos(fh), 0, -Math.sin(fh));
+  mouthV.addScaledVector(mouthF, C.h * .2).y -= C.h * .08;
+  const dc = dragS.x * (camera.position.x - fox.x) + dragS.z * (camera.position.z - fox.z);
+  if (Math.abs(dc) > 1) fox.crownSide = dc > 0 ? -1 : 1; const cs = fox.crownSide || 1;
+  // geschleift ist der Baum länger als das Tier: in der Länge stärker gestreckt als in der Breite, damit die Krone
+  // hinter dem Körper liegt und nicht den Kopf verdeckt
+  const kw = 1.4, kl = 4, L = TREE_H * s * kl * .9, drop = mouthV.y - surfaceAt(mouthV.x, mouthV.z) - .05;
+  const sy = Math.min(.95, Math.max(.1, drop / L)), yaw = .6 + Math.sin(performance.now() * .004) * .03; // leicht pendelnd
+  dragD.copy(mouthF).multiplyScalar(-Math.cos(yaw)).addScaledVector(dragS, cs * Math.sin(yaw)).multiplyScalar(Math.sqrt(1 - sy * sy)); dragD.y = -sy; dragD.normalize();
+  o.quaternion.setFromUnitVectors(dragUp, dragD); o.scale.set(s * kw, s * kl, s * kw);
+  o.position.copy(mouthV).addScaledVector(dragD, -TREE_H * s * kl * .05);
+  o.visible = true;
+  dragTip.copy(o.position).addScaledVector(dragD, L); fox.dragTip = dragTip; // dort schleift die Krone (Spur, Staub in ai.js)
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 

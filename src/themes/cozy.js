@@ -46,7 +46,9 @@ export default {
       skin: { name: 'Skin', roughness: .55, emissive: 0x3a1606, emissiveIntensity: .25 }, // warmer Schimmer, damit die Hand nicht blass wirkt
       nails: { name: 'Nails', roughness: .3 }, trim: { name: 'Trim', roughness: .35, metalness: .35 },
       sleeve: { name: 'Sleeve', roughness: .8 }, sleeveIn: { name: 'SleeveIn', roughness: 1 } } },
-    'creature.fox': { file: 'animals/Fox.glb', hd: 'animals/Fox_HD.glb', head: 'Head', react: true, ws: 1.1, rest: 'paw' },
+    // carry: 'drag' = Baum im Maul schleifen; anchors: Ankerpunkte [Knochen, x, y, z] in Tierhöhen (kreatur.md 3.13)
+    'creature.fox': { file: 'animals/Fox.glb', hd: 'animals/Fox_HD.glb', head: 'Head', react: true, ws: 1.1, rest: 'paw', carry: 'drag',
+      anchors: { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], tail: ['Tail8', 0, -.01, -.07] } },
     'creature.wolf': { file: 'animals/Wolf.glb', head: 'Head', ws: 1, rest: 'paw' },
     'creature.stag': { file: 'animals/Stag.glb', head: 'Head', ws: .9, rest: 'hoof' },
     'creature.bull': { file: 'animals/Bull.glb', head: 'Head', ws: .9, rest: 'hoof' },

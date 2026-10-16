@@ -7,7 +7,7 @@ import { clock } from '../core/render.js';
 import { ACT_LABEL } from './creature.js';
 
 // Erfahrung je Tätigkeit (S.cXp); Text für den Charakterbogen
-const XP = { tree: 'Bäume ins Lager gebracht', haul: 'Waren getragen', play: 'mit dem Dorf gespielt', mischief: 'Bäume umgeworfen' };
+const XP = { tree: 'Bäume ins Lager gebracht', haul: 'Waren getragen', play: 'mit dem Dorf gespielt', mischief: 'Bäume umgeworfen', sweep: 'Plätze gefegt' };
 const LEARN_MAX = 30, LOG_MAX = 10;
 if (!S.cXp || typeof S.cXp !== 'object') S.cXp = {};
 for (const k in XP) if (typeof S.cXp[k] !== 'number' || !isFinite(S.cXp[k]) || S.cXp[k] < 0) S.cXp[k] = 0;

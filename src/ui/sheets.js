@@ -267,7 +267,8 @@ function foxDoing() {
   switch (fox.state) {
     case 'walk':
       if (fox.next === 'shrine' && fox.morph) return `läuft zum Schrein, um die Gestalt ${CREATURES[fox.morph].label} anzunehmen`;
-      if (fox.next === 'store') return 'trägt einen Baum im Maul zum Lager';
+      if (fox.next === 'store') return CREATURES[fox.kind].carry === 'drag' ? 'schleift einen Baum im Maul zum Lager' : 'trägt einen Baum im Maul zum Lager';
+      if (fox.next === 'sweep') return 'läuft zum Schrein, um den Platz zu fegen';
       if (fox.next === 'haulPick' && fox.haul) return `läuft zur ${ROLES[fox.haul.hut.role].hut}, um Waren ins Lager zu tragen`;
       if (fox.next === 'haulLager' && fox.haul) return `läuft zum Lager, um Nachschub für die ${ROLES[fox.haul.hut.role].hut} zu holen`;
       if (fox.next === 'haulDeliver' && fox.carryGoods && fox.haul) return `trägt ${Object.keys(fox.carryGoods).map(k => resText(k, fox.carryGoods[k])).join(', ')} zur ${ROLES[fox.haul.hut.role].hut}`;
@@ -277,6 +278,12 @@ function foxDoing() {
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
     case 'play': return 'tollt über den Dorfplatz';
     case 'rest': return 'hat sich hingelegt und döst';
+    case 'toss': return 'nimmt Waren ins Maul und wirft sie sich auf den Rücken';
+    case 'waitLoad': return 'liegt still, während ein Bewohner Waren auflädt';
+    case 'shake': return 'schüttelt die Waren vom Rücken';
+    case 'sweep': return 'fegt mit dem Schwanz den Platz vor dem Schrein';
+    case 'ritual': return 'sammelt Kraft für ein Wunder';
+    case 'test': return 'zeigt eine Animation';
     case 'cast': return mind.log[0] && mind.log[0].kind === 'shrine' ? 'nimmt im Licht des Schreins die neue Gestalt an' : 'wirkt mit dir ein Wunder';
     case 'pickup': return 'hebt den gefällten Baum auf';
     case 'haulUp': return 'nimmt die Waren ins Maul';
@@ -310,4 +317,4 @@ $('foxForms').addEventListener('click', e => {
 });
 on('foxTransform', id => setCreature(id));
 
-export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };
+export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, setObserve, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

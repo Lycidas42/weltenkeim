@@ -64,7 +64,7 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 | Persönlichkeit je Gestalt | Startwerte, Lieblingsessen, Lieblingsspiel | 3.10 | 🟡 teilweise |
 | Erleben in der Welt | Nahsicht statt Porträt, Erziehen per Geste, „Warum?“, Charakterbogen mit Erfahrung und Lernchronik | 3.11 | ✅ vorhanden |
 | Zweibeinige Gestalt | aufrechtes Tier, das mit den Händen arbeitet und trägt | 3.12 | 🔵 geplant |
-| Handeln als Tier | Vierbeiner handeln mit Maul, Rücken, Schwanz; Bewohner beladen sie; Wunder als Ritual | 3.13 | 🔵 geplant |
+| Handeln als Tier | Vierbeiner handeln mit Maul, Rücken, Schwanz; Bewohner beladen sie; Wunder als Ritual | 3.13 | 🟡 Prototyp (Fuchs) |
 
 **Bewusst nicht vorgesehen** (⛔ verworfen, passt nicht zum Ton des Spiels):
 
@@ -388,7 +388,7 @@ nicht als Ersatz.
 
 ### 3.13 Handeln als Tier
 
-**Stand:** 🔵 geplant – Prototyp mit dem Fuchs auf Branch `claude/vierbeiner-test`
+**Stand:** 🟡 teilweise – Prototyp mit dem Fuchs auf Branch `claude/vierbeiner-test` (G 1)
 
 Die Zweibeiner (3.12) wirken zu menschlich. Die Vierbeiner bleiben Tiere und bekommen eigene Wege, um Bäume zu
 tragen, Bewohnern zu helfen und Wunder zu wirken. Leitgedanke: **Das Tier tut, was ein Tier mit seinem Körper
@@ -445,7 +445,24 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
 
 1. **Prototyp mit dem Fuchs** (Branch `claude/vierbeiner-test`): Baum im Maul schleifen, Last auf dem Rücken,
    Schwanz fegt; ein Bewohner belädt den Fuchs; Aufladepose und Schwanzbogen für den Regen. Dazu eine Testleiste
-   für Animationen und Handlungen im Charakterbogen.
+   für Animationen und Handlungen im Charakterbogen. 🟡 Umgesetzt:
+   - **Anker und Bewegungen:** `src/creature/body.js` mit Ankerpunkten aus dem Theme (`anchors`), Bewegungen der
+     Knochen in Ebenen über der laufenden Animation, Last auf dem Rücken, fliegenden Waren, Staub und Funken.
+   - **Maul:** Der Fuchs (`carry: 'drag'`) schleift den Baum am Wurzelende, schräg nach hinten neben dem Körper; die
+     Krone zieht eine Spur und Staub, er geht langsamer mit gesenktem Kopf.
+   - **Rücken:** Allein nimmt er bis zu 3 Waren nacheinander ins Maul und wirft sie mit einem Kopfwurf auf den Rücken
+     (Säcke wie Satteltaschen); am Ziel schüttelt er sie ab.
+   - **Schwanz:** neue Hilfe „Platz am Schrein fegen“ (selten, bringt etwas Glaube): Der Schwanz schwingt tief über
+     den Boden, Staub fliegt.
+   - **Bewohner:** Ist an der Hütte jemand frei, legt sich der Fuchs hin, ein Bewohner hebt Stück für Stück auf
+     seinen Rücken (eigene Pose); so trägt er bis zu 5 Waren.
+   - **Ritual:** `src/creature/ritual.js`: Sphinx-Pose mit erhobenem Kopf, Runenkreis am Boden, Funken ziehen zum
+     Fuchs, das Fell glimmt; dann bäumt er sich auf und zieht mit dem Schwanz einen Lichtbogen, das Licht fliegt zum
+     Ziel (wachsendes Feld, sonst junger Wald), dort regnet es. Kostet Glaube wie das Wunder der Hand. Bisher nur aus
+     der Testleiste.
+   - **Testleiste:** Charakterbogen → „Testen“: alle Animationen einzeln, dazu die fünf Handlungen.
+   - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), geschleifte Fichte wirkt noch steil,
+     Säcke ohne Geschirr, Ritual noch nicht im normalen Verhalten.
 2. Ankerpunkte und Verben für die übrigen Rassen.
 3. Ausrüstung aus den Werkstätten.
 4. Wunder durch die Kreatur zusammen mit dem Lernen (3.9).

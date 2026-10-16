@@ -9,7 +9,7 @@ import { groundAt } from './huts.js';
 import { smoothH } from '../world/nav.js';
 import { HIP_Y, LANTERN_C, ROD_TIP, SHO_Y, VS, chopPose, digPose, vAll, vAxe, vBasket, vBowAim, vBowBack, vBowDraw, vBread, vEggBasket, vEggs, vFlourSack, vGame, vGrainSack, vHats, vLantern, vLanternGlass, vLoafBasket, vLoaves, vMilk, vParts, vPlanks, vQuiver, vRod, vSapling, vShovel, vVeg, vVegTop, vWood, villagers } from './villagers.js';
 import { lV, lights } from './night.js';
-import { REEL_T } from './ai.js';
+import { LOAD_T, REEL_T } from './ai.js';
 import { FOOD_COL } from './food.js';
 
 // Jeder Bewohner besteht aus Teilen (Beine, Arme, Kopf, Werkzeug …), die hier je nach Tätigkeit gestellt werden
@@ -48,8 +48,11 @@ function renderVillagers(dt, t) {
     else if (v.state === 'grabbed' || v.state === 'falling') {
       const s = Math.sin(t * 16 + v.ph); roll = v.state === 'grabbed' ? Math.sin(t * 7 + v.ph) * .5 : t * 10;
       leg = s * .5; armA = -2.7 + s * .5; armB = -2.7 - s * .5; splay = .5;
+    } else if (v.state === 'loadFox') { // Ware vor dem Bauch, dann hoch über den Rücken der Kreatur heben
+      const u = 1 - v.timer / LOAD_T, up = smooth(.15, .6, u) * (1 - smooth(.8, 1, u));
+      armA = armB = -1.1 - up * 1.5; splay = .12; tilt = -.08 * up + .15 * (1 - up) * smooth(0, .15, u); leg = .15;
     } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
-    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw') { armA = armB = -1.1; splay = .12; }
+    if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw' && v.state !== 'loadFox') { armA = armB = -1.1; splay = .12; }
     const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
     if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
     if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
