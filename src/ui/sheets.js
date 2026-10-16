@@ -23,7 +23,7 @@ import { GROW_DAYS, days, food, portions } from '../village/food.js';
 
 let creatureLoading = null;
 async function setCreature(id) {
-  if (!CREATURES[id] || id === fox.kind || creatureLoading) return;
+  if (!CREATURES[id] || CREATURES[id].off || id === fox.kind || creatureLoading) return;
   creatureLoading = id; renderForms();
   try {
     const g = await loadCreature(id);
@@ -277,7 +277,7 @@ function renderFox() {
 // ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
 // Gestalten mit Fell-Modell und eigenen Reaktionen bekommen einen Stern
 const formLabel = id => CREATURES[id].label + (CREATURES[id].react ? ' ★' : '');
-$('foxForms').innerHTML = Object.entries(CREATURES).map(([id, c]) => `<button data-form="${id}"${c.react ? ' class="feat"' : ''}>${formLabel(id)}</button>`).join('');
+$('foxForms').innerHTML = Object.entries(CREATURES).filter(([, c]) => !c.off).map(([id, c]) => `<button data-form="${id}"${c.react ? ' class="feat"' : ''}>${formLabel(id)}</button>`).join('');
 // kurze Beschreibung des aktuellen Zustands für das Panel
 function foxDoing() {
   switch (fox.state) {

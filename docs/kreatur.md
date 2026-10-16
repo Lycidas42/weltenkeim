@@ -36,7 +36,7 @@ Black & White oder bei einem Tamagotchi. Daran misst sich jedes Feature der Krea
 ## 1. Ist-Stand
 
 - **Gestalten:** Fuchs (eigene Reaktionen; Fell-Modell vorhanden, derzeit nicht geladen), Wolf, Hirsch, Stier, Alpaka,
-  Katze; gewählt am Schrein (die Kreatur läuft hin und verwandelt sich). Name und Geschlecht im Charakterbogen
+  Katze (Katze und Alpaka vorerst abgeschaltet, `off` in `kinds.js`: noch zu unfertig); gewählt am Schrein (die Kreatur läuft hin und verwandelt sich). Name und Geschlecht im Charakterbogen
   (Start: Fenja, weiblich). `S.creature`, `S.name`, `S.gender`.
 - **Neigungen:** `S.w` mit `help` (Helfen), `play` (Spielen), `mischief` (Unfug); bestimmen, was sie aus eigenem Antrieb tut.
 - **Tätigkeiten:** Baum fällen und ins Lager bringen (Helfen), Waren tragen (bis zu 3 Stück im Maul: von Hütten ins
