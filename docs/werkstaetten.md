@@ -77,7 +77,12 @@ schiebt sie vorher weg (`kreatur.md` 3.13).
 - Liegen Steine im Lager, holen **freie Bewohner** (Träger) einzeln einen Stein und pflastern damit eine gut
   ausgetretene Stelle (`paveSpot`): nah am Dorf, bevorzugt neben schon gepflasterten Stellen, so wachsen die Straßen
   vom Dorf aus weiter. Sie knien und klopfen den Stein fest („Weg gepflastert“). Ein Stein pflastert die
-  ausgetretenen Punkte im Umkreis von 0,8 Einheiten.
+  ausgetretenen Punkte im Umkreis von 0,6 Einheiten.
+- **Breite:** Straßen bleiben schmal (zwei bis drei Geländepunkte, knapp 1 Einheit): Ein Punkt wird nur gepflastert,
+  wenn im 5×5-Feld um ihn höchstens 10 Punkte schon gepflastert sind (`ROAD_FILL`). Ausgetretene Flächen um Hütten
+  und Lager werden so nicht ganz zugepflastert.
+- **Vorrang für Steinhäuser:** Wird der Platz knapp und gibt es noch Holzhäuser, bleiben 8 Steine im Lager liegen,
+  gepflastert wird nur mit dem, was darüber hinausgeht.
 - Gepflastert ist dauerhaft wie bei einer Römerstraße: je Geländepunkt vier flache, leicht unregelmäßige Steine, die
   der Neigung folgen, mit dunklen Fugen dazwischen (`palette.terrain.pave`, `pave2`, `paveJoint`; ein InstancedMesh,
   höchstens 16 000 Steine, alle zwei Sekunden der Geländehöhe nachgeführt). Der Weg wächst nicht mehr zu, auf

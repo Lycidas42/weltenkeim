@@ -56,12 +56,16 @@ onSave(savePaths);
 function savePaths() { const out = [], pv = []; for (let k = 0; k < WEAR.length; k++) { if (WEAR[k] > 3) out.push(k, Math.round(WEAR[k])); if (PAVE[k]) pv.push(k); } S.paths = out; S.paved = pv; S.pathsN = N; }
 const vtx = (x, z) => { const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL); return i < 1 || j < 1 || i >= SEG || j >= SEG ? -1 : j * N + i; };
 const pavedAt = (x, z) => { const k = vtx(x, z); return k >= 0 && PAVE[k] === 1; };
+// Straßen bleiben schmal: Ein Punkt wird nur gepflastert, wenn im 5×5-Feld um ihn herum höchstens ROAD_FILL Punkte
+// gepflastert sind. Eine Straße von zwei bis drei Punkten Breite (knapp 1 Einheit) passt, eine ganze Fläche nicht.
+const ROAD_FILL = 11;
+function roomForRoad(k) { let n = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) n += PAVE[k + dj * N + di] || 0; return n < ROAD_FILL; }
 // Ein Stein pflastert die ausgetretenen Punkte im Umkreis r (folgt so der Form des Pfads); liefert die Anzahl
-function paveAt(x, z, r = .8) {
+function paveAt(x, z, r = .6) {
   let n = 0; const i0 = Math.floor((x - r + HALF) / CELL), i1 = Math.ceil((x + r + HALF) / CELL), j0 = Math.floor((z - r + HALF) / CELL), j1 = Math.ceil((z + r + HALF) / CELL);
   for (let j = Math.max(1, j0); j <= Math.min(SEG - 1, j1); j++) for (let i = Math.max(1, i0); i <= Math.min(SEG - 1, i1); i++) {
     const k = j * N + i, px = -HALF + i * CELL, pz = -HALF + j * CELL;
-    if (PAVE[k] || WEAR[k] < 12 || Math.hypot(px - x, pz - z) > r || H[k] < .1) continue;
+    if (PAVE[k] || WEAR[k] < 12 || Math.hypot(px - x, pz - z) > r || H[k] < .1 || !roomForRoad(k)) continue;
     PAVE[k] = 1; WEAR[k] = WEAR_MAX; wearDirty.add(k); n++;
   }
   if (n) stonesDirty = true;
@@ -72,7 +76,7 @@ function paveAt(x, z, r = .8) {
 function paveSpot(skip = []) {
   let best = -1, bs = 1e9;
   for (let k = 0; k < WEAR.length; k++) {
-    if (PAVE[k] || WEAR[k] < 22 || H[k] < .1) continue;
+    if (PAVE[k] || WEAR[k] < 22 || H[k] < .1 || k < 2 * N + 2 || k >= PAVE.length - 2 * N - 2 || !roomForRoad(k)) continue;
     const i = k % N, j = (k - i) / N, x = -HALF + i * CELL, z = -HALF + j * CELL, d = Math.hypot(x, z);
     if (d > 22 || skip.some(p => Math.hypot(p.x - x, p.z - z) < 1.6)) continue;
     const next = PAVE[k - 1] || PAVE[k + 1] || PAVE[k - N] || PAVE[k + N] || PAVE[k - N - 1] || PAVE[k + N + 1];

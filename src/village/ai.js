@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, rnd, smooth } from '../core/util.js';
-import { PROC, RES, S, prayYield, resText } from '../core/state.js';
+import { PROC, RES, S, STONE_HOUSE, cap, prayYield, resText } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { addGlaube, addHolz, addLogs, floatText } from '../ui/feedback.js';
 import { BED, LUNCH, WAKE } from '../world/sky.js';
@@ -105,7 +105,9 @@ function haulJob(v) {
   };
   if (Math.random() < .5 && feed()) return true;
   // Wege pflastern: einen Stein im Lager holen und an einen ausgetretenen Pfad legen (werkstaetten.md 3)
-  if (Math.random() < .4 && Math.floor(S.stone) - villagers.filter(x => x.haul && x.haul.kind === 'pave' && !x.carry).length >= 1) {
+  // Wird ein Steinhaus gebraucht (Platz knapp), bleiben die Steine dafür im Lager
+  const keep = villagers.length >= cap() - 3 && houses.some(h => !h.stone) ? STONE_HOUSE.stone : 0;
+  if (Math.random() < .4 && Math.floor(S.stone) - keep - villagers.filter(x => x.haul && x.haul.kind === 'pave' && !x.carry).length >= 1) {
     const sp = paveSpot(villagers.filter(x => x.haul && x.haul.kind === 'pave').map(x => x.haul));
     if (sp) { v.haul = { kind: 'pave', res: 'stone', n: 1, x: sp.x, z: sp.z }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickStone'); return true; }
   }
