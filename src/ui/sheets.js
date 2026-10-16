@@ -1,5 +1,6 @@
 // Panels: Arbeit, Schrein, Kreatur, Info; Uhrzeit- und Wettermenü; Kamera folgt
 
+import * as THREE from 'three';
 import { $, clamp, fmt, fmt1 } from '../core/util.js';
 import { MAX_POP, PROC, ROLES, S, SAVE_KEY, SOUL_COST, WORKS, cap, handCost, on, passive, prayYield, resText, save, stopSaving, templeCost } from '../core/state.js';
 import { camera, controls, isMobile } from '../core/render.js';
@@ -14,7 +15,8 @@ import { build } from '../village/houses.js';
 import { farmSites, huts } from '../village/huts.js';
 import { fields, stock } from '../farm/farm.js';
 import { spawnVillager, villagers } from '../village/villagers.js';
-import { ACT_COL, ACT_LABEL, loadCreature, pron, useCreature } from '../creature/creature.js';
+import { ACT_COL, ACT_LABEL, foxPivot, loadCreature, pron, useCreature } from '../creature/creature.js';
+import { facePoint } from '../creature/face.js';
 import { XP, mind, share, why } from '../creature/mind.js';
 import { foxToShrine } from '../creature/ai.js';
 import { fish, wild } from '../wildlife/land.js';
@@ -164,6 +166,15 @@ function renderFollow() {
 // Unten zeigt eine Karte Tätigkeit und Grund. Herauszoomen über NEAR.end beendet sie, ebenso × und „Nicht folgen“.
 const NEAR = { d: 9, pol: .9, end: 16, glide: 1.2 };
 let observe = false, glide = 0, cardT = 0;
+// Gesichtsansicht (Test der Mimik): Kamera direkt vor dem Kopf, auf Augenhöhe
+let faceView = false; const faceV = new THREE.Vector3();
+// Tele statt Weitwinkel: Aus der Nähe verzerrt der Weitwinkel die lange Schnauze, die zur Kamera zeigt, ins Riesenhafte
+let faceFov = 0;
+function setFaceView(on) {
+  if (on === faceView) return; faceView = on;
+  if (on) { faceFov = camera.fov; camera.fov = 16; } else camera.fov = faceFov;
+  camera.updateProjectionMatrix();
+}
 function setObserve(on) {
   if (on) { observe = true; glide = NEAR.glide; follow = true; closeSheets(); renderCard(); } else { observe = false; follow = false; }
   renderFollow();
@@ -188,6 +199,11 @@ function updateCamera(dt) {
   if (tr > 25) { const k = 25 / tr, ox = controls.target.x, oz = controls.target.z; controls.target.x *= k; controls.target.z *= k; camera.position.x += controls.target.x - ox; camera.position.z += controls.target.z - oz; }
   controls.target.y = 1;
   controls.update();
+  if (faceView && facePoint(faceV)) {
+    const a = foxPivot.rotation.y, d = CREATURES[fox.kind].h * 1.6;
+    camera.position.set(faceV.x + Math.sin(a + .35) * d, faceV.y + d * .05, faceV.z + Math.cos(a + .35) * d);
+    faceV.y -= d * .04; camera.lookAt(faceV); // Gesicht im oberen Bilddrittel, unten liegt die Testleiste
+  }
 }
 $('btnFocus').addEventListener('click', () => setObserve(!observe));
 $('btnCardSheet').addEventListener('click', () => openSheet('sheetFox'));
@@ -301,4 +317,4 @@ $('foxForms').addEventListener('click', e => {
 });
 on('foxTransform', id => setCreature(id));
 
-export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, follow, observe, setObserve, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };
+export { GROW_TEXT, HINTS, SHRINE, WX_ICON, closeSheets, setFaceView, follow, observe, setObserve, foodDays, foxDoing, openSheet, renderFox, renderName, renderShrine, renderWork, setCreature, setFollow, updateCamera, windWord };

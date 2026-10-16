@@ -23,7 +23,7 @@ MANNEQUIN = os.path.join(RAW, 'Universal_Animation_Library_2_Standard_', 'Univer
 # Arten: Farben (sRGB-Hex) und Formen. light = Bauch/Schnauze/Schwanzspitze, dark = Pfoten/Ohrspitzen/Nase.
 ART = {
     'fox': {'file': 'Foxfolk.glb', 'fur': 'c96a33', 'light': 'f6ecdc', 'dark': '3d2c25',
-            'snout': (0.078, 0.30), 'ears': {'r': 0.088, 'h': 0.23, 'spread': 0.07}, 'tail': 'bushy', 'ruff': True, 'iris': 'c98a2a'},
+            'snout': (0.078, 0.30), 'ears': {'r': 0.10, 'h': 0.24, 'spread': 0.085}, 'tail': 'bushy', 'ruff': True, 'iris': 'c98a2a', 'brow': 'e9c79a', 'cup': '4a3328', 'tear': True},
     'bear': {'file': 'Bearfolk.glb', 'fur': '6a4530', 'light': 'c9a27a', 'dark': '2e2019', 'belly': 1.25, 'limbs': 1.4, 'legs': 1.12, 'head': 1.18,
              'snout': (0.10, 0.12), 'ears': {'round': 0.065}, 'tail': 'stub'},
     # weitere Arten: Hase (lange Ohren), Waschbär (Maske) …
@@ -36,7 +36,15 @@ ANIMS = ['Idle_Loop', 'Idle_FoldArms_Loop', 'Walk_Loop', 'Jog_Fwd_Loop', 'Walk_C
          'Hit_Chest', 'Spell_Simple_Shoot', 'Yes', 'Idle_No_Loop', 'LayToIdle',
          'Farm_Harvest', 'Farm_PlantSeed', 'Farm_Watering', 'Interact', 'OverhandThrow',
          'Curl_Down', 'Curl_Idle', 'Lift_Ground', 'Hold_Idle']  # die letzten vier baut das Skript selbst (posen())
-TRIS = 7000
+# Detailstufe: Zieldreiecke nach dem Reduzieren und Voxelgröße beim Verschmelzen (kleiner = schärfere Formen).
+# Hoch für die Arbeit am Gesicht; eine leichte Fassung fürs Handy z. B. mit TM_TRIS=7000, TM_VOXEL=0.018 erzeugen.
+TRIS = globals().get('TM_TRIS', 40000)
+VOXEL = globals().get('TM_VOXEL', 0.009)
+# Wangenbüschel (Ansatz, Spitze, Radius; linke Seite), werden Teil der Körperform
+RUFF = [((0.10, -0.06, 1.70), (0.155, 0.0, 1.69), 0.022), ((0.105, -0.05, 1.68), (0.175, 0.02, 1.655), 0.025),
+        ((0.10, -0.05, 1.66), (0.175, 0.03, 1.62), 0.026), ((0.095, -0.05, 1.64), (0.16, 0.03, 1.59), 0.024),
+        ((0.085, -0.06, 1.62), (0.13, 0.0, 1.57), 0.02), ((0.07, -0.08, 1.61), (0.10, -0.04, 1.56), 0.017)]
+JAW_Z = 1.66  # Höhe der Maullinie unter der Schnauze (vor der Kopfskalierung); Unterkiefer und Mundraum sitzen daran
 
 def srgb(h):
     c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
@@ -133,10 +141,12 @@ def build(kind='fox', out=None):
     def capsule(a, b, r):
         a, b = Vector(a), Vector(b); d = b - a; n = max(3, int(d.length / (r * .6)))
         for i in range(n + 1): ellip(a + d * (i / n), (r, r, r), 16)
-    def cone(base, tip, r, tip_r=.15):  # tip_r: Radius an der Spitze als Anteil (Ohren spitz, Schnauze stumpf)
+    def cone(base, tip, r, tip_r=.15, flat=1.0):  # tip_r: Radius an der Spitze als Anteil (Ohren spitz, Schnauze stumpf); flat: Tiefe als Anteil (Ohren flach)
         base, tip = Vector(base), Vector(tip); d = tip - base
         me = bpy.data.meshes.new('c'); o = bpy.data.objects.new('c', me); sc.collection.objects.link(o)
-        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r * tip_r, depth=d.length); bm.to_mesh(me); bm.free()
+        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r * tip_r, depth=d.length)
+        if flat != 1.0: bmesh.ops.scale(bm, vec=(1, flat, 1), verts=bm.verts)
+        bm.to_mesh(me); bm.free()
         o.location = base + d / 2; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized()); parts.append(o)
     k = A.get('belly', 1.0)
     # Bauch endet über den Oberschenkeln, darunter ein schmales Becken: sonst wachsen Bauch und Beine zu einem Rock zusammen
@@ -144,16 +154,23 @@ def build(kind='fox', out=None):
     ellip((0, 0.02, 0.99), (0.16 * k, 0.14 * k, 0.09))                                                                           # Becken
     hk, lk, gk = A.get('head', 1.0), A.get('limbs', 1.0), A.get('legs', 1.0)
     hp = lambda x, y, z: (x * hk, y * hk, 1.76 + (z - 1.76) * hk)   # Punkt am Kopf, mit der Kopfgröße skaliert
-    ellip((0, 0.0, 1.76), (0.19 * hk, 0.17 * hk, 0.17 * hk)); ellip((0, -0.06, 1.70), (0.17 * hk, 0.12 * hk, 0.10 * hk))           # Kopf, Wangen
-    sr, sl = A['snout']; cone(hp(0, -0.10, 1.715), hp(0, -0.10 - sl, 1.69), sr * hk, .42)                                      # Schnauze (Oberkiefer), stumpfes Ende
-    cone(hp(0, -0.05, 1.70), hp(0, -0.10 - sl * .55, 1.69), sr * 1.5 * hk, .55)                                                # breiter Ansatz: Gesicht läuft dreieckig in die Schnauze
+    ellip(hp(0, 0.01, 1.785), (0.20 * hk, 0.165 * hk, 0.15 * hk)); ellip((0, -0.06, 1.70), (0.105 * hk, 0.12 * hk, 0.09 * hk))     # Kopf (oben breit), Wangen schmaler: Dreieck zur Schnauze
+    # Schnauze als flacher Keil (breiter als hoch): an der Stirn fast so breit wie der Augenabstand, spitz zur Nase.
+    # Als runder Kegel sah sie von oben wie ein Rohr zwischen den Augen aus.
+    sr, sl = A['snout']; cone(hp(0, -0.09, 1.715), hp(0, -0.10 - sl, 1.69), sr * 1.6 * hk, .27, .55)                           # Oberkiefer, stumpfes Ende
+    cone(hp(0, -0.05, 1.71), hp(0, -0.10 - sl * .6, 1.69), sr * 1.85 * hk, .45, .65)                                           # breiter Ansatz: Gesicht läuft dreieckig in die Schnauze
+    # Augen liegen in Höhlen (Schritt 2b) unter einem leichten Stirnwulst, der sie überschattet
+    EY = A.get('eye', {'x': 0.074, 'y': -0.127, 'z': 1.795, 'slant': 20})
+    for s_ in (1, -1): ellip(hp(s_ * 0.077, -0.122, 1.827), (0.047 * hk, 0.036 * hk, 0.019 * hk), 20)
     if A.get('ruff'):                                                                                                           # Wangenfell, seitlich abstehend
-        for s in (1, -1): ellip(hp(s * 0.125, -0.05, 1.665), (0.095 * hk, 0.08 * hk, 0.075 * hk), 20)
-    cone(hp(0, -0.10, 1.655), hp(0, -0.10 - sl * .8, 1.648), sr * .62 * hk, .5)                                                # Unterkiefer: Maullinie dazwischen
+        for s in (1, -1):
+            ellip(hp(s * 0.075, -0.075, 1.67), (0.05 * hk, 0.07 * hk, 0.055 * hk), 20)
+            # Büschel als Teil der Form (verschmelzen weich mit der Wange): nach hinten, außen und etwas nach unten
+            for b, t, r in RUFF: cone(hp(b[0] * s, b[1], b[2]), hp(t[0] * s, t[1], t[2]), r * hk, .12, .45)
     E = A['ears']
     for s in (1, -1):                                                                                                           # Ohren
         if E.get('round'): ellip(hp(s * 0.13, 0.02, 1.90), (E['round'] * hk, E['round'] * .6 * hk, E['round'] * hk), 20)
-        else: cone(hp(s * 0.10, 0.01, 1.88), hp(s * (0.10 + E['spread']), 0.03, 1.88 + E['h']), E['r'] * hk)
+        else: cone(hp(s * 0.10, 0.01, 1.88), hp(s * (0.10 + E['spread']), 0.03, 1.88 + E['h']), E['r'] * hk, .15, .55)  # flach wie ein echtes Ohr: Drehen sieht man
     for s in ('l', 'r'):
         ua, la, hd = B['upperarm_' + s], B['lowerarm_' + s], B['hand_' + s]
         capsule(B['clavicle_' + s][1], ua[1], 0.065 * lk); capsule(la[0], la[1], 0.055 * lk)
@@ -170,8 +187,31 @@ def build(kind='fox', out=None):
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True); bpy.ops.object.join()
     body = bpy.context.view_layer.objects.active; body.name = 'TMBody'
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    r = body.modifiers.new('rm', 'REMESH'); r.mode = 'VOXEL'; r.voxel_size = 0.018; bpy.ops.object.modifier_apply(modifier='rm')
+    r = body.modifiers.new('rm', 'REMESH'); r.mode = 'VOXEL'; r.voxel_size = VOXEL; bpy.ops.object.modifier_apply(modifier='rm')
+    # kleine abgetrennte Inseln (z. B. dünne Büschelspitzen) entfernen: an ihnen scheitert sonst die automatische Gewichtung
+    bm = bmesh.new(); bm.from_mesh(body.data); bm.verts.ensure_lookup_table(); seen = set(); isl = []
+    for v0 in bm.verts:
+        if v0.index in seen: continue
+        stack, comp = [v0], []; seen.add(v0.index)
+        while stack:
+            v = stack.pop(); comp.append(v)
+            for e in v.link_edges:
+                w = e.other_vert(v)
+                if w.index not in seen: seen.add(w.index); stack.append(w)
+        isl.append(comp)
+    isl.sort(key=len); small = [v for c in isl[:-1] for v in c]
+    if small: bmesh.ops.delete(bm, geom=small, context='VERTS'); print('Inseln entfernt:', len(isl) - 1)
+    bm.to_mesh(body.data); bm.free()
     sm = body.modifiers.new('sm', 'CORRECTIVE_SMOOTH'); sm.iterations = 8; sm.use_only_smooth = True; bpy.ops.object.modifier_apply(modifier='sm')
+    # 2b. Augenhöhlen: je ein schräges Ellipsoid aus dem Kopf schneiden; das Auge sitzt darin zurückgesetzt
+    import math
+    for s_ in (1, -1):
+        me2 = bpy.data.meshes.new('cut'); cut = bpy.data.objects.new('cut', me2); sc.collection.objects.link(cut)
+        bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12, radius=1); bm.to_mesh(me2); bm.free()
+        cut.location = hp(EY['x'] * s_, EY['y'] - 0.012, EY['z']); cut.rotation_euler = (0, -math.radians(EY['slant'] * s_), 0)
+        cut.scale = (0.039 * hk, 0.022, 0.029 * hk); bpy.context.view_layer.update()
+        bo = body.modifiers.new('eye', 'BOOLEAN'); bo.operation = 'DIFFERENCE'; bo.object = cut; bo.solver = 'EXACT'
+        bpy.context.view_layer.objects.active = body; bpy.ops.object.modifier_apply(modifier='eye'); bpy.data.objects.remove(cut, do_unlink=True)
     body.data.calc_loop_triangles(); n = len(body.data.loop_triangles)
     d = body.modifiers.new('dc', 'DECIMATE'); d.ratio = min(1, TRIS / n); bpy.ops.object.modifier_apply(modifier='dc')
     bpy.ops.object.shade_smooth()
@@ -183,9 +223,28 @@ def build(kind='fox', out=None):
     parent = eb['pelvis']
     for i in range(4):
         b = eb.new(f'tail_0{i + 1}'); b.head = inv @ pts[i]; b.tail = inv @ pts[i + 1]; b.parent = parent; b.use_connect = i > 0; parent = b
+    # Gesicht: Ohren (aufstellen, anlegen, zucken) und Unterkiefer (Maul öffnen) bewegt das Spiel im Code (creature/face.js)
+    for s, nm in ((1, 'ear_l'), (-1, 'ear_r')):
+        b = eb.new(nm); b.parent = eb['Head']
+        if E.get('round'): b.head, b.tail = inv @ Vector(hp(s * 0.12, 0.02, 1.86)), inv @ Vector(hp(s * 0.14, 0.02, 1.96))
+        else: b.head, b.tail = inv @ Vector(hp(s * 0.10, 0.01, 1.88)), inv @ Vector(hp(s * (0.10 + E['spread']), 0.03, 1.88 + E['h']))
+    b = eb.new('jaw'); b.parent = eb['Head']; b.head, b.tail = inv @ Vector(hp(0, -0.07, JAW_Z)), inv @ Vector(hp(0, -0.10 - sl * .8, JAW_Z - 0.01))
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); arm.select_set(True); bpy.context.view_layer.objects.active = arm
+    for nm in ('ear_l', 'ear_r', 'jaw'): arm.data.bones[nm].use_deform = False  # nicht automatisch: sie liegen im Kopf und zögen Stirn und Schnauze an sich
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    for nm in ('ear_l', 'ear_r', 'jaw'): arm.data.bones[nm].use_deform = True; body.vertex_groups.get(nm) or body.vertex_groups.new(name=nm)
+    # Punkte, an denen die automatische Gewichtung gescheitert ist (im feinen Netz z. B. an Augenhöhlen und Stirnwulst),
+    # bekommen den nächsten Knochen; sonst bleiben sie in der Grundpose stehen und das Gesicht reißt bei jeder Bewegung auf
+    from mathutils.geometry import intersect_point_line
+    segs = [(b.name, arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform and not b.name.startswith(('ear_', 'jaw'))]
+    fixed = 0
+    for v in body.data.vertices:
+        if sum(e.weight for e in v.groups) >= 0.5: continue
+        def dist(sg):
+            p_, t = intersect_point_line(v.co, sg[1], sg[2]); t = max(0.0, min(1.0, t)); return (v.co - (sg[1] + (sg[2] - sg[1]) * t)).length
+        body.vertex_groups[min(segs, key=dist)[0]].add([v.index], 1.0, 'ADD'); fixed += 1
+    print('ohne Gewicht, nachgetragen:', fixed)
     # Gewichte glätten und auf 4 Knochen je Punkt begrenzen (so viele nutzt das Spiel): sonst ziehen die Schultern
     # beim Tragen die Haut am oberen Rücken zu einem Buckel hoch
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); bpy.context.view_layer.objects.active = body
@@ -194,21 +253,55 @@ def build(kind='fox', out=None):
     bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
     bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
     bpy.ops.object.mode_set(mode='OBJECT')
+    # Ohren und Unterkiefer gezielt gewichten (die automatischen Gewichte teilen sie nicht sauber vom Kopf):
+    # Anteil w an den neuen Knochen, der Rest bleibt in den alten Gruppen (anteilig verkleinert)
+    # (jaw bleibt leer: der Unterkiefer ist ein eigenes Teil, Schritt 5)
+    def take(vg_name, wfn):
+        g = body.vertex_groups[vg_name]
+        for v in body.data.vertices:
+            w = wfn(v.co)
+            if w <= 0.001: continue
+            for e in v.groups:
+                if e.group != g.index: e.weight *= (1 - w)
+            g.add([v.index], w, 'REPLACE')
+    for s, nm in ((1, 'ear_l'), (-1, 'ear_r')):
+        bn = arm.data.bones[nm]; a, b = arm.matrix_world @ bn.head_local, arm.matrix_world @ bn.tail_local; ax = (b - a).normalized()
+        def ear(co, a=a, ax=ax, s=s):
+            t = (co - a).dot(ax); r = ((co - a) - ax * t).length
+            return smooth(-0.015, 0.03, t) * smooth(0.13, 0.08, r) * (1 if co.x * s > 0.04 else 0)
+        take(nm, ear)
 
     # 4. Farben als Vertexfarben mit weichen Übergängen (Masken in der T-Pose)
-    FUR, LIGHT, DARK = srgb(A['fur']), srgb(A['light']), srgb(A['dark'])
+    FUR, LIGHT, DARK, CUP = srgb(A['fur']), srgb(A['light']), srgb(A['dark']), srgb(A.get('cup', A['dark']))
     me = body.data; ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); me.color_attributes.active_color = ca
     for v in me.vertices:
         x, y, z = v.co; ax = abs(x)
         belly = smooth(1.15, .8, (x / .135) ** 2 + ((z - 1.22) / .27) ** 2) * smooth(-0.03, -0.11, y)
         muzzle = smooth(-0.12, -0.17, y) * smooth(1.70, 1.675, z) * smooth(1.58, 1.62, z)          # Unterseite der Schnauze, oben bleibt Fell
-        cheek = smooth(1.0, .55, ((ax - .13) / .1) ** 2 + ((y + .07) / .1) ** 2 + ((z - 1.655) / .07) ** 2)  # Wangenfell
+        cheek = smooth(1.0, .55, ((ax - .085) / .075) ** 2 + ((y + .09) / .1) ** 2 + ((z - 1.665) / .065) ** 2)  # Wangenfell
         throat = smooth(1.0, .6, (x / .11) ** 2 + ((z - 1.56) / .12) ** 2) * smooth(-0.0, -0.07, y)     # Kehle bis zum Unterkiefer
         tip = smooth(.6, .68, y) * smooth(.92, 1.0, z) if A['tail'] == 'bushy' else 0
-        light = max(belly, muzzle, cheek, throat, tip)
-        dark = max(smooth(.53, .58, ax) * smooth(1.25, 1.35, z), smooth(.2, .12, z), smooth(1.975, 2.03, z))
+        cup = back = 0
+        if not E.get('round'):  # Ohren wie beim Rotfuchs: innen dunkle Muschel (helle Haarbüschel kommen extra), Rücken dunkel
+            t = (z - 1.88) / E['h']; ex = 0.10 + E['spread'] * t; yc = 0.01 + 0.02 * t; rr = E['r'] * (1 - t * .85)
+            ear = smooth(-0.04, 0.06, t) * (1 if ax > 0.05 else 0)
+            cup = ear * smooth(.85, .6, t) * smooth(rr * .8, rr * .45, abs(ax - ex)) * smooth(yc - 0.004, yc - 0.018, y)
+            back = ear * smooth(yc + 0.002, yc + 0.016, y) * smooth(0.05, 0.25, t)
+        ruff = smooth(.085, .11, ax) * smooth(1.55, 1.58, z) * smooth(1.72, 1.70, z) * smooth(0.08, 0.04, y) if A.get('ruff') else 0  # Wangenbüschel hell
+        light = max(belly, muzzle, cheek, throat, tip, ruff)
+        tear = 0
+        if A.get('tear'):  # dunkle Tränenlinie vom inneren Augenwinkel zur Schnauze
+            p0, p1 = Vector(hp(0.052, -0.155, 1.776)), Vector(hp(0.03, -0.235, 1.712)); q = Vector((ax, y, z)); d = p1 - p0
+            u = max(0.0, min(1.0, (q - p0).dot(d) / d.length_squared)); tear = smooth(.011, .005, (q - p0 - d * u).length) * (1 - u * .5)
+        sock = 0
+        for s_ in (1, -1):  # Augenhöhle leicht abgedunkelt (Schatten unter dem Stirnwulst)
+            ex_, ey_, ez_ = hp(EY['x'] * s_, EY['y'], EY['z'])
+            sock = max(sock, smooth(1.6, 1.0, ((x - ex_) / 0.04) ** 2 + ((z - ez_) / 0.03) ** 2) * smooth(-0.11, -0.13, y))
+        dark = max(tear * .85, sock * .45, smooth(.53, .58, ax) * smooth(1.25, 1.35, z), smooth(.2, .12, z), smooth(1.975, 2.03, z))
         c = [FUR[i] * (1 - light) + LIGHT[i] * light for i in range(3)]
         c = [c[i] * (1 - dark) + DARK[i] * dark for i in range(3)]
+        c = [c[i] * (1 - back * .8) + DARK[i] * back * .8 for i in range(3)]
+        c = [c[i] * (1 - cup) + CUP[i] * cup for i in range(3)]
         ca.data[v.index].color = (*c, 1)
     mat = bpy.data.materials.new('Fell_' + kind); mat.use_nodes = True; nt = mat.node_tree
     p = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'); p.inputs['Roughness'].default_value = .85
@@ -216,18 +309,46 @@ def build(kind='fox', out=None):
     me.materials.clear(); me.materials.append(mat)
 
     # 5. Augen und Nase am Kopfknochen
-    def bead(name, c, r, rgb, rough):
+    def bead(name, c, r, rgb, rough, bone='Head', roll=0):  # roll: Neigung in der Gesichtsebene (Grad, + = außen hoch für die linke Seite)
         m2 = bpy.data.materials.new(name); m2.use_nodes = True
         q = next(n for n in m2.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'); q.inputs['Base Color'].default_value = (*srgb(rgb), 1); q.inputs['Roughness'].default_value = rough
         me2 = bpy.data.meshes.new(name); o = bpy.data.objects.new(name, me2); sc.collection.objects.link(o)
         bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=1); bm.to_mesh(me2); bm.free()
-        o.scale = r; o.location = c; me2.materials.append(m2); bpy.context.view_layer.update()
-        w = o.matrix_world.copy(); o.parent = arm; o.parent_type = 'BONE'; o.parent_bone = 'Head'; o.matrix_world = w
+        o.scale = r; o.location = c; o.rotation_euler = (0, -roll * 3.14159 / 180, 0); me2.materials.append(m2); bpy.context.view_layer.update()
+        w = o.matrix_world.copy(); o.parent = arm; o.parent_type = 'BONE'; o.parent_bone = bone; o.matrix_world = w
         return o
-    # Augen flach in die Kopfform gesetzt (nicht vorstehend), leicht mandelförmig; zum Schlafen skaliert das Spiel sie flach (Lider)
+    # Haarbüschel innen in den Ohren: flache helle Kegel vom Ohrgrund nach oben, am Ohrknochen (bewegen sich mit)
+    def tuft(name, base, tip, r, bone, tip_r=.05, mat=None):
+        base, tip = Vector(base), Vector(tip); d = tip - base
+        me2 = bpy.data.meshes.new(name); o = bpy.data.objects.new(name, me2); sc.collection.objects.link(o)
+        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=r, radius2=r * tip_r, depth=d.length); bmesh.ops.scale(bm, vec=(1, .35, 1), verts=bm.verts); bm.to_mesh(me2); bm.free()
+        for f in me2.polygons: f.use_smooth = True
+        o.location = base + d / 2; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized())
+        me2.materials.append(mat or tuft_mat); bpy.context.view_layer.update()
+        w = o.matrix_world.copy(); o.parent = arm; o.parent_type = 'BONE'; o.parent_bone = bone; o.matrix_world = w
+        return o
+    tufts = []
+    tuft_mat = bpy.data.materials.new('Haar_' + kind); tuft_mat.use_nodes = True
+    q = next(n for n in tuft_mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'); q.inputs['Base Color'].default_value = (*srgb(A['light']), 1); q.inputs['Roughness'].default_value = .9
+    if not E.get('round'):
+        ax_pt = lambda s, t, dy=0, dx=0: hp(s * (0.10 + E['spread'] * t) + s * dx, 0.01 + 0.02 * t - E['r'] * .55 * (1 - t * .85) * .85 + dy, 1.88 + E['h'] * t)
+        for s, nm in ((1, 'ear_l'), (-1, 'ear_r')):
+            for i, (dx, t0, t1, rr) in enumerate([(-0.038, -0.02, 0.50, 0.024), (0.0, 0.0, 0.62, 0.026), (0.036, -0.02, 0.46, 0.022), (-0.02, 0.06, 0.40, 0.018), (0.022, 0.06, 0.42, 0.018)]):
+                tufts.append(tuft(f'EarTuft{nm[-1].upper()}{i}', ax_pt(s, t0, 0, dx), ax_pt(s, t1, -0.006, dx * .5), rr * hk, nm))
     iris = A.get('iris', '1d1714')
-    extra = [bead('EyeL', hp(0.072, -0.148, 1.79), (0.026, 0.012, 0.032), iris, .3), bead('EyeR', hp(-0.072, -0.148, 1.79), (0.026, 0.012, 0.032), iris, .3),
-             bead('EyePupilL', hp(0.071, -0.156, 1.79), (0.011, 0.006, 0.02), '120c08', .2), bead('EyePupilR', hp(-0.071, -0.156, 1.79), (0.011, 0.006, 0.02), '120c08', .2),
+    # Mandelaugen wie beim Rotfuchs: breiter als hoch, außen schräg nach oben, dunkler Rand, schmale senkrechte Pupille.
+    # Lider zeichnet das Spiel im Shader auf das Auge (creature/face.js), damit sie nie über den Augenrand ragen.
+    extra = []
+    for s, k in ((1, 'L'), (-1, 'R')):
+        ex, ey, ez, sl_ = EY['x'] * s, EY['y'], EY['z'], EY['slant'] * s
+        extra += [bead('EyeRim' + k, hp(ex, ey + 0.003, ez), (0.037, 0.011, 0.026), A['dark'], .5, roll=sl_),
+                  bead('Eye' + k, hp(ex, ey, ez), (0.031, 0.012, 0.0205), iris, .3, roll=sl_),
+                  bead('EyePupil' + k, hp(ex * .985, ey - 0.008, ez), (0.0075, 0.006, 0.016), '120c08', .2, roll=sl_ * .3),
+                  bead('Brow' + k, hp(s * 0.064, -0.148, ez + 0.032), (0.024, 0.01, 0.012), A.get('brow', A['fur']), .8, roll=-s * 12)]
+    extra += [
+             # Unterkiefer am Kieferknochen (öffnet sich im Spiel), dahinter der dunkle Mundraum am Kopf
+             bead('Jaw', hp(0, -0.10 - sl * .36, JAW_Z - 0.017), (sr * .62 * hk, sl * .44 * hk, sr * .4 * hk), A['light'], .8, 'jaw'),
+             bead('Mouth', hp(0, -0.10 - sl * .38, JAW_Z), (sr * .5 * hk, sl * .4 * hk, sr * .2 * hk), '4a2420', .6),
              bead('Nose', hp(0, -0.10 - sl + 0.012, 1.695), (0.03 * hk, 0.026 * hk, 0.024 * hk), A['dark'], .5)]  # sitzt auf der Schnauzenspitze
 
     # 6. Animationen aus UAL1 und UAL2 als NLA-Spuren
@@ -251,7 +372,7 @@ def build(kind='fox', out=None):
             for o in s.objects:
                 try: o.select_set(False, view_layer=vl)
                 except Exception: pass
-    for o in [arm, body, *extra]: o.select_set(True)
+    for o in [arm, body, *extra, *tufts]: o.select_set(True)
     bpy.context.view_layer.objects.active = arm
     out = out or os.path.join(REPO, 'assets', 'models', 'animals', A['file'])
     bpy.ops.export_scene.gltf(filepath=out, use_selection=True, export_animations=True, export_animation_mode='NLA_TRACKS', export_skins=True,

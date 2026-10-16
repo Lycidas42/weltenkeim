@@ -17,6 +17,7 @@ import { ACT_DESC, ACT_LABEL, eyesClosed, foxActs, foxAnim, foxMixer, foxOnce, f
 import { HAND_DUR, handAnim, playHand } from './gestures.js';
 import { MILL_BUF, hauling } from '../village/ai.js';
 import { leanReasons, noteChoice, noteDone, noteLearn, share, updateMind } from './mind.js';
+import { updateFace } from './face.js';
 
 const LIFT_GRAB = .75; // Sekunden ab Beginn des Aufhebens, bis die Hände den Baum fassen (Bild 18 von Lift_Ground)
 function foxIdle(t) { fox.state = 'idle'; fox.timer = t; fox.idleA = ['idle', 'idle', 'idle2', 'eat'][Math.floor(Math.random() * 4)]; }
@@ -193,7 +194,8 @@ function updateFox(dt, t) {
   const dvh = Math.atan2(Math.sin(fox.h - fox.vh), Math.cos(fox.h - fox.vh));
   fox.vh += Math.sign(dvh) * Math.min(Math.abs(dvh) * (1 - Math.exp(-dt * 7)), dt * 4.5);
   foxPivot.rotation.y = fox.vh;
-  foxMixer.update(dt); swayTail(t, fox.state === 'walk' || fox.state === 'play'); eyesClosed(fox.state === 'rest' && fox.cur === 'lie');
+  foxMixer.update(dt); swayTail(t, fox.state === 'walk' || fox.state === 'play');
+  if (!updateFace(dt, t)) eyesClosed(fox.state === 'rest' && fox.cur === 'lie'); // Zweibeiner mit Gesicht: Lider, Blick, Ohren (face.js)
   updateMouthTree();
 }
 // Ruun wirkt mit: bäumt sich auf, wenn der Spieler ein Wunder wirkt (sofern er gerade frei ist)

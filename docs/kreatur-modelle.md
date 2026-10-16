@@ -7,7 +7,7 @@ Branch `claude/zweibeiner-test` (alles zu neuen Gestalten bleibt dort, bis entsc
 
 | Gestalt | Datei | Herkunft | Stand |
 |---|---|---|---|
-| Fuchsmensch (`foxfolk`) | `assets/models/animals/Foxfolk.glb` | Körper selbst gebaut (`assets/source/build_tiermensch.py`), Skelett und Animationen Quaternius Universal Animation Library 1+2 (CC0) | ✅ im Test, 7.000 Dreiecke, 1,4 MB, 18 Animationen |
+| Fuchsmensch (`foxfolk`) | `assets/models/animals/Foxfolk.glb` | Körper selbst gebaut (`assets/source/build_tiermensch.py`), Skelett und Animationen Quaternius Universal Animation Library 1+2 (CC0) | ✅ im Test, Detailstufe 40.000 Dreiecke, 2,9 MB, 21 Animationen, Gesicht mit Mimik (5a) |
 | Bärenmensch (`bearfolk`) | `assets/models/animals/Bearfolk.glb` | wie Fuchsmensch, Art `bear` (runde Ohren, kurze Schnauze, Stummelschwanz, kräftiger) | ✅ im Test |
 | Magier, Barbar, Schurkin, Ritter (`mage`, `barbarian`, `rogue`, `knight`) | `assets/models/animals/<Name>.glb` | KayKit Adventurers (CC0), Waffen entfernt (`assets/source/prep_kaykit.py`) | ✅ im Test, je 19 von 76 Animationen, je 1 MB |
 
@@ -112,6 +112,35 @@ Ziel: Der Spieler soll sich mit dem Tier verbinden und identifizieren; heute wir
    (etwa 30.000–40.000 Dreiecke) und nur zugeschaltet, wenn die Kamera nah ist; Fellmaske: buschig an Schwanz,
    Wangen, Brust, kurz an Schnauze und Pfoten. Auf dem Handy messen. **Erste Stufe: Fell nur im Gesicht** (Wangen,
    Stirn, Ohren, Kehle) – kostet einen Bruchteil und wirkt dort, wo man hinschaut; der ganze Körper nur, wenn es reicht.
+
+## 5a. Stand Gesicht (16.10., Nachmittag)
+
+Nach Fotos echter Rotfüchse überarbeitet (Bauskript, nur Art `fox`):
+
+- **Form:** Kopf oben breit, läuft als Dreieck zur Schnauze; Schnauze als flacher Keil (als runder Kegel sah sie von
+  oben wie ein Rohr aus); Augen in Höhlen unter einem Stirnwulst, Höhle leicht abgedunkelt; Wangenfell mit Büscheln als
+  Teil der Körperform (eigene Kegel wirkten wie Stacheln); dunkle Tränenlinie.
+- **Teile am Kopfknochen:** Mandelaugen (`EyeL/R`, schräg), dunkler Rand (`EyeRimL/R`), schmale Pupille (`EyePupilL/R`),
+  helle Brauenflecken (`BrowL/R`), Nase, dunkler Mundraum (`Mouth`); Unterkiefer (`Jaw`) am Knochen `jaw`.
+- **Ohren:** flach wie echte Ohren, innen dunkle Muschel mit hellen Haarbüscheln (`EarTuft…`, am Ohrknochen), Rücken
+  dunkel; Knochen `ear_l`/`ear_r` (vor/zurück, zur Seite, um die Längsachse drehen wie eine Katze).
+- **Detailstufe:** `TM_TRIS` (Standard 40.000) und `TM_VOXEL` (0,009); fürs Handy später z. B. 7.000 / 0,018 oder das
+  Detailmodell nur in der Nahsicht laden.
+- **Fallen beim Gewichten:** Ohr- und Kieferknochen nehmen an der automatischen Gewichtung nicht teil (sie liegen im
+  Kopf und zogen Stirn und Schnauze an sich; nach dem Löschen blieben Punkte ohne Knochen, das Gesicht riss in jeder
+  Animation auf). Kleine Inseln nach dem Verschmelzen entfernen, sonst scheitert die Gewichtung ganz. Immer auch in
+  einer Animation ansehen, nicht nur in der Grundpose.
+- **Im Spiel (`src/creature/face.js`):** Lider im Shader auf dem Auge (ragen nie über den Rand; Höhe, Schräge,
+  Biegung frei), Blinzeln, Pupillen folgen dem Blick mit kleinen Sprüngen, Brauen, Ohren mit Zucken, Kiefer, Kopf und
+  Nacken drehen sich zum Ziel (Hand, im Test die Kamera). Ausdrücke in `EXPR` (Ruhig, Neugierig, Fröhlich, Übermütig,
+  Stolz, Müde, Traurig, Beleidigt, Wütend, Ängstlich, Schläft). Ansehen: Charakterbogen → „Animationen testen“ → Mimik,
+  „Gesicht nah“ (Tele, sonst verzerrt der Weitwinkel die Schnauze). Zweibeiner empfangen keine Schatten mehr (eckige
+  Flecken im Gesicht).
+- **Noch offen:** Stimmungsgerüst (Ausdruck aus Stimmung und Alter statt fest), Kiefer wirkt geöffnet klotzig,
+  Schalenfell im Gesicht für die Nahsicht, Geräusche.
+- **Vorlage für echte Vierbeiner** (falls wir umschwenken): „Fox“ von AIUM2 auf Sketchfab (CC BY 4.0, bearbeitbar);
+  „Fox Idle“ von kenchoo ist CC BY-NC-ND (nicht nutzbar, nur Vorbild). Die Gesichtssteuerung hängt nur an benannten
+  Teilen und ließe sich übertragen.
 
 ## 6. Offene Punkte (Stand Ende 16.10.)
 

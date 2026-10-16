@@ -20,7 +20,8 @@ let foxModel = null, foxMixer = null, foxActs = {};
 // Liefert ein „Rig“ { model, mixer, acts, cur }; genutzt für die Welt (später auch für das Fell-Modell in der Nahsicht).
 function buildRig(id, gltf, fur = false) {
   const C = CREATURES[id], model = shadowify(gltf.scene);
-  model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
+  // Zweibeiner empfangen keine Schatten: Die grobe Schattenkarte warf eckige Flecken von Stirnwulst und Ohren ins Gesicht
+  model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (C.body === 'biped') o.receiveShadow = false; for (const m of [].concat(o.material)) { m.metalness = 0; m.roughness = Math.max(m.roughness, .75); } } });
   // In der Grundpose vermessen: ein wiederverwendetes Modell kann noch liegen oder geduckt sein, und die
   // Begrenzungsbox von Skinned-Meshes hängt von der Pose ab. Sonst wird das Tier mal riesig, mal winzig.
   resetBones(model);

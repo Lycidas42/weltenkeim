@@ -1,12 +1,14 @@
 // Test (Branch claude/zweibeiner-test): Animationen der Kreatur einzeln ansehen. Im Charakterbogen „Animationen testen“
 // hält die Kreatur an (fox.state = 'test', ihr Verhalten ruht), schaltet die Nahsicht ein und zeigt unten eine Leiste
-// mit allen Animationen des Modells; „Weiter“ lässt sie wieder normal laufen.
+// mit allen Animationen des Modells; „Weiter“ lässt sie wieder normal laufen. Darunter die Mimik (creature/face.js):
+// jeden Ausdruck einzeln zeigen, „Gesicht nah“ stellt die Kamera direkt vor den Kopf.
 
 import { $ } from '../core/util.js';
 import { fox } from '../creature/kinds.js';
 import { foxMixer, loadCreature } from '../creature/creature.js';
 import { foxIdle } from '../creature/ai.js';
-import { closeSheets, setObserve } from './sheets.js';
+import { closeSheets, setFaceView, setObserve } from './sheets.js';
+import { EXPR, setFaceTest } from '../creature/face.js';
 
 // bekannte Namen auf Deutsch (sonst der Name aus der Datei)
 const LABEL = { Idle_Loop: 'Stehen', Idle_FoldArms_Loop: 'Arme verschränken', Walk_Loop: 'Gehen', Jog_Fwd_Loop: 'Laufen', Walk_Carry_Loop: 'Gehen mit Last',
@@ -30,11 +32,24 @@ async function startTest() {
   $('animTestList').innerHTML = names.map(n => `<button data-a="${n}" aria-pressed="false">${LABEL[n] || n}</button>`).join('');
   $('animTest').hidden = false; anim(names.includes('Idle_Loop') ? 'Idle_Loop' : names[0]);
 }
+// Mimik: Ausdruck festhalten, bis „Weiter“ oder ein zweiter Druck auf denselben Knopf
+let faceOn = false, exprNow = null;
+function expr(name) {
+  exprNow = name && exprNow !== name ? name : null; setFaceTest(exprNow);
+  $('animTestExprNow').textContent = exprNow ? EXPR[exprNow].label : '';
+  for (const b of $('animTestExpr').children) b.setAttribute('aria-pressed', String(b.dataset.e === exprNow));
+  if (exprNow && !faceOn) faceNear(true);
+}
+function faceNear(on) { faceOn = on; setFaceView(on); $('animTestFace').setAttribute('aria-pressed', String(on)); }
+$('animTestExpr').innerHTML = Object.entries(EXPR).map(([k, e]) => `<button data-e="${k}" aria-pressed="false">${e.label}</button>`).join('');
+$('animTestExpr').addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) expr(b.dataset.e); }); // zweiter Druck: wieder frei
+$('animTestFace').addEventListener('click', () => faceNear(!faceOn));
 function stopTest() {
+  expr(null); faceNear(false);
   $('animTest').hidden = true; foxMixer.stopAllAction(); fox.cur = null; foxIdle(1); setObserve(true);
 }
 $('btnAnimTest').addEventListener('click', startTest);
 $('animTestEnd').addEventListener('click', stopTest);
 $('animTestList').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) anim(b.dataset.a); });
 
-export { anim, anims, startTest, stopTest };
+export { anim, anims, expr, faceNear, startTest, stopTest };

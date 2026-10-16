@@ -18,6 +18,7 @@ const APP = [
   './src/core/util.js',
   './src/creature/ai.js',
   './src/creature/creature.js',
+  './src/creature/face.js',
   './src/creature/gestures.js',
   './src/creature/kinds.js',
   './src/creature/mind.js',
