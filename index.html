@@ -412,6 +412,8 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="now"><span class="dot"></span><span id="foxNow"></span></div>
     <p class="why" id="foxWhy" hidden></p>
     <div class="row"><button class="act" id="btnFocus" aria-pressed="false">Beobachten</button><button class="act" id="btnQuadTest">Testen</button></div>
+    <p class="formsLbl">Ausrüstung <span class="sub">aus den Werkstätten, gegen Bretter</span></p>
+    <div class="items" id="foxGearItems"></div>
     <p class="formsLbl">Neigungen <span class="sub">seit Tagesbeginn</span></p>
     <div class="bars" id="foxBars"></div>
     <p class="formsLbl">Erfahrung</p>
@@ -446,7 +448,7 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 
   <footer class="dock">
     <div class="hint" id="hint"></div>
-    <div id="quadTest" hidden><div class="head"><span>Gerade:</span> <b id="quadTestNow"></b><button id="quadTestEnd">Weiter</button></div><div class="head"><span>Animationen</span></div><div class="list" id="quadTestList"></div><div class="head"><span>Handlungen</span></div><div class="list" id="quadTestActs"></div></div>
+    <div id="quadTest" hidden><div class="head"><span>Gerade:</span> <b id="quadTestNow"></b><button id="quadTestEnd">Weiter</button></div><div class="head"><span>Animationen</span></div><div class="list" id="quadTestList"></div><div class="head"><span>Handlungen</span></div><div class="list" id="quadTestActs"></div><div class="head"><span>Ausrüstung</span></div><div class="list" id="quadTestGear"></div></div>
     <div id="foxCard" hidden><div class="txt"><b id="cardName"></b><span id="cardNow"></span><span id="cardWhy" class="cwhy"></span></div><button id="btnCardSheet">Bogen</button><button class="x" id="btnCardEnd" aria-label="Beobachten beenden">×</button></div>
     <div class="ctx" id="ctxSculpt" hidden>
       <button data-dir="1" aria-pressed="true">Heben</button>

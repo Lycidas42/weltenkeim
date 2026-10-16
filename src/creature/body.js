@@ -3,6 +3,9 @@
 
 import * as THREE from 'three';
 import { renderer, scene } from '../core/render.js';
+import { S } from '../core/state.js';
+
+if (!S.cGear || typeof S.cGear !== 'object') S.cGear = {}; // Ausrüstung der Kreatur: { basket, bags, cart } (kreatur.md 3.13 B)
 import { CREATURES, fox } from './kinds.js';
 import { foxModel, foxPivot } from './creature.js';
 import { model, shadowify } from '../assets/models.js';
@@ -10,7 +13,7 @@ import { surfaceAt } from '../world/terrain.js';
 
 // Ankerpunkte: [Knochen, x, y, z]; Versatz in Einheiten der Tierhöhe im Raum des Tiers (+Z vorn, +Y oben).
 // Die Werte je Gestalt stehen im Theme (anchors), dies ist der Rückfall für das Quaternius-Skelett.
-const ANCH_DEF = { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], tail: ['Tail8', 0, -.01, -.07] };
+const ANCH_DEF = { mouth: ['Head', 0, -.07, .21], back: ['Torso', 0, .12, 0], chest: ['Torso3', 0, -.02, .02], tail: ['Tail8', 0, -.01, -.07] };
 const off = new THREE.Vector3();
 function bone(name) {
   if (!foxModel) return null; const u = foxModel.userData, c = u.bones || (u.bones = {});
@@ -64,7 +67,9 @@ const backItems = BACK_SLOTS.map((_, i) => { const o = shadowify(model(i === 4 ?
 const back = { n: 0, shake: 0 };
 const bp = new THREE.Vector3(), bq = new THREE.Quaternion(), bTilt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 function backSlot(i, out) {
-  const C = CREATURES[fox.kind], s = BACK_SLOTS[i]; anchor('back', out);
+  const C = CREATURES[fox.kind];
+  if (gear.cart && cart.visible) { const c = CART_SLOTS[i]; return out.set(c[0], c[1], c[2]).multiplyScalar(C.h * .95).applyAxisAngle(Y, cartH).add(cart.position); } // im Karren
+  const s = BACK_SLOTS[i]; anchor('back', out);
   return out.add(off.set(s[0], s[1], s[2]).multiplyScalar(C.h).applyQuaternion(foxPivot.quaternion));
 }
 function itemScale(i) { const C = CREATURES[fox.kind]; return (i === 4 ? CRATE : SACK) * C.h / 1.45; }
@@ -80,7 +85,8 @@ function updateBack(dt, t) {
     backSlot(i, bp); o.position.copy(bp);
     // beim Abschütteln kippen die Säcke mit
     bTilt.setFromAxisAngle(Z, back.shake > 0 ? Math.sin(t * 28) * .35 : Math.sin(t * 9 + i) * .03);
-    bq.copy(foxPivot.quaternion).multiply(bTilt); if (i < 4) bq.multiply(qV.setFromAxisAngle(Z, (i % 2 ? 1 : -1) * .35)); // Säcke lehnen seitlich an
+    if (gear.cart && cart.visible) bq.setFromAxisAngle(Y, cartH); else bq.copy(foxPivot.quaternion);
+    bq.multiply(bTilt); if (i < 4 && !(gear.cart && cart.visible)) bq.multiply(qV.setFromAxisAngle(Z, (i % 2 ? 1 : -1) * .35)); // Säcke lehnen seitlich an
     o.quaternion.copy(bq); o.scale.setScalar(itemScale(i));
   }
   for (let i = flyers.length - 1; i >= 0; i--) {
@@ -161,6 +167,8 @@ function setGlow(k) {
 // Unterbein hängen) werden um diesen Unterschied senkrecht zur Ebene verschoben, höchstens um ein Viertel der Tierhöhe.
 const FEET = ['IKFrontLegL', 'IKFrontLegR', 'IKBackLegL', 'IKBackLegR'], FOOT_LIFT = .02;
 const fw = new THREE.Vector3(), fl = new THREE.Vector3(), pInv = new THREE.Matrix4();
+// zusätzliche Verschiebung einzelner Pfoten im Raum des Tiers, in Tierhöhen (z. B. Graben: Vorderpfoten scharren)
+const footExtra = {};
 function plantFeet() {
   if (!foxModel) return; const C = CREATURES[fox.kind], lim = C.h * .25;
   foxPivot.updateMatrixWorld(); pInv.copy(foxPivot.matrixWorld).invert();
@@ -170,16 +178,100 @@ function plantFeet() {
     (u.ftBase || (u.ftBase = new THREE.Vector3())).copy(b.position);
     b.getWorldPosition(fw);
     fl.set(fw.x, surfaceAt(fw.x, fw.z) + FOOT_LIFT, fw.z).applyMatrix4(pInv); // Boden unter der Pfote im Raum des Tiers
-    const d = Math.max(-lim, Math.min(lim, fl.y)); if (Math.abs(d) < .005) { (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position); continue; }
-    fw.addScaledVector(fl.set(0, d, 0).applyQuaternion(foxPivot.quaternion), 1); // um d entlang der Hochachse des Tiers
+    const d = Math.max(-lim, Math.min(lim, fl.y)), e = footExtra[n];
+    if (Math.abs(d) < .005 && !e) { (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position); continue; }
+    fl.set(0, d, 0); if (e) fl.add(off.set(e[0], e[1], e[2]).multiplyScalar(C.h));
+    fw.add(fl.applyQuaternion(foxPivot.quaternion)); // um d entlang der Hochachse des Tiers (plus Zusatz)
     b.parent.worldToLocal(b.position.copy(fw));
     (u.ftOut || (u.ftOut = new THREE.Vector3())).copy(b.position);
   }
 }
+
+// Ausrüstung (kreatur.md 3.13 B), in den Werkstätten gefertigt (S.cGear): Satteltaschen auf dem Rücken, Zuggeschirr mit
+// Karren, Korb mit Henkel fürs Maul. Alles im Code gebaut.
+const leather = new THREE.MeshStandardMaterial({ color: 0x7a4a2a, roughness: .85 }), strapM = new THREE.MeshStandardMaterial({ color: 0x4f2f1c, roughness: .9 });
+const wicker = new THREE.MeshStandardMaterial({ color: 0xb48a52, roughness: .95 }), woodM = new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: .9 });
+const metal = new THREE.MeshStandardMaterial({ color: 0x5b5650, roughness: .6, metalness: .3 });
+function mk(geo, mat, x = 0, y = 0, z = 0, par) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; if (par) par.add(m); return m; }
+// Satteltaschen: zwei Taschen mit Deckel, ein Gurt über den Rücken (Maße für ein Tier der Höhe 1, skaliert mit C.h)
+const bags = new THREE.Group();
+for (const sx of [-1, 1]) {
+  mk(new THREE.BoxGeometry(.05, .13, .17), leather, sx * .15, -.06, -.03, bags);
+  mk(new THREE.BoxGeometry(.055, .035, .175), strapM, sx * .15, .01, -.03, bags);
+}
+mk(new THREE.BoxGeometry(.31, .012, .05), strapM, 0, .045, -.03, bags); // Gurt über den Rücken
+bags.visible = false; scene.add(bags);
+// Geschirr: Brustgurt; Karren: Kasten auf zwei Rädern mit Deichsel, die am Geschirr hängt
+const harness = new THREE.Group();
+mk(new THREE.TorusGeometry(.13, .016, 6, 18), strapM, 0, 0, 0, harness).rotation.y = Math.PI / 2;
+harness.visible = false; scene.add(harness);
+const cart = new THREE.Group(), cartBox = new THREE.Group(); cart.add(cartBox);
+mk(new THREE.BoxGeometry(.5, .04, .55), woodM, 0, .22, 0, cartBox);
+for (const sx of [-1, 1]) mk(new THREE.BoxGeometry(.03, .12, .55), woodM, sx * .235, .3, 0, cartBox);
+for (const sz of [-1, 1]) mk(new THREE.BoxGeometry(.5, .12, .03), woodM, 0, .3, sz * .26, cartBox);
+const wheels = [-1, 1].map(sx => { const w = mk(new THREE.CylinderGeometry(.16, .16, .03, 14), woodM, sx * .29, .16, 0, cart); w.rotation.z = Math.PI / 2; mk(new THREE.CylinderGeometry(.04, .04, .035, 8), metal, 0, 0, 0, w); return w; });
+const shafts = [-1, 1].map(sx => { const s = mk(new THREE.CylinderGeometry(.012, .012, 1, 5), woodM, 0, 0, 0); s.userData.sx = sx; scene.add(s); s.visible = false; return s; });
+cart.visible = false; scene.add(cart);
+const CART_SLOTS = [[-.12, .3, .12], [.12, .3, .12], [-.12, .3, -.12], [.12, .3, -.12], [0, .42, 0]];
+// Korb mit Henkel im Maul; darin Pilze
+const basket = new THREE.Group();
+mk(new THREE.CylinderGeometry(.075, .055, .08, 10, 1, true), wicker, 0, -.07, 0, basket).material = wicker.clone(); basket.children[0].material.side = THREE.DoubleSide;
+mk(new THREE.CircleGeometry(.055, 10).rotateX(-Math.PI / 2), wicker, 0, -.11, 0, basket);
+mk(new THREE.TorusGeometry(.07, .008, 5, 14, Math.PI), wicker, 0, -.03, 0, basket);
+const shroomM = new THREE.MeshStandardMaterial({ color: 0xc8553d, roughness: .7 }), stemM = new THREE.MeshStandardMaterial({ color: 0xf1e6cf, roughness: .8 });
+const shrooms = [[-.025, .01], [.02, -.02], [.025, .025]].map(([x, z]) => { const g = new THREE.Group(); mk(new THREE.CylinderGeometry(.008, .01, .03, 6), stemM, 0, 0, 0, g); mk(new THREE.SphereGeometry(.022, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), shroomM, 0, .012, 0, g); g.position.set(x, -.05, z); basket.add(g); return g; });
+basket.visible = false; scene.add(basket);
+// Stamm, den sie mit dem Kopf vor sich her rollt
+const barkM = new THREE.MeshStandardMaterial({ color: 0x6b4a30, roughness: .95 }), cutM = new THREE.MeshStandardMaterial({ color: 0xd8b98a, roughness: .9 });
+const log = new THREE.Group(), logRoll = new THREE.Group(); log.add(logRoll);
+mk(new THREE.CylinderGeometry(.07, .075, .62, 9), barkM, 0, 0, 0, logRoll).rotation.z = Math.PI / 2;
+for (const sx of [-1, 1]) mk(new THREE.CircleGeometry(.07, 9), cutM, sx * .311, 0, 0, logRoll).rotation.y = sx * Math.PI / 2;
+log.visible = false; scene.add(log);
+const gear = { cart: false, basket: 0, log: false, roll: 0 }; // was gerade benutzt wird (ai.js setzt es)
+const gp = new THREE.Vector3(), gq = new THREE.Quaternion(), cartPos = new THREE.Vector3(), cartFwd = new THREE.Vector3(), lastLog = new THREE.Vector3();
+let cartH = 0, cartInit = false;
+function updateGear(dt) {
+  const C = CREATURES[fox.kind], k = C.h, G = S.cGear || {}, on = !!foxModel;
+  // Satteltaschen sitzen am Rückenanker
+  bags.visible = on && !!G.bags;
+  if (bags.visible) { anchor('back', gp); bags.position.copy(gp); bags.quaternion.copy(foxPivot.quaternion); bags.scale.setScalar(k); }
+  // Geschirr und Karren nur, wenn sie ihn gerade zieht
+  harness.visible = cart.visible = on && gear.cart;
+  for (const s of shafts) s.visible = cart.visible;
+  if (cart.visible) {
+    anchor('chest', gp); harness.position.copy(gp); harness.quaternion.copy(foxPivot.quaternion); harness.scale.setScalar(k);
+    // der Karren folgt wie ein Anhänger: Er bleibt im festen Abstand hinter dem Geschirr und dreht sich zur Zugrichtung
+    const len = k * 1.15, fx = Math.sin(fox.vh), fz = Math.cos(fox.vh);
+    if (!cartInit) { cartPos.set(gp.x - fx * len, 0, gp.z - fz * len); cartInit = true; }
+    cartFwd.set(gp.x - cartPos.x, 0, gp.z - cartPos.z); const d = cartFwd.length() || 1; cartFwd.multiplyScalar(1 / d);
+    const before = cartPos.clone(); cartPos.set(gp.x - cartFwd.x * len, 0, gp.z - cartFwd.z * len);
+    const moved = Math.hypot(cartPos.x - before.x, cartPos.z - before.z) * Math.sign(cartFwd.x * (cartPos.x - before.x) + cartFwd.z * (cartPos.z - before.z) || 1);
+    cartH = Math.atan2(cartFwd.x, cartFwd.z); const gy = surfaceAt(cartPos.x, cartPos.z);
+    cart.position.set(cartPos.x, gy, cartPos.z); cart.rotation.set(0, cartH, 0); cart.scale.setScalar(k * .95);
+    for (const w of wheels) w.rotation.x += moved / (.16 * k * .95);
+    for (const s of shafts) { // Deichsel vom Karren zum Geschirr
+      const a = new THREE.Vector3(s.userData.sx * .2 * k, .3 * k, .26 * k).applyAxisAngle(Y, cartH).add(cart.position);
+      const b = new THREE.Vector3(s.userData.sx * .13, -.02, 0).multiplyScalar(k).applyQuaternion(foxPivot.quaternion).add(gp);
+      s.position.copy(a).add(b).multiplyScalar(.5); s.quaternion.setFromUnitVectors(Y, b.sub(a).normalize()); s.scale.set(k, a.distanceTo(s.position) * 2, k);
+    }
+  } else cartInit = false;
+  // Korb im Maul, mit so vielen Pilzen, wie sie gefunden hat
+  basket.visible = on && gear.basket > 0;
+  if (basket.visible) { anchor('mouth', gp); basket.position.copy(gp); basket.quaternion.copy(foxPivot.quaternion); basket.scale.setScalar(k * 1.6); shrooms.forEach((m, i) => m.visible = i < gear.basket - 1); }
+  // Stamm rollt vor dem Kopf am Boden
+  log.visible = on && gear.log;
+  if (log.visible) {
+    anchor('mouth', gp); const fx = Math.sin(fox.vh), fz = Math.cos(fox.vh); gp.x += fx * k * .12; gp.z += fz * k * .12;
+    const r = .075 * k * 1.4; gp.y = surfaceAt(gp.x, gp.z) + r;
+    if (lastLog.lengthSq()) gear.roll += Math.hypot(gp.x - lastLog.x, gp.z - lastLog.z) / r; lastLog.copy(gp);
+    log.position.copy(gp); log.rotation.set(0, fox.vh, 0); logRoll.rotation.x = gear.roll; log.scale.setScalar(k * 1.4);
+  } else lastLog.set(0, 0, 0);
+}
+const Y = new THREE.Vector3(0, 1, 0);
 function updateBody(dt, t) {
   const vh = renderer.domElement.height;
-  applyOver(dt); plantFeet(); updateBack(dt, t); updateDrops(dt);
+  applyOver(dt); plantFeet(); updateGear(dt); updateBack(dt, t); updateDrops(dt);
   updateCloud(DUST, dt, vh, true); updateCloud(SPARK, dt, vh, false);
 }
 
-export { anchor, back, backItems, bone, dust, over, overOff, resetOver, setGlow, shakeOff, spark, tossOnBack, updateBody };
+export { anchor, back, backItems, bone, dust, footExtra, gear, over, overOff, resetOver, setGlow, shakeOff, spark, tossOnBack, updateBody };

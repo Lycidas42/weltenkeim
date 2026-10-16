@@ -23,7 +23,7 @@ function renderVillagers(dt, t) {
     if (v.state === 'sleep' || v.hidden) { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte bzw. gehalten bei ausgeblendeter Hand
     let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
     v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
-    v.st = v.state === 'lunch' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
+    v.st = v.state === 'lunch' || v.state === 'ride' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
     if (v.state === 'walk' || v.state === 'flee') {
       const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
       bob = Math.abs(s) * .03; leg = s * .6; armA = -s * .5; armB = s * .5;
@@ -56,6 +56,7 @@ function renderVillagers(dt, t) {
     const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
     if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
     if (v.stalk && v.state === 'walk') { tilt = .28; bob -= .02; } // geduckt anpirschen
+    else if (v.state === 'ride') { const s = Math.sin(t * 9 + v.ph); armA = -2.6 + s * .35; armB = -2.6 - s * .35; splay = .5; } // jubelt auf dem Rücken
     else if (v.cheer > 0 && ['idle', 'walk', 'pray', 'beg', 'lunch'].includes(v.state)) { const s = Math.sin(t * 13 + v.ph); armA = -2.8 + s * .3; armB = -2.8 - s * .3; splay = .55; bob += Math.abs(Math.sin(t * 9 + v.ph)) * .05; } // Jubel
     const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : null, shoulder = vTool && v.state === 'walk' && !v.carry;
     const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');

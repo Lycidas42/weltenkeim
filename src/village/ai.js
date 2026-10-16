@@ -251,11 +251,18 @@ function startSaw(v) {
 }
 // Ein Bewohner belädt die Kreatur (kreatur.md 3.13 B): geht neben sie und hebt die Waren nacheinander auf ihren Rücken.
 // job = { x, z (wo er steht), fx, fz (wo die Kreatur liegt), n, res, onItem(), onDone(), onAbort() }
-const LOAD_T = 1.1;
+const LOAD_T = 1.1, rideP = new THREE.Vector3();
 function helpLoad(v, job) {
   if (v.tree) { v.tree.reserved = null; v.tree = null; }
   v.load = job; walk(v, job.x, job.z, 'loadFox');
 }
+// Ein Bewohner reitet auf der Kreatur (kreatur.md 3.13 B): seat(out) liefert den Sitzplatz (Weltposition) und gibt die
+// Blickrichtung zurück; done() ruft die Kreatur, wenn der Ritt vorbei ist (dropRide setzt ihn daneben ab)
+function startRide(v, seat) {
+  if (v.tree) { v.tree.reserved = null; v.tree = null; }
+  v.state = 'ride'; v.seat = seat; v.cheer = 1.5;
+}
+function dropRide(v, x, z) { if (v.state !== 'ride') return; v.seat = null; v.x = x; v.z = z; v.cheer = 2; idle(v, .6); }
 // abgebrochen (gegriffen, geflohen, eingeschlafen): die Kreatur wartet nicht länger
 function dropLoad(v) { const j = v.load; if (!j) return; v.load = null; v.carry = 0; if (j.onAbort) j.onAbort(); }
 function arrive(v) {
@@ -413,6 +420,7 @@ function updateVillager(v, dt, t) {
     case 'flee': v.timer -= dt; if (moveFree(v, v.tx, v.tz, 2.2 * dt, navV) === true || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
     case 'grabbed': return;
+    case 'ride': { if (!v.seat) { idle(v, .3); break; } const p = rideP; v.h = v.seat(p); v.x = p.x; v.y = p.y; v.z = p.z; return; }
     case 'falling': {
       v.vy -= 16 * dt; v.x = clamp(v.x + v.vx * dt, -HALF * .95, HALF * .95); v.z = clamp(v.z + v.vz * dt, -HALF * .95, HALF * .95); v.y += v.vy * dt;
       const g = surfaceAt(v.x, v.z);
@@ -438,4 +446,4 @@ const wish = { kind: null, t: 0, dur: 90, by: null, cool: 25, checkT: 0, at: SHR
 const begSpot = () => shrinePt(rnd(.25), 1.95 + Math.random() * .15);
 function goBeg(v) { const p = begSpot(); walk(v, p.x, p.z, 'beg'); }
 
-export { JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, goBeg, hauling, helpLoad, idle, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };
+export { JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, dropRide, goBeg, hauling, helpLoad, idle, startRide, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };

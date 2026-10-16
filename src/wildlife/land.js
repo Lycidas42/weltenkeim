@@ -10,6 +10,8 @@ import { spawnMote } from '../village/shrine.js';
 import { blockedAt, followPath, navReady, navV, setGoal, smoothH } from '../world/nav.js';
 import { villagers } from '../village/villagers.js';
 import { hand } from '../hand/hand.js';
+import { fields } from '../farm/farm.js';
+import { floatText } from '../ui/feedback.js';
 
 // Rehe und Hasen leben außerhalb des Dorfes, Fische im flachen Wasser rund um die Insel. Später sollen Jäger und Angler
 // sie nutzen: `wild` (Rehe, Hasen) und `fish` stehen dafür bereit.
@@ -97,8 +99,22 @@ function updateWild(dt, t) {
       }
     }
     if (stunned) a.state = 'idle';
-    else if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; } }
-    else { a.timer -= dt; if (followPath(a, a.sp * dt) || (a.state === 'flee' && a.timer <= 0)) { a.state = 'idle'; a.timer = 3 + Math.random() * 6; } }
+    else if (a.state === 'idle') { a.timer -= dt; if (a.timer <= 0) {
+      const f = !deer && !a.scared && Math.random() < .12 && fields.find(f => f.state === 'grow' && !f.pest && Math.hypot(f.x - a.x, f.z - a.z) < 16);
+      if (f) { a.field = f; f.pest = a; a.state = 'walk'; setGoal(a, f.x, f.z, navV); a.sp = 1.1; } // Hase hoppelt zu einem Feld
+      else { const p = wildSpot(a.x, a.z, deer ? 7 : 4); if (p) { a.state = 'walk'; setGoal(a, p.x, p.z, navV); a.sp = deer ? .55 : 1.1; } else a.timer = 2; }
+    } }
+    else if (a.state === 'nibble') { // knabbert am Feld: es wächst zurück, bis ihn jemand verscheucht oder er satt ist
+      const f = a.field; a.timer -= dt;
+      if (!f || f.state !== 'grow' || a.timer <= 0) { leaveField(a); a.state = 'idle'; a.timer = 4; }
+      else { f.g = Math.max(0, f.g - dt * .004); if (Math.random() < dt * .15) floatText(a.x, heightAt(a.x, a.z) + .5, a.z, 'knabber', 'w'); }
+    }
+    else { a.timer -= dt; if (followPath(a, a.sp * dt) || (a.state === 'flee' && a.timer <= 0)) {
+      if (a.state === 'walk' && a.field && Math.hypot(a.field.x - a.x, a.field.z - a.z) < 1.2) { a.state = 'nibble'; a.timer = 40; }
+      else { leaveField(a); a.state = 'idle'; a.timer = 3 + Math.random() * 6; }
+    } }
+    if (a.state === 'flee') leaveField(a);
+    a.scared = Math.max(0, (a.scared || 0) - dt);
     const y = heightAt(a.x, a.z), M = a.m, moving = a.state !== 'idle', fast = a.state === 'flee';
     if (deer) {
       const cyc = t * (fast ? 11 : 6) + a.ph, sw = moving ? Math.sin(cyc) * (fast ? .7 : .35) : 0;
@@ -110,11 +126,18 @@ function updateWild(dt, t) {
       const hop = moving ? Math.abs(Math.sin(t * (fast ? 13 : 8) + a.ph)) : 0;
       M.body.position.y = hop * (fast ? .16 : .08); M.body.rotation.x = moving ? -Math.cos(t * (fast ? 13 : 8) + a.ph) * .25 : 0;
       M.ears.forEach((e, k) => { e.rotation.x = -.3 + (moving ? .4 : Math.max(0, Math.sin(t * 3 + a.ph + k)) ** 8 * .5); });
-      M.head.rotation.y = !moving ? Math.sin(t * .8 + a.ph) * .4 : 0;
+      M.head.rotation.y = !moving ? Math.sin(t * .8 + a.ph) * .4 : 0; if (a.state === 'nibble') M.body.rotation.x = .25 + Math.sin(t * 9) * .05; // knabbert
       M.g.position.set(a.x, y, a.z);
     }
     M.g.rotation.y = smoothH(a, dt, a.state === 'flee' ? 12 : 7, a.state === 'flee' ? 9 : 5);
   }
 }
 
-export { fish, killAnimal, removeAnimal, updateWild, wild };
+function leaveField(a) { if (a.field && a.field.pest === a) a.field.pest = null; a.field = null; }
+// Die Kreatur verscheucht ein Tier (kreatur.md 3.13 D, Schädlinge): es flieht weit weg und meidet die Felder eine Weile
+function scareAway(a, fromX, fromZ) {
+  leaveField(a); const dx = a.x - fromX, dz = a.z - fromZ, l = Math.hypot(dx, dz) || 1;
+  const p = wildSpot(a.x + dx / l * 9, a.z + dz / l * 9, 4) || { x: a.x + dx / l * 6, z: a.z + dz / l * 6 };
+  a.state = 'flee'; setGoal(a, p.x, p.z, navV); a.sp = 3.4; a.timer = 4; a.scared = 120;
+}
+export { fish, killAnimal, removeAnimal, scareAway, updateWild, wild };

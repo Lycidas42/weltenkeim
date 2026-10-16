@@ -4,7 +4,7 @@
 // Schwanz fegt, Ritual). „Weiter“ lässt sie wieder normal laufen.
 
 import { $ } from '../core/util.js';
-import { MIRACLES, S } from '../core/state.js';
+import { S, emit, on } from '../core/state.js';
 import { fox } from '../creature/kinds.js';
 import { foxActs, foxMixer } from '../creature/creature.js';
 import { foxDo, foxDrop, foxIdle } from '../creature/ai.js';
@@ -14,7 +14,11 @@ import { closeSheets, setObserve } from './sheets.js';
 
 const LABEL = { idle: 'Stehen', idle2: 'Stehen 2', eat: 'Fressen', walk: 'Gehen', run: 'Rennen', attack: 'Angriff', hit: 'Getroffen', jump: 'Springen',
   lieDown: 'Hinlegen', lie: 'Liegen', standUp: 'Aufstehen', sitDown: 'Aufladen beginnen', sit: 'Aufladen', cast: 'Aufbäumen', praise: 'Freuen (Lob)', scold: 'Ducken (Tadel)' };
-const ACTS = [['tree', 'Baum schleifen'], ['self', 'Selbst aufladen'], ['villager', 'Bewohner belädt'], ['sweep', 'Schwanz fegt'], ['ritual', 'Ritual: Regen']];
+// Handlungen nach den drei Stufen (kreatur.md 3.13): Körper, Bewohner, Magie
+const ACTS = [['tree', 'Baum schleifen'], ['self', 'Selbst aufladen'], ['push', 'Stamm rollen'], ['plant', 'Graben und pflanzen'], ['sweep', 'Schwanz fegt'],
+  ['forage', 'Pilze suchen'], ['pest', 'Hasen verjagen'], ['villager', 'Bewohner belädt'], ['ride', 'Bewohner reitet'],
+  ['rain', 'Ritual: Regen'], ['haste', 'Ritual: Eile'], ['move', 'Lichtranken: Felsen']];
+const GEAR = [['basket', 'Korb'], ['bags', 'Satteltaschen'], ['cart', 'Karren']];
 
 function mark(list, key, val) { for (const b of $(list).children) b.setAttribute('aria-pressed', String(b.dataset[key] === val)); }
 function anim(name) {
@@ -27,9 +31,9 @@ function anim(name) {
 function act(kind) {
   if (fox.state === 'test') { foxMixer.stopAllAction(); fox.cur = null; foxIdle(0); }
   let msg;
-  if (kind === 'ritual') {
-    const c = MIRACLES.rain.cost, fill = S.glaube < c; if (fill) S.glaube = c; // für den Test genug Glaube
-    msg = startRitual('rain') || (fill ? 'Glaube für den Test aufgefüllt.' : '');
+  if (['rain', 'haste', 'move'].includes(kind)) {
+    const fill = S.glaube < 30; if (fill) S.glaube = 30; // für den Test genug Glaube
+    msg = startRitual(kind) || (fill ? 'Glaube für den Test aufgefüllt.' : '');
   } else msg = foxDo(kind);
   $('quadTestNow').textContent = msg || ACTS.find(x => x[0] === kind)[1];
   mark('quadTestList', 'a', null); mark('quadTestActs', 'h', msg ? null : kind);
@@ -43,6 +47,10 @@ function stopTest() {
   $('quadTest').hidden = true; if (fox.state === 'test') { foxMixer.stopAllAction(); fox.cur = null; foxIdle(1); }
   mark('quadTestActs', 'h', null); setObserve(true);
 }
+// Ausrüstung im Test an- und ablegen (sonst in den Werkstätten gegen Bretter, Charakterbogen)
+function renderGear() { $('quadTestGear').innerHTML = GEAR.map(([k, l]) => `<button data-g="${k}" aria-pressed="${!!S.cGear[k]}">${l}</button>`).join(''); }
+$('quadTestGear').addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (!b) return; S.cGear[b.dataset.g] = !S.cGear[b.dataset.g]; renderGear(); emit('fox'); });
+renderGear(); on('fox', renderGear);
 $('quadTestActs').innerHTML = ACTS.map(([k, l]) => `<button data-h="${k}" aria-pressed="false">${l}</button>`).join('');
 $('btnQuadTest').addEventListener('click', startTest);
 $('quadTestEnd').addEventListener('click', stopTest);

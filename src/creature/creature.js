@@ -286,7 +286,11 @@ function updateMouthTree() {
 // Schleifen (kreatur.md 3.13 A): Das Maul packt den Stamm am Wurzelende, der Baum liegt schräg nach hinten und seitlich
 // neben dem Körper, die Krone schleift über den Boden. Die Krone liegt auf der von der Kamera abgewandten Seite.
 const dragUp = new THREE.Vector3(0, 1, 0), dragD = new THREE.Vector3(), dragS = new THREE.Vector3(), dragTip = new THREE.Vector3();
+// Wachsen mit der Erfahrung (kreatur.md 3.13 A): Anfangs schleift sie kleine Bäume, nach etwa 15 Bäumen ganze.
+// Später hängt das am Alter (3.1).
+const growK = () => .55 + .45 * Math.min(1, (S.cXp && S.cXp.tree || 0) / 15);
 function dragTree(o, s, C) {
+  s *= growK();
   const head = foxModel.userData.head; head.getWorldPosition(mouthV);
   const fh = foxPivot.rotation.y; mouthF.set(Math.sin(fh), 0, Math.cos(fh)); dragS.set(Math.cos(fh), 0, -Math.sin(fh));
   mouthV.addScaledVector(mouthF, C.h * .2).y -= C.h * .08;
@@ -304,4 +308,4 @@ function dragTree(o, s, C) {
 }
 const mouthTmp = new THREE.Vector3(), mouthFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, buildRig, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };
+export { ACT_COL, ACT_DESC, ACT_LABEL, FUR, buildRig, growK, foxActs, foxAnim, foxMixer, foxModel, foxOnce, foxPivot, loadCreature, mouthF, mouthTmp, mouthV, mouthZ, pron, rigPlay, updateFur, updateMouthTree, useCreature };

@@ -1,7 +1,7 @@
 // Panels: Arbeit, Schrein, Kreatur, Info; Uhrzeit- und Wettermenü; Kamera folgt
 
 import { $, clamp, fmt, fmt1 } from '../core/util.js';
-import { MAX_POP, PROC, ROLES, S, SAVE_KEY, SOUL_COST, WORKS, cap, handCost, on, passive, prayYield, resText, save, stopSaving, templeCost } from '../core/state.js';
+import { MAX_POP, PROC, ROLES, S, SAVE_KEY, SOUL_COST, WORKS, cap, emit, handCost, on, passive, prayYield, resText, save, stopSaving, templeCost } from '../core/state.js';
 import { camera, controls, isMobile } from '../core/render.js';
 import { floatText, toast } from './feedback.js';
 import { WEATHER, isDaytime, setWeather, skipTo, toggleDayNight } from '../world/sky.js';
@@ -231,6 +231,21 @@ function renderShrine() {
     if (S.glaube < c || (it.ok && !it.ok())) return; S.glaube -= c; it.buy(); renderShrine(); save(); }));
 }
 on('fox', () => renderFox());
+// Ausrüstung der Kreatur (kreatur.md 3.13 B): in den Werkstätten gefertigt, bezahlt mit Brettern (S.holz)
+const GEAR_SHOP = [
+  { id: 'basket', title: 'Korb mit Henkel', desc: () => `Beim Pilzesuchen trägt ${S.name} einen Korb im Maul und sucht an bis zu drei Büschen.`, cost: 4 },
+  { id: 'bags', title: 'Satteltaschen', desc: () => `Allein trägt ${S.name} 5 statt 3 Waren auf dem Rücken.`, cost: 8 },
+  { id: 'cart', title: 'Zuggeschirr mit Karren', desc: () => `Bewohner laden 10 statt 5 Waren in den Karren, ${S.name} zieht ihn ins Lager.`, cost: 16 },
+];
+function renderGearShop() {
+  setHTML('foxGearItems', GEAR_SHOP.map(g => { const own = S.cGear && S.cGear[g.id], ok = !own && S.holz >= g.cost;
+    return `<div class="item"><div><h3>${g.title}</h3><p>${g.desc()}</p></div><button class="buy" data-gear="${g.id}" ${ok ? '' : 'disabled'}>${own ? '✓ vorhanden' : `${fmt(g.cost)} Bretter`}</button></div>`; }).join(''));
+}
+$('foxGearItems').addEventListener('click', e => { // Klick am Container: übersteht das Neuzeichnen der Liste
+  const b = e.target.closest('[data-gear]'); if (!b) return; const g = GEAR_SHOP.find(x => x.id === b.dataset.gear);
+  if (!g || S.cGear[g.id] || S.holz < g.cost) return; S.holz -= g.cost; S.cGear[g.id] = true;
+  toast(`Die Werkstätten haben ${g.title} gefertigt.`); renderGearShop(); emit('fox'); save();
+});
 // Charakterbogen (kreatur.md 3.11 D): Tätigkeit und Grund, Neigungen mit Änderung seit Tagesbeginn, Erfahrung,
 // Lernchronik und letzte Entscheidungen. Läuft alle 0,25 s: Listen nur neu setzen, wenn sich etwas geändert hat.
 const setHTML = (id, html) => { const el = $(id); if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; } };
@@ -256,6 +271,7 @@ function renderFox() {
   const w = why(); $('foxWhy').hidden = !w; if (w) $('foxWhy').textContent = `Warum: ${w}`;
   $('foxNow').textContent = `${S.name} ${foxDoing()}.`;
   $('foxForm').textContent = `Gestalt: ${CREATURES[fox.kind].label} – wechseln am Schrein`;
+  renderGearShop();
 }
 // Buttons nur einmal anlegen und danach aktualisieren: renderFox läuft alle 0,25 s,
 // ein Neuaufbau zwischen Drücken und Loslassen würde den Klick verschlucken.
@@ -269,6 +285,10 @@ function foxDoing() {
       if (fox.next === 'shrine' && fox.morph) return `läuft zum Schrein, um die Gestalt ${CREATURES[fox.morph].label} anzunehmen`;
       if (fox.next === 'store') return CREATURES[fox.kind].carry === 'drag' ? 'schleift einen Baum im Maul zum Lager' : 'trägt einen Baum im Maul zum Lager';
       if (fox.next === 'sweep') return 'läuft zum Schrein, um den Platz zu fegen';
+      if (fox.next === 'dig') return 'läuft zum Waldrand, um einen Setzling einzugraben';
+      if (fox.next === 'sniff') return 'sucht an den Büschen nach Pilzen';
+      if (fox.next === 'forageStore') return 'bringt Pilze ins Lager';
+      if (fox.next === 'haulDeliver' && fox.haul && fox.carryGoods && fox.carryGoods.logs && fox.haul.supply === 'logs') return `rollt Stämme mit dem Kopf zur ${ROLES[fox.haul.hut.role].hut}`;
       if (fox.next === 'haulPick' && fox.haul) return `läuft zur ${ROLES[fox.haul.hut.role].hut}, um Waren ins Lager zu tragen`;
       if (fox.next === 'haulLager' && fox.haul) return `läuft zum Lager, um Nachschub für die ${ROLES[fox.haul.hut.role].hut} zu holen`;
       if (fox.next === 'haulDeliver' && fox.carryGoods && fox.haul) return `trägt ${Object.keys(fox.carryGoods).map(k => resText(k, fox.carryGoods[k])).join(', ')} zur ${ROLES[fox.haul.hut.role].hut}`;
@@ -276,12 +296,16 @@ function foxDoing() {
       if (fox.next === 'play') return 'läuft zum Dorfplatz, um zu spielen';
       return fox.act === 'help' ? 'läuft zu einem Baum, um Holz zu holen' : 'schleicht zu einem Baum und führt etwas im Schilde';
     case 'work': return fox.act === 'help' ? 'fällt einen Baum für das Dorf' : 'rüttelt mutwillig an einem Baum';
-    case 'play': return 'tollt über den Dorfplatz';
+    case 'play': return fox.rider ? 'tollt mit einem Bewohner auf dem Rücken über den Dorfplatz' : 'tollt über den Dorfplatz';
     case 'rest': return 'hat sich hingelegt und döst';
     case 'toss': return 'nimmt Waren ins Maul und wirft sie sich auf den Rücken';
     case 'waitLoad': return 'liegt still, während ein Bewohner Waren auflädt';
     case 'shake': return 'schüttelt die Waren vom Rücken';
     case 'sweep': return 'fegt mit dem Schwanz den Platz vor dem Schrein';
+    case 'dig': return 'scharrt ein Loch und gräbt einen Setzling ein';
+    case 'sniff': return 'schnuppert an einem Busch nach Pilzen';
+    case 'chase': return 'jagt einen Hasen vom Feld';
+    case 'nudge': return 'stupst den Stamm an die Säge';
     case 'ritual': return 'sammelt Kraft für ein Wunder';
     case 'test': return 'zeigt eine Animation';
     case 'cast': return mind.log[0] && mind.log[0].kind === 'shrine' ? 'nimmt im Licht des Schreins die neue Gestalt an' : 'wirkt mit dir ein Wunder';

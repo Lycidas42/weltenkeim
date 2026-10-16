@@ -1,23 +1,30 @@
 // Wunder als Ritual der Kreatur (kreatur.md 3.13 C), Prototyp am Fuchs: Sie setzt sich und lädt auf (das Fell
 // leuchtet, ein Zeichen erscheint am Boden, Funken ziehen zu ihr), dann bäumt sie sich auf und zieht mit dem Schwanz
-// einen Lichtbogen. Von der Schwanzspitze fliegt das Licht zum Ziel, dort wirkt das Wunder (Regen).
+// einen Lichtbogen. Von der Schwanzspitze fliegt das Licht zum Ziel, dort wirkt das Wunder (Regen, Eile). Für sehr große
+// Dinge (einen Felsen versetzen) wachsen stattdessen Lichtranken aus der Schwanzspitze, heben ihn an und setzen ihn ab.
 
 import * as THREE from 'three';
 import { MIRACLES, S } from '../core/state.js';
 import { scene } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
-import { surfaceAt } from '../world/terrain.js';
+import { heightAt, surfaceAt } from '../world/terrain.js';
 import { fields } from '../farm/farm.js';
 import { trees } from '../world/trees.js';
 import { CREATURES, fox } from './kinds.js';
 import { foxAnim, foxOnce, foxPivot } from './creature.js';
 import { anchor, over, overOff, setGlow, spark } from './body.js';
 import { foxDrop, foxIdle } from './ai.js';
-import { castRain } from '../hand/miracles.js';
+import { castHaste, castRain } from '../hand/miracles.js';
+import { rocks } from '../world/nature.js';
+import { buildNav, nearBuilding } from '../world/nav.js';
+import { villagers } from '../village/villagers.js';
+import { CENTER } from '../village/layout.js';
 import { noteChoice, noteDone } from './mind.js';
 
 const CHARGE_T = 2.6, GESTURE_T = 2.3, FLY_T = 1.1;
 const R = { phase: null, t: 0, x: 0, z: 0, kind: 'rain' };
+// Rituale: Wunder der Hand (Regen, Eile) und die Geisterkraft für Großes (Felsen versetzen, kostet ebenfalls Glaube)
+const RITES = { rain: MIRACLES.rain, haste: MIRACLES.haste, move: { cost: 15, label: 'Felsen versetzen' } };
 
 // Zeichen am Boden: Kreise mit Runen, auf eine Leinwand gemalt
 function runeTexture() {
@@ -64,8 +71,19 @@ const orb = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 8), new THREE.MeshB
 orb.visible = false; scene.add(orb);
 const orbFrom = new THREE.Vector3(), orbTo = new THREE.Vector3(), tip = new THREE.Vector3(), body = new THREE.Vector3();
 
-// Ziel: ein Feld, das gerade wächst, sonst junger Wald in der Nähe, sonst ein Stück vor ihr
-function pickTarget() {
+// Ziel: Regen auf ein Feld, das gerade wächst, sonst jungen Wald, sonst ein Stück vor ihr; Eile dorthin, wo die meisten
+// Bewohner beisammen sind; Felsen: der nächste mittelgroße Felsen
+function pickTarget(kind) {
+  if (kind === 'haste') {
+    let best = null, bn = 0;
+    for (const v of villagers) { if (v.state === 'sleep') continue; const n = villagers.filter(w => w.state !== 'sleep' && Math.hypot(w.x - v.x, w.z - v.z) < 5).length; if (n > bn) { bn = n; best = v; } }
+    return best ? { x: best.x, z: best.z } : { x: CENTER.x, z: CENTER.z };
+  }
+  if (kind === 'move') {
+    let best = null, bd = 1e9;
+    for (const r of rocks) { if (r.s < .25 || r.s > .8) continue; const d = Math.hypot(r.x - fox.x, r.z - fox.z); if (d < bd && d < 16) { bd = d; best = r; } }
+    return best ? { x: best.x, z: best.z, rock: best } : null;
+  }
   let best = null, bd = 1e9;
   for (const f of fields) if (f.state === 'grow') { const d = Math.hypot(f.x - fox.x, f.z - fox.z); if (d < bd && d < 30) { bd = d; best = f; } }
   if (!best) for (const t of trees) if (t.alive && !t.gone && t.g < .7) { const d = Math.hypot(t.x - fox.x, t.z - fox.z); if (d < bd && d < 18) { bd = d; best = t; } }
@@ -75,17 +93,19 @@ function pickTarget() {
 // Ritual beginnen; liefert einen Text, wenn es nicht geht
 function startRitual(kind = 'rain', at = null) {
   if (R.phase) return 'Das Ritual läuft schon.';
-  const m = MIRACLES[kind]; if (S.glaube < m.cost) return `${m.label} kostet ${m.cost} Glaube.`;
+  const m = RITES[kind]; if (S.glaube < m.cost) return `${m.label} kostet ${m.cost} Glaube.`;
   if (['grabbed', 'shrine'].includes(fox.state) || fox.next === 'shrine') return `${S.name} ist gerade beschäftigt.`;
+  const p = at || pickTarget(kind); if (!p) return 'Kein passender Felsen in der Nähe.';
   foxDrop(); S.glaube -= m.cost;
-  const p = at || pickTarget(); R.x = p.x; R.z = p.z; R.kind = kind;
+  R.x = p.x; R.z = p.z; R.kind = kind; R.rock = p.rock || null; R.move = null;
   fox.state = 'ritual'; fox.h = Math.atan2(R.x - fox.x, R.z - fox.z); fox.once = 0;
   R.phase = 'sit'; R.t = 0; foxOnce('sitDown');
-  noteChoice('help', 'miracle', `${m.label} wirken`, [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }]);
+  noteChoice('help', 'miracle', kind === 'move' ? 'einen Felsen versetzen' : `${m.label} wirken`, [{ key: 'test', label: 'in der Testleiste gewählt', weight: 1 }]);
   return '';
 }
 function endRitual() {
-  R.phase = null; overOff('ritual'); overOff('ritualTail'); setGlow(0); rune.visible = false;
+  R.phase = null; overOff('ritual'); overOff('ritualTail'); setGlow(0); rune.visible = false; vines.forEach(v => v.visible = false);
+  if (R.move) { R.move.rock.lift = 0; R.move = null; }
   if (fox.state === 'ritual') foxIdle(1.5);
 }
 function updateRitual(dt, t) {
@@ -115,23 +135,61 @@ function updateRitual(dt, t) {
     anchor('tail', tip); updateTrail(tip, R.t > .25 && u < 1, dt);
     if (Math.random() < dt * 30) spark(tip.x, tip.y, tip.z, { vx: (Math.random() - .5) * .8, vy: -.3 + Math.random() * .6, vz: (Math.random() - .5) * .8, life: .8, s: .09 });
     if (!R.fired && u >= .85) { // das Licht löst sich von der Schwanzspitze
-      R.fired = true; R.fly = 0; orbFrom.copy(tip); orbTo.set(R.x, surfaceAt(R.x, R.z) + 5.5, R.z); orb.visible = true;
-      overOff('ritual');
+      R.fired = true; R.fly = 0; overOff('ritual');
+      if (R.kind === 'move') startMove(); // Lichtranken statt Licht
+      else { orbFrom.copy(tip); orbTo.set(R.x, surfaceAt(R.x, R.z) + (R.kind === 'haste' ? 2.2 : 5.5), R.z); orb.visible = true; }
     }
+    if (R.move) { if (updateMove(dt, t, C)) { endRitual(); } return; }
     if (R.fired) {
       R.fly += dt; const k = Math.min(1, R.fly / FLY_T);
       orb.position.lerpVectors(orbFrom, orbTo, k); orb.position.y += Math.sin(k * Math.PI) * 2.5; orb.scale.setScalar(1 + Math.sin(t * 20) * .15);
       if (Math.random() < dt * 60) spark(orb.position.x, orb.position.y, orb.position.z, { vx: (Math.random() - .5) * .5, vy: (Math.random() - .5) * .5, vz: (Math.random() - .5) * .5, life: .7, s: .11 });
       if (k >= 1) {
         orb.visible = false; for (let i = 0; i < 30; i++) { const a = Math.random() * Math.PI * 2, e = Math.random() * 2; spark(orbTo.x, orbTo.y, orbTo.z, { vx: Math.cos(a) * e, vy: (Math.random() - .3) * e, vz: Math.sin(a) * e, life: 1, s: .13 }); }
-        if (R.kind === 'rain') castRain(R.x, R.z);
-        floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, `${S.name} wirkt ${MIRACLES[R.kind].label}`, 's');
-        noteDone('miracle', `${MIRACLES[R.kind].label} gewirkt`); toast(`${S.name} hat ${MIRACLES[R.kind].label} gewirkt.`);
+        if (R.kind === 'rain') castRain(R.x, R.z); else if (R.kind === 'haste') castHaste(R.x, R.z);
+        floatText(fox.x, foxPivot.position.y + C.h + .4, fox.z, `${S.name} wirkt ${RITES[R.kind].label}`, 's');
+        noteDone('miracle', `${RITES[R.kind].label} gewirkt`); toast(`${S.name} hat ${RITES[R.kind].label} gewirkt.`);
         endRitual();
       }
     }
     if (R.t > GESTURE_T + FLY_T + .5) endRitual();
   }
+}
+// Lichtranken: drei leuchtende Ranken von der Schwanzspitze zum Felsen, die sich winden. Der Felsen hebt sich, schwebt
+// ein Stück vom Dorf weg und senkt sich wieder (Felsen werden nicht gespeichert: nach dem Neuladen liegt er wie vorher)
+const vineMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false });
+const vines = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), vineMat); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
+const MOVE_T = { grow: .6, up: 1.1, go: 1.6, down: .7 }, rockTop = new THREE.Vector3();
+function startMove() {
+  const r = R.rock, dx = r.x - CENTER.x, dz = r.z - CENTER.z, l = Math.hypot(dx, dz) || 1;
+  let to = null; // ein Stück vom Dorf weg, auf festem Boden, nicht in Gebäuden
+  for (let d = 3.5; d < 7 && !to; d += .5) for (const a of [0, .4, -.4, .8, -.8]) { const c = Math.cos(a), s = Math.sin(a), x = r.x + (dx / l * c - dz / l * s) * d, z = r.z + (dx / l * s + dz / l * c) * d, h = heightAt(x, z); if (h > .3 && h < 3.2 && !nearBuilding(x, z, r.s + .3)) { to = { x, z }; break; } }
+  if (!to) to = { x: r.x + dx / l * 3, z: r.z + dz / l * 3 };
+  R.move = { rock: r, from: { x: r.x, z: r.z }, to, t: 0 };
+}
+function updateMove(dt, t, C) {
+  const M = R.move, r = M.rock; M.t += dt; const T = MOVE_T, t1 = T.grow, t2 = t1 + T.up, t3 = t2 + T.go, t4 = t3 + T.down;
+  const sm = x => x * x * (3 - 2 * x), up = 1.6 + r.s;
+  if (M.t > t1 && M.t <= t2) r.lift = sm((M.t - t1) / T.up) * up;
+  else if (M.t > t2 && M.t <= t3) { const k = sm((M.t - t2) / T.go); r.x = M.from.x + (M.to.x - M.from.x) * k; r.z = M.from.z + (M.to.z - M.from.z) * k; r.lift = up + Math.sin(k * Math.PI) * .4; }
+  else if (M.t > t3) r.lift = (1 - sm(Math.min(1, (M.t - t3) / T.down))) * up;
+  anchor('tail', tip); rockTop.set(r.x, heightAt(r.x, r.z) + (r.lift || 0) + r.s * .45, r.z);
+  const grow = Math.min(1, M.t / T.grow), fade = M.t > t3 ? 1 - Math.min(1, (M.t - t3) / T.down) : 1;
+  vines.forEach((v, i) => { // Ranke: Bogen mit Windung, wächst von der Schwanzspitze zum Felsen
+    const ph = t * 3 + i * 2.1, mid = tip.clone().lerp(rockTop, .5); mid.y += 1.2 + Math.sin(ph) * .3; mid.x += Math.cos(ph + i) * .5; mid.z += Math.sin(ph * 1.3 + i) * .5;
+    const end = tip.clone().lerp(rockTop, grow), m2 = tip.clone().lerp(mid, grow);
+    v.geometry.dispose(); v.geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(tip.clone(), m2, end), 18, .025 * C.h * (1.2 - i * .2), 5, false); v.visible = true;
+  });
+  vineMat.opacity = .8 * fade;
+  if (Math.random() < dt * 40) spark(rockTop.x + (Math.random() - .5) * r.s, rockTop.y - r.s * .5, rockTop.z + (Math.random() - .5) * r.s, { vy: -.4, life: .8, s: .1 });
+  if (M.t >= t4) {
+    r.lift = 0; vines.forEach(v => v.visible = false); buildNav();
+    for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28; spark(r.x + Math.cos(a) * r.s, heightAt(r.x, r.z) + .1, r.z + Math.sin(a) * r.s, { vx: Math.cos(a) * 1.2, vy: .5, vz: Math.sin(a) * 1.2, life: .8, s: .12 }); }
+    floatText(r.x, heightAt(r.x, r.z) + 1.4, r.z, 'Felsen versetzt', 's');
+    noteDone('miracle', 'einen Felsen mit Lichtranken versetzt'); toast(`${S.name} hat einen Felsen versetzt.`);
+    R.move = null; return true;
+  }
+  return false;
 }
 const ritual = R;
 

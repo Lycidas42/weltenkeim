@@ -460,9 +460,27 @@ Holz, die Kreatur rammt den Baum um; ein Bewohner sät, die Kreatur scharrt Löc
      Fuchs, das Fell glimmt; dann bäumt er sich auf und zieht mit dem Schwanz einen Lichtbogen, das Licht fliegt zum
      Ziel (wachsendes Feld, sonst junger Wald), dort regnet es. Kostet Glaube wie das Wunder der Hand. Bisher nur aus
      der Testleiste.
-   - **Testleiste:** Charakterbogen → „Testen“: alle Animationen einzeln, dazu die fünf Handlungen.
-   - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), geschleifte Fichte wirkt noch steil,
-     Säcke ohne Geschirr, Ritual noch nicht im normalen Verhalten.
+   - **Kopf:** Stämme für die Sägemühle rollt er mit dem Kopf vor sich her (ein Stamm steht für alle) und stupst sie
+     an die Säge.
+   - **Pfoten:** neue Hilfe „Setzling eingraben“: Am Waldrand scharrt er mit den Vorderpfoten ein Loch (Erde fliegt),
+     danach wächst dort ein Setzling. Die Pfoten stehen auch sonst einzeln auf dem Boden, am Hang neigt er sich.
+   - **Schwanz:** Er wedelt als Zeichen, wenn er etwas findet, einen Hasen verscheucht hat oder beladen werden will.
+   - **Wachsen:** Der geschleifte Baum wird mit der Erfahrung größer (nach etwa 15 Bäumen voll), kleine Bäume bringen
+     weniger Holz. Später hängt das am Alter (3.1).
+   - **Fuchs-Stärken (D):** „Pilze suchen“: An Büschen im Wald schnuppern, Funde kommen als Gemüse ins Lager.
+     „Hasen verjagen“: Hasen hoppeln jetzt manchmal an wachsende Felder und knabbern (das Feld wächst zurück); der
+     Fuchs jagt sie weg, sie meiden die Felder danach eine Weile.
+   - **Reiten:** Beim Spielen steigt manchmal ein Bewohner auf seinen Rücken und jubelt.
+   - **Ausrüstung:** im Charakterbogen gegen Bretter: Korb mit Henkel (Pilze an bis zu 3 Büschen, Korb im Maul),
+     Satteltaschen (allein 5 statt 3 Waren), Zuggeschirr mit Karren (Bewohner laden 10 statt 5 Waren in den Karren,
+     der Karren folgt wie ein Anhänger). Spielstand `S.cGear = { basket, bags, cart }`.
+   - **Magie:** Ritual auch für **Eile** (das Licht fliegt dorthin, wo die meisten Bewohner sind). **Lichtranken:**
+     Drei leuchtende Ranken wachsen aus der Schwanzspitze, heben einen Felsen an und setzen ihn ein Stück vom Dorf
+     entfernt ab (kostet 15 Glaube; Felsen werden nicht gespeichert).
+   - **Testleiste:** Charakterbogen → „Testen“: alle Animationen einzeln, zwölf Handlungen nach Stufen, Ausrüstung
+     zum An- und Ablegen.
+   - Offen: echte Sitzpose (die gebaute sah falsch aus, daher Sphinx-Pose), Rituale nur aus der Testleiste (im
+     normalen Verhalten erst mit dem Lernen, 3.9), Pflug, Lernen nach Tierart (E), andere Rassen.
 2. Ankerpunkte und Verben für die übrigen Rassen.
 3. Ausrüstung aus den Werkstätten.
 4. Wunder durch die Kreatur zusammen mit dem Lernen (3.9).
