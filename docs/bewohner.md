@@ -17,15 +17,17 @@ Stand der Features: siehe `README.md`.
   Haar, Frisur, Kleidung und Größe werden je Platz deterministisch gewürfelt (`dressVillager(i)`); ein Hut zeigt den
   Beruf. Es gibt **keinen Mund und keine Augenbrauen**, also keine Mimik.
 - **Identität:** Bewohner haben keinen Namen und keine Eigenschaften. Gespeichert wird nur ihre Anzahl (`S.pop`),
-  beim Laden entstehen sie neu. Höchstens 40 (`MAX_POP`).
+  beim Laden entstehen sie neu. Höchstens 40 (`MAX_POP`). Ein Bewohner kann sterben, bisher nur durch den Blitz
+  (Abschnitt 3.3).
 - **Tagesablauf** (`src/village/ai.js`): Arbeit je Beruf, **Mittagspause** auf dem Dorfplatz unter der Dorflinde
   (sitzen, ins Brot beißen), **Feierabend und Schlaf** in der Hütte (unsichtbar, „Zzz“ über dem Haus). Freie Bewohner
   ohne Beruf beten am Schrein.
 - **Zustände** (`v.state`): `idle`, `walk`, `chop`, `plant`, `sow`, `harvest`, `tend`, `saw`, `proc`, `aim`, `fish`,
-  `pray`, `beg`, `lunch`, `sleep`, `flee`, `grabbed`, `falling`, `dizzy`. Je Zustand gibt es **genau eine Pose**
+  `pray`, `beg`, `lunch`, `sleep`, `flee`, `grabbed`, `falling`, `dizzy`, `dying`. Je Zustand gibt es **genau eine Pose**
   (prozedural, z. B. `chopPose`, `digPose`, `prayPose`); Übergänge nur beim Knien und Sitzen weich (`v.kn`, `v.st`).
 - **Ausdruck heute:** Jubel mit erhobenen Armen nach einer erfüllten Bitte (`v.cheer`), Flucht vor der Kreatur und
-  vor einem fallenden Baum (`flee`), „Uff!“ und Schwindel nach hartem Wurf (`dizzy`), Laterne ab der Dämmerung,
+  vor einem fallenden Baum, vor Wirbelsturm, Blitz und Feuer (`flee`), „Uff!“ und Schwindel nach hartem Wurf, nach
+  dem Wirbelsturm und knapp neben einem Blitz (`dizzy`), Laterne ab der Dämmerung,
   Schwebetexte wie „Treffer!“ oder „Weizen geerntet“.
 - **Ton:** Das Spiel hat bisher **keinerlei Ton**.
 - **Bedürfnisse:** nur ein einfacher Hunger als Tageswert: Wer mittags eine Portion aus dem Lager isst, ist satt, sonst
@@ -84,6 +86,22 @@ Drei Werte von 0 bis 1, bewusst wenige:
 - **Wirkung:** Laune ändert Arbeitstempo (etwa ±20 %) und Gebetsertrag (`prayYield`). Kein Bewohner hört ganz auf zu
   arbeiten oder verlässt die Insel.
 - **Dorfstimmung:** Durchschnitt der Laune aller Bewohner, als ein Wert für Anzeige und Bestenliste.
+
+### 3.3 Tod eines Bewohners
+
+**Stand:** ✅ vorhanden – bisher nur durch das Wunder Blitz (`gott-und-hand.md` 2) · [#13](https://github.com/Lycidas42/weltenkeim/issues/13)
+
+- Ein direkter Blitztreffer tötet einen Bewohner am Boden; wen die Hand hält, wer auf der Kreatur reitet, wer schläft
+  oder im Stollen ist, den trifft er nicht. Der Wirbelsturm tötet niemanden.
+- Er sackt zusammen, verkohlt und wird zu einem kleinen Häufchen Asche, das nach einigen Sekunden verweht
+  (`src/village/death.js`). Ein Hinweis meldet es („Der Blitz hat einen Bewohner getroffen.“); sobald Bewohner Namen
+  haben (3.1), nennt er den Namen.
+- Er wird aus `villagers` entfernt und gleich gespeichert (`S.pop` sinkt). Beruf, Bitte, Träger-Auftrag, Beute,
+  Reservierungen (Baum, Feld, Felsen) und Aufgaben für die Kreatur werden frei; was er trug, ist verloren. Neue
+  Bewohner kommen auf dem üblichen Weg dazu.
+- Damit niemand plötzlich anders aussieht, rücken die Farben der Bewohner dahinter mit auf. Nach dem Neuladen gilt
+  wieder das Aussehen je Platz, bis es einen festen Saatwert je Bewohner gibt (3.1).
+- 💡 Trauer der anderen Bewohner, Gräber, Friedhof und Bestattung (noch nicht entschieden).
 
 ## 4. Emotionen und Ausdruck
 

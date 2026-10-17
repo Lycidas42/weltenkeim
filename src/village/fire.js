@@ -62,14 +62,16 @@ function ignite(b) {
   return lost;
 }
 
-// Flammen und Rauch: ein Partikelsystem für alle Brände (auch für den Blitzeinschlag und brennende Bäume)
-const FX_N = 360, fxPos = new Float32Array(FX_N * 3), fxCol = new Float32Array(FX_N * 3), fxA = new Float32Array(FX_N * 2), parts = [];
+// Flammen und Rauch: ein Partikelsystem für alle Brände (auch für den Blitzeinschlag und brennende Bäume).
+// Vormultiplizierte Farben: Flammen leuchten additiv (Deckkraft 0), Rauch deckt normal ab (a.z = 1).
+const FX_N = 420, fxPos = new Float32Array(FX_N * 3), fxCol = new Float32Array(FX_N * 3), fxA = new Float32Array(FX_N * 3), parts = [];
 const fxGeo = new THREE.BufferGeometry();
-fxGeo.setAttribute('position', new THREE.BufferAttribute(fxPos, 3)); fxGeo.setAttribute('color', new THREE.BufferAttribute(fxCol, 3)); fxGeo.setAttribute('a', new THREE.BufferAttribute(fxA, 2));
+fxGeo.setAttribute('position', new THREE.BufferAttribute(fxPos, 3)); fxGeo.setAttribute('color', new THREE.BufferAttribute(fxCol, 3)); fxGeo.setAttribute('a', new THREE.BufferAttribute(fxA, 3));
 const fxU = { uVH: { value: 800 } };
 const fxPts = new THREE.Points(fxGeo, new THREE.ShaderMaterial({ uniforms: fxU, transparent: true, depthWrite: false, vertexColors: true,
-  vertexShader: `attribute vec2 a; varying float vA; varying vec3 vC; uniform float uVH; void main() { vA = a.x; vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_PointSize = a.y * projectionMatrix[1][1] * uVH * .5 / -mv.z; gl_Position = projectionMatrix * mv; }`,
-  fragmentShader: `varying float vA; varying vec3 vC; void main() { vec2 c = gl_PointCoord - .5; float d = dot(c, c); if (d > .25 || vA <= 0.) discard; gl_FragColor = vec4(vC, vA * (1. - d * 4.)); }` }));
+  blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  vertexShader: `attribute vec3 a; varying vec2 vA; varying vec3 vC; uniform float uVH; void main() { vA = a.xz; vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_PointSize = a.y * projectionMatrix[1][1] * uVH * .5 / -mv.z; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying vec2 vA; varying vec3 vC; void main() { vec2 c = gl_PointCoord - .5; float d = dot(c, c); if (d > .25 || vA.x <= 0.) discard; float a = vA.x * (1. - d * 4.); gl_FragColor = vec4(vC * a, a * vA.y); }` }));
 fxPts.frustumCulled = false; fxPts.userData.noSnow = true; fxPts.renderOrder = 5; scene.add(fxPts);
 const FL = C.flame.map(c => new THREE.Color(c)), SMOKE = new THREE.Color(C.smoke), fc = new THREE.Color();
 // kind: 'flame' (steigt schnell, glüht gelb → rot) oder 'smoke' (dunkel, wächst, treibt)
@@ -100,8 +102,8 @@ function updateFire(dt, t) {
       const [cx, cz, hx, hz] = footOf(b), ry = b.o.rotation.y, c = Math.cos(ry), s = Math.sin(ry), y0 = heightAt(b.x, b.z), top = roofOf(b);
       const k = Math.min(1, (BURN_T - F.t) / 1.5, F.t / 2 + .15); // Feuer flammt auf und sinkt am Ende zusammen
       const spot = () => { const lx = cx + rnd(hx * .85), lz = cz + rnd(hz * .85); return [b.x + lx * c + lz * s, b.z - lx * s + lz * c]; };
-      if (Math.random() < dt * 55 * k) { const [x, z] = spot(); spawnFx('flame', x, y0 + top * (.45 + Math.random() * .5), z, .9 + hx * .6); }
-      if (Math.random() < dt * 9 * k) { const [x, z] = spot(); spawnFx('smoke', x, y0 + top * .9, z, 1 + hx * .5); }
+      for (let n = Math.floor(dt * 90 * k + Math.random()); n > 0; n--) { const [x, z] = spot(); spawnFx('flame', x, y0 + top * (.4 + Math.random() * .55), z, 1.1 + hx * .7); }
+      if (Math.random() < dt * 14 * k) { const [x, z] = spot(); spawnFx('smoke', x, y0 + top * .95, z, 1.1 + hx * .6); }
       setSoot(b, Math.min(1, (BURN_T - F.t) / 8));
       if (F.t <= 0) { F.t = 0; floatText(b.x, y0 + top + .4, b.z, 'Das Feuer erlischt', 'w'); }
     } else {
@@ -115,10 +117,10 @@ function updateFire(dt, t) {
   // Partikel fortschreiben
   for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.t += dt; if (q.t > q.life) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; if (!q.fl) { q.vx += dt * .12; q.vy *= 1 - dt * .2; } }
   for (let i = 0; i < FX_N; i++) {
-    const q = parts[i]; if (!q) { fxA[i * 2] = 0; continue; }
+    const q = parts[i]; if (!q) { fxA[i * 3] = 0; continue; }
     const u = q.t / q.life; fxPos.set([q.x, q.y, q.z], i * 3);
-    if (q.fl) { fc.copy(FL[0]).lerp(FL[1], Math.min(1, u * 2)); if (u > .5) fc.lerp(FL[2], (u - .5) * 2); fxA[i * 2] = Math.min(1, u * 8) * (1 - u); fxA[i * 2 + 1] = q.s * (.26 - u * .16); }
-    else { fc.copy(SMOKE); fxA[i * 2] = Math.min(1, u * 5) * (1 - u) * .6; fxA[i * 2 + 1] = q.s * (.25 + u * .7); }
+    if (q.fl) { fc.copy(FL[0]).lerp(FL[1], Math.min(1, u * 2)); if (u > .5) fc.lerp(FL[2], (u - .5) * 2); fxA[i * 3] = Math.min(1, u * 8) * (1 - u) * .9; fxA[i * 3 + 1] = q.s * (.32 - u * .18); fxA[i * 3 + 2] = 0; }
+    else { fc.copy(SMOKE); fxA[i * 3] = Math.min(1, u * 5) * (1 - u) * .65; fxA[i * 3 + 1] = q.s * (.28 + u * .8); fxA[i * 3 + 2] = 1; }
     fxCol.set([fc.r, fc.g, fc.b], i * 3);
   }
   fxGeo.attributes.position.needsUpdate = fxGeo.attributes.color.needsUpdate = fxGeo.attributes.a.needsUpdate = true;

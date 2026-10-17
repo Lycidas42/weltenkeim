@@ -169,14 +169,14 @@ export default async (page, wk) => {
     await run(30);
     const st = await wk.eval(w => ({ fly: w.flying.length, x: w.storm.x, z: w.storm.z }));
     flew = Math.max(flew, st.fly);
-    if (n === 5) { await look(st.x, st.z, 1.5); await wk.shot('sturm'); }
+    if (n === 4) { await look(st.x, st.z, 2.2); await wk.shot('sturm'); }
   }
   for (let n = 0; n < 20 && await wk.eval(w => w.storm.on || w.flying.length > 0); n++) await run(30);
   const after = await wk.eval((w, ids) => ids.map(i => { const t = w.trees[i]; return { alive: t.alive && !t.gone, chopped: t.stumpT > 0 }; }), before.map(t => t.i));
   const idx = new Map(before.map((t, k) => [t.i, after[k]]));
   const nearUp = near.filter(t => !idx.get(t.i).alive).length, farGone = far.filter(t => { const a = idx.get(t.i); return !a.alive && !a.chopped; }).length;
   const sh = await wk.eval(w => ({ hit: __hits.find(h => h.kind === 'storm'), logs: w.S.logs - w.S.logs0, fly: w.flying.length }));
-  if (nearUp !== near.length) fail(`Sturm: nur ${nearUp} von ${near.length} Bäumen an der Bahn ausgerissen`);
+  if (nearUp !== near.length) fail(`Sturm: nur ${nearUp} von ${near.length} Bäumen an der Bahn ausgerissen: ` + JSON.stringify(await wk.eval((w, [ids, f]) => ids.map(i => { const t = w.trees[i]; return { i, alive: t.alive, gone: t.gone, g: t.g, x: t.x, z: t.z, h: w.heightAt(t.x, t.z), res: !!t.reserved }; }).filter(t => t.alive && !t.gone), [near.map(t => t.i), forest])) + ' Bahn ' + JSON.stringify(forest));
   if (farGone) fail(`Sturm: ${farGone} Bäume abseits der Bahn ausgerissen`);
   if (!flew) fail('Sturm: keine Bäume in der Luft gesehen');
   if (!sh.hit || sh.hit.trees < near.length || sh.hit.killed !== 0) fail(`Sturm: Meldung fehlt oder unvollständig (${JSON.stringify(sh.hit)})`);
@@ -186,7 +186,8 @@ export default async (page, wk) => {
 
   // 8. Sturm durch eine Gruppe Bewohner: Bewohner auf der Bahn fliegen und landen, alle leben; im Umkreis Flucht mit Angst
   const grp = await wk.eval((w, o) => {
-    const free = w.villagers.filter(v => ['idle', 'walk', 'pray'].includes(v.state) && !v.carry && !v.load), on = free.slice(0, 4), side = free.slice(4, 7);
+    const free = w.villagers.filter(v => ['idle', 'walk', 'pray', 'chop', 'plant', 'lunch', 'sow', 'harvest', 'tend', 'quarry', 'pave'].includes(v.state) && !v.load).sort((a, b) => (a.carry ? 1 : 0) - (b.carry ? 1 : 0)), on = free.slice(0, 4), side = free.slice(4, 7);
+    for (const v of [...on, ...side]) { if (v.tree && v.tree.reserved === v) v.tree.reserved = null; v.tree = null; if (v.field && v.field.by === v) v.field.by = null; v.field = null; if (v.rock && v.rock.by === v) v.rock.by = null; v.rock = null; }
     on.forEach((v, k) => { v.x = o.x - 1.5 + k; v.z = o.z + (k % 2 ? .3 : -.3); v.state = 'idle'; v.timer = 4; v.tree = null; });
     side.forEach((v, k) => { v.x = o.x - 1 + k; v.z = o.z + 3.2; v.state = 'idle'; v.timer = 4; v.tree = null; });
     window.__hits = []; window.__seen = {}; window.__grp = [...on, ...side];
@@ -206,20 +207,22 @@ export default async (page, wk) => {
   if (rest.st.some(s => ['falling', 'dizzy', 'flee', 'dying'].includes(s.s) || !isFinite(s.x + s.y + s.z))) fail(`Nach dem Sturm hängen Bewohner fest: ${JSON.stringify(rest.st.map(s => s.s))}`);
   if (!rest.hit || rest.hit.villagers < grp.on.length || rest.hit.killed !== 0) fail(`Sturm-Meldung für Bewohner fehlt (${JSON.stringify(rest.hit)})`);
   // gehen wieder ihrer Arbeit nach: in den nächsten Sekunden wechseln alle aus dem Leerlauf in eine Tätigkeit
-  await wk.eval(() => { window.__busy = {}; });
-  for (let n = 0; n < 12; n++) { await run(30); await wk.eval((w, ids) => { for (const i of ids) if (w.villagers[i].state !== 'idle') window.__busy[i] = 1; }, [...grp.on, ...grp.side]); }
+  // (wer wartet, z. B. ein Säger ohne Stämme, setzt seinen Leerlauf immer wieder neu an)
+  await wk.eval(() => { window.__busy = {}; window.__lastT = {}; });
+  for (let n = 0; n < 24; n++) { await run(15); await wk.eval(w => { window.__grp.forEach((v, i) => { if (v.state !== 'idle' || (window.__lastT[i] !== undefined && v.timer > window.__lastT[i])) window.__busy[i] = 1; window.__lastT[i] = v.timer; }); }); }
   const busy = await page.evaluate(() => Object.keys(window.__busy).length);
   if (busy < grp.on.length + grp.side.length) fail(`Nach dem Sturm gehen nur ${busy} von ${grp.on.length + grp.side.length} Bewohnern wieder etwas nach`);
   log(`Sturm im Dorf: ${grp.on.length} herumgewirbelt und schwindelig, ${grp.side.length} fliehen mit Angst, alle leben und arbeiten weiter`);
 
   // 9. Blitz auf einen Baum: weg, kein Holz, dunkler Fleck
-  await wk.eval(w => { window.__hits = []; });
+  await wk.eval(w => { window.__hits = []; w.chooseMiracle('bolt'); });
+  const tp = await wk.eval(w => { const t = w.trees.find(t => t.alive && !t.gone && t.g > .6 && !t.reserved && !w.buildingAt(t.x, t.z, 1) && w.villagers.every(v => Math.hypot(v.x - t.x, v.z - t.z) > 2) && w.wild.every(a => Math.hypot(a.x - t.x, a.z - t.z) > 1)); window.__bt = t; return { x: t.x, z: t.z }; });
+  await look(tp.x, tp.z, 1.6); await run(1);
   const bt = await wk.eval(w => {
-    const t = w.trees.find(t => t.alive && !t.gone && t.g > .6 && !t.reserved && !w.buildingAt(t.x, t.z, 1) && w.villagers.every(v => Math.hypot(v.x - t.x, v.z - t.z) > 2) && w.wild.every(a => Math.hypot(a.x - t.x, a.z - t.z) > 1));
-    const i = w.trees.indexOf(t), fly0 = w.flying.length; w.castBolt(t.x, t.z);
+    const t = window.__bt, i = w.trees.indexOf(t), fly0 = w.flying.length; w.castBolt(t.x, t.z);
     return { i, x: t.x, z: t.z, alive: t.alive, gone: t.gone, fly: w.flying.length - fly0, scorch: w.scorches.some(s => Math.hypot(s.x - t.x, s.z - t.z) < .1), hit: __hits[0] };
   });
-  await look(bt.x, bt.z, 1.1); await wk.shot('blitz');
+  await wk.shot('blitz');
   if (bt.alive || !bt.gone) fail('Blitz auf Baum: Baum steht noch');
   if (bt.fly) fail('Blitz auf Baum: Baum fliegt (soll verbrennen, kein Holz)');
   if (!bt.scorch) fail('Blitz auf Baum: kein dunkler Fleck');
