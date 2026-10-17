@@ -40,7 +40,7 @@ function reconcileJobs() {
     let need = n - Math.min(n, cur.length);
     for (const v of villagers) {
       if (need <= 0) break;
-      if (v.role || v.haul || v.state === 'grabbed' || v.state === 'falling') continue;
+      if (v.role || v.haul || v.state === 'grabbed' || v.state === 'falling' || v.state === 'dying') continue;
       const hs = huts.filter(h => h.role === r).sort((a, b) => villagers.filter(x => x.hut === a).length - villagers.filter(x => x.hut === b).length)[0];
       v.role = r; v.hut = hs; v.saplings = 0; need--;
       if (v.state === 'pray' || v.state === 'idle') idle(v, .2 + Math.random() * .6);
@@ -49,4 +49,4 @@ function reconcileJobs() {
 }
 function roleCount(r) { return villagers.filter(v => v.role === r).length; }
 
-export { effJobs, hutCap, reconcileJobs, roleCount, wantRoles };
+export { effJobs, hutCap, leaveJob, reconcileJobs, roleCount, wantRoles };

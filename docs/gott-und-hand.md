@@ -41,9 +41,9 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
 |---|---|---|---|---|
 | Regen | Fläche: Bäume wachsen, Setzlinge sprießen, Felder wachsen bis zur nächsten Stufe und danach eine Weile schneller, Pfützen | 20 Glaube | gut | ✅ vorhanden (`castRain`) |
 | Eile | Fläche: Bewohner gehen und arbeiten schneller, auch in Werkstätten | 12 Glaube | gut | ✅ vorhanden (`castHaste`) |
-| Bann | Fläche: Wild erstarrt eine Weile, Jäger treffen sicher | ca. 10 | neutral | 🔵 geplant (heute Hand-Hilfe „Bannen“) |
-| Wirbelsturm | Ein Wirbel zieht über eine kurze Bahn: reißt Bäume aus, wirbelt Waren und Bewohner durch die Luft, deckt Dächer ab. Spielerisch nutzbar zum Roden. Bahn per Wischgeste | teuer | böse (im Dorf), neutral (im leeren Wald) | 🔵 geplant |
-| Blitz / Feuer | ein Ziel: Gebäude brennt, Baum wird zu Asche | mittel | böse | 🔵 geplant |
+| Bann | Fläche (Umkreis 6): alles lebende Wild erstarrt 20 s und sprüht Funken; die Jäger nehmen es ins Visier und treffen sicher | 10 Glaube | neutral | ✅ vorhanden (`castBan`) · [#13](https://github.com/Lycidas42/weltenkeim/issues/13) |
+| Wirbelsturm | Der Finger wischt eine Bahn (bis 14 lang), ein Wirbel aus Staub und Blättern zieht sie in etwa 6 s entlang: reißt Bäume nahe der Bahn aus (sie landen als Holz), wirbelt Bewohner durch die Luft (danach schwindelig, er tötet niemanden); im Umkreis fliehen Bewohner und Wild. Spielerisch nutzbar zum Roden. Ein Tipp ohne Wischen kostet nichts und erklärt die Geste. 🔵 Waren mitreißen und Dächer abdecken | 40 Glaube | böse (im Dorf), neutral (im leeren Wald) | 🟡 teilweise (`castStorm`) – ohne Waren und Dächer · [#13](https://github.com/Lycidas42/weltenkeim/issues/13) |
+| Blitz / Feuer | ein Ziel per Tipp, ein Lichtblitz erhellt die Szene, die Stelle bleibt angesengt: Gebäude brennt etwa 20 s, aber nicht nieder (niemand arbeitet dort, wartende Waren einer Hütte verbrennen), und bleibt einige Spielstunden rußig; Baum wird zu Asche (kein Holz); Wild wird erlegt; ein direkter Treffer **tötet** einen Bewohner (`bewohner.md` 3.3), knapp daneben wirft er um. Bewohner im Umkreis fliehen; Gehaltene und Getragene trifft er nicht | 25 Glaube | böse | ✅ vorhanden (`castBolt`) · [#13](https://github.com/Lycidas42/weltenkeim/issues/13) |
 | Dürre | Fläche: Felder welken, Bäume wachsen nicht | mittel | böse | 🔵 geplant |
 | Plage | Schädlinge auf Feldern, Ernte halbiert | mittel | böse | 🔵 geplant |
 | Segen der Ernte | Fläche: Felder reifen ein Stück weiter / Ertrag +50 % | teuer | gut | 💡 Idee |
@@ -54,6 +54,8 @@ Prüffrage für jede neue Aktion: *Könnte ein Dorfbewohner das?* Ja → Hand. N
   das Gegenteil tun stark böse (Abschnitt 7).
 - Die Waage macht Wunder ihrer Richtung günstiger: gute bei guter, böse bei böser Ausrichtung (z. B. bis −25 %).
 - Wunder wirken immer auf einen Ort, nicht auf das Gehaltene: Was die Hand hält, bleibt beim Wirken in der Hand.
+- Sturm und Blitz melden, was sie getroffen haben (`emit('miracleHit', { kind, trees, villagers, killed, buildings, wild })`).
+  Noch hört niemand darauf; die Waage (Abschnitt 7) gewichtet es später.
 - Die Kreatur lernt Wunder durch Zusehen und wirkt sie mit Glaube aus dem Vorrat, wenn erlaubt (`kreatur-lernen.md`).
 
 ## 3. Greifen, Halten, Absetzen, Werfen
@@ -181,7 +183,7 @@ ein Schild unter dem Zeiger, was ein Klick tut, und die Hand nimmt die passende 
 | Feld gießen | ✅ Wunder Regen | **Wunder Regen** | Wasser vom Himmel ist Sache der Götter |
 | Vieh füttern (Milch, Eier, Fleisch) | Hand | **Hand** | körperliche Arbeit |
 | Fisch greifen | Hand | **Hand** (ein Fisch pro Tipp) | körperlich; ein Schwarm wäre ein Wunder |
-| Wild bannen | Hand | **Wunder Bann** | übernatürlich |
+| Wild bannen | ✅ Wunder Bann (Hand-Tipp auf lebendes Wild zeigt einen Hinweis) | **Wunder Bann** | übernatürlich |
 | Erlegtes Wild aufheben | Hand | **Hand** | Tragen |
 | Setzling pflanzen | Hand | **Hand** | körperliche Arbeit |
 | Waren der Hütte ins Lager | Hand | **Hand** | Arbeit der Träger |
@@ -323,14 +325,16 @@ Standardwerten zusammengeführt. Hand und Waage gehören zur Welt, nicht zum Pro
    - Klein und unabhängig davon jederzeit möglich: **Größe und Kraft beim Formen** (4.1).
 2. **Waage** (`S.align`, `S.deeds`) mit Anzeige; vorhandene Taten zählen (Werfen, sanft Absetzen, Helfen, Bitten,
    Regen, Bäume ausreißen).
-3. **Abgrenzung Hand/Wunder** umsetzen: Gießen und Sofort-Verarbeitung aus `helpAt` entfernen, Bann als Wunder.
+3. **Abgrenzung Hand/Wunder** umsetzen: Gießen und Sofort-Verarbeitung aus `helpAt` entfernen, Bann als Wunder
+   (✅ Bann, [#13](https://github.com/Lycidas42/weltenkeim/issues/13)).
 4. **Hand verändert sich mit der Waage** (Tönung, Schimmer/Rauch, Krallen).
 5. **Ressourcen tragen** (5.2) und Hand-Stufen für alle Bereiche (6).
 6. **Editor** „Hand gestalten“ mit Farben, dann Stoffe, Schmuck, Zeichnung.
-7. **Böse Wunder** und Wirbelsturm; Formen um Ebnen erweitern.
+7. **Böse Wunder** und Wirbelsturm; Formen um Ebnen erweitern (✅ Blitz und Wirbelsturm, [#13](https://github.com/Lycidas42/weltenkeim/issues/13)).
 
 ## 12. Offene Fragen
 
-- Wirbelsturm: rein böses Wunder oder auch gutes Werkzeug (Roden, Waren verteilen)? Gewicht auf der Waage abhängig
-  davon, was er trifft?
+- ~~Wirbelsturm: rein böses Wunder oder auch gutes Werkzeug (Roden, Waren verteilen)? Gewicht auf der Waage abhängig
+  davon, was er trifft?~~ **Entschieden** ([#13](https://github.com/Lycidas42/weltenkeim/issues/13)): neutral im leeren Wald, böse im Dorf. Sturm und Blitz melden ihre
+  Treffer (`miracleHit`), die Waage gewichtet sie später danach, was sie getroffen haben.
 - Wie sichtbar soll die Waage für Einsteiger sein – von Anfang an oder erst nach der ersten bösen Tat?

@@ -22,7 +22,7 @@ function renderVillagers(dt, t) {
     const L = v.look;
     if (v.state === 'sleep' || v.state === 'mine' || v.hidden) { for (const m of vAll) m.setMatrixAt(i, zero); return; } // schläft in der Hütte bzw. gehalten bei ausgeblendeter Hand
     let bob = 0, tilt = 0, roll = 0, leg = 0, armA = 0, armB = 0, splay = .25, armRz = 0, bite = -1;
-    v.kn = v.state === 'pray' || v.state === 'beg' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
+    v.kn = v.state === 'pray' || v.state === 'beg' || v.state === 'dying' ? Math.min(1, (v.kn || 0) + dt * 5) : Math.max(0, (v.kn || 0) - dt * 5); // knien
     v.st = v.state === 'lunch' || v.state === 'ride' ? Math.min(1, (v.st || 0) + dt * 4) : Math.max(0, (v.st || 0) - dt * 4); // sitzen
     if (v.state === 'walk' || v.state === 'flee') {
       const s = Math.sin(t * (v.haste > 0 || v.state === 'flee' ? 18 : 11) + v.ph);
@@ -52,6 +52,7 @@ function renderVillagers(dt, t) {
       const u = 1 - v.timer / LOAD_T, up = smooth(.15, .6, u) * (1 - smooth(.8, 1, u));
       armA = armB = -1.1 - up * 1.5; splay = .12; tilt = -.08 * up + .15 * (1 - up) * smooth(0, .15, u); leg = .15;
     } else if (v.state === 'dizzy') { armA = armB = 0; splay = 1.2 + Math.sin(t * 6 + v.ph) * .2; }
+    else if (v.state === 'dying') { const k = smooth(0, .6, 1 - v.timer / v.dieT); tilt = .9 * k; armA = armB = .15; splay = .05 + .2 * k; } // sackt zusammen
     if (v.carry && v.state !== 'grabbed' && v.state !== 'falling' && v.state !== 'saw' && v.state !== 'loadFox') { armA = armB = -1.1; splay = .12; }
     const rodOn = v.role === 'fisher' && !v.carry && !['grabbed', 'falling', 'sleep', 'lunch'].includes(v.state);
     if (rodOn && v.state !== 'fish') armB = -.85 + (v.state === 'walk' ? Math.sin(t * 11 + v.ph) * .05 : 0); // Rute schräg nach vorn oben
@@ -61,7 +62,8 @@ function renderVillagers(dt, t) {
     const vTool = v.role === 'lumber' ? vAxe : v.role === 'forester' ? vShovel : v.role === 'mason' || v.role === 'miner' ? vPick : null, shoulder = vTool && v.state === 'walk' && !v.carry;
     const sapling = v.role === 'forester' && v.saplings > 0 && (v.state === 'walk' || v.state === 'idle');
     const vh = v.state === 'grabbed' || v.state === 'falling' ? (v.vh = v.h) : smoothH(v, dt);
-    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w, VS * L.s, VS * L.s * L.w); dummy.updateMatrix();
+    const ash = v.state === 'dying' ? 1 - smooth(.45, 1, 1 - v.timer / v.dieT) : 1; // zerfällt zu Asche
+    dummy.position.set(v.x, v.y + bob, v.z); dummy.rotation.set(tilt, vh, roll, 'YXZ'); dummy.scale.set(VS * L.s * L.w * ash, VS * L.s * ash, VS * L.s * L.w * ash); dummy.updateMatrix();
     const M = dummy.matrix;
     const part = (mesh, x, y, a, z, pz = 0) => { vEuler.set(a, 0, z); vTmp.makeRotationFromEuler(vEuler).setPosition(x, y, pz); mesh.setMatrixAt(i, vOut.multiplyMatrices(M, vTmp)); };
     // Laterne in der linken Hand (nicht beim Hacken, Beten, Tragen: dann steht sie neben dem Bewohner)
@@ -84,7 +86,7 @@ function renderVillagers(dt, t) {
       part(vBread, -.085, SHO_Y, armB, -splay + armRz);
       if (v.mealC !== v.meal) { v.mealC = v.meal; vBread.setColorAt(i, mealC.setHex(FOOD_COL[v.meal])); vBread.instanceColor.needsUpdate = true; }
     } else vBread.setMatrixAt(i, zero);
-    if (!lantern || v.state === 'grabbed' || v.state === 'falling') { vLantern.setMatrixAt(i, zero); vLanternGlass.setMatrixAt(i, zero); }
+    if (!lantern || v.state === 'grabbed' || v.state === 'falling' || v.state === 'dying') { vLantern.setMatrixAt(i, zero); vLanternGlass.setMatrixAt(i, zero); }
     else {
       if (handLantern) { // hängt senkrecht an der Hand, pendelt beim Gehen
         const ca = Math.cos(splay) * .13;

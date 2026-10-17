@@ -140,7 +140,7 @@ function loadHelper(hut, any = false) {
   let best = null, bd = 1e9;
   for (const v of villagers) {
     const free = !v.carry && !v.haul && !v.load && !v.gift && (v.state === 'idle' || v.state === 'proc' || (v.state === 'walk' && !['sleep', 'lunch', 'pray', 'gift', 'giftPick'].includes(v.next)));
-    if (!free && !(any && !['sleep', 'grabbed', 'falling', 'loadFox'].includes(v.state))) continue;
+    if (!free && !(any && !['sleep', 'grabbed', 'falling', 'loadFox', 'dying'].includes(v.state))) continue;
     const d = Math.hypot(v.x - fox.x, v.z - fox.z) - (v.hut === hut ? 6 : 0); if (d < bd && d < (any ? 40 : 10)) { bd = d; best = v; }
   }
   return best;
@@ -207,7 +207,7 @@ function foxChaseGo(h, why = []) {
 // Reiten: ein freier Bewohner in der Nähe steigt beim Spielen auf den Rücken
 // so viele, wie Plätze da sind (Stier: zwei)
 function mount(force) {
-  const n = CREATURES[fox.kind].acts.riders, list = villagers.filter(v => !v.carry && !v.load && !v.haul && (v.state === 'idle' || v.state === 'walk' || (force && !['sleep', 'grabbed', 'falling', 'ride'].includes(v.state))))
+  const n = CREATURES[fox.kind].acts.riders, list = villagers.filter(v => !v.carry && !v.load && !v.haul && (v.state === 'idle' || v.state === 'walk' || (force && !['sleep', 'grabbed', 'falling', 'ride', 'dying'].includes(v.state))))
     .map(v => ({ v, d: Math.hypot(v.x - fox.x, v.z - fox.z) })).filter(e => e.d < (force ? 40 : 10)).sort((a, b) => a.d - b.d).slice(0, n);
   if (!list.length) return; fox.riders = list.map(e => e.v); fox.rider = fox.riders[0];
   fox.riders.forEach((v, i) => startRide(v, out => { seat(i, n, out); return fox.vh; }));
@@ -448,7 +448,7 @@ function updateFox(dt, t) {
     }
     case 'escort': { // neben dem Bewohner herlaufen
       const E = fox.esc, v = E && E.v; E.t -= dt;
-      if (!v || !villagers.includes(v) || E.t <= 0 || ['sleep', 'grabbed', 'falling', 'ride'].includes(v.state)) { fox.esc = null; fox.desc = 'einen Bewohner begleitet'; foxFinish('help', 'escort'); break; }
+      if (!v || !villagers.includes(v) || E.t <= 0 || ['sleep', 'grabbed', 'falling', 'ride', 'dying'].includes(v.state)) { fox.esc = null; fox.desc = 'einen Bewohner begleitet'; foxFinish('help', 'escort'); break; }
       const sx = Math.cos(v.vh ?? v.h), sz = -Math.sin(v.vh ?? v.h), tx = v.x + sx * .9, tz = v.z + sz * .9, d = Math.hypot(tx - fox.x, tz - fox.z);
       if (d > .4) { anim(d > 2 ? 'run' : 'walk'); if ((fox.chaseT = (fox.chaseT || 0) - dt) <= 0) { fox.chaseT = .4; setGoal(fox, tx, tz, navF); } followPath(fox, (d > 2 ? C.run : C.walk * 1.4) * dt); }
       else { anim(v.state === 'walk' ? 'walk' : 'idle'); fox.h = v.vh ?? v.h; }

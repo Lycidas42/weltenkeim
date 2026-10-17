@@ -140,4 +140,11 @@ function scareAway(a, fromX, fromZ) {
   const p = wildSpot(a.x + dx / l * 9, a.z + dz / l * 9, 4) || { x: a.x + dx / l * 6, z: a.z + dz / l * 6 };
   a.state = 'flee'; setGoal(a, p.x, p.z, navV); a.sp = 3.4; a.timer = 4; a.scared = 120;
 }
-export { fish, killAnimal, removeAnimal, scareAway, updateWild, wild };
+// Schreck (Wunder Sturm und Blitz): ein Stück vom Ort weg flüchten; gebanntes Wild bleibt starr
+function startle(a, fromX, fromZ, run = 4) {
+  if (a.state === 'dead' || a.stun > 0) return false;
+  const dx = a.x - fromX, dz = a.z - fromZ, l = Math.hypot(dx, dz) || 1;
+  leaveField(a); a.state = 'flee'; setGoal(a, a.x + dx / l * run + rnd(1), a.z + dz / l * run + rnd(1), navV); a.sp = a.kind === 'reh' ? 3 : 3.2; a.timer = 2.5;
+  return true;
+}
+export { fish, killAnimal, removeAnimal, scareAway, startle, updateWild, wild };

@@ -33,11 +33,19 @@ async function setCreature(id) {
   creatureLoading = null; renderForms(); renderFox();
 }
 
+// Hinweis im Wunder-Werkzeug je gewähltem Wunder
+const MIRACLE_HINTS = {
+  rain: 'Regen: auf Wald oder Felder tippen.',
+  haste: 'Eile: dorthin tippen, wo Bewohner arbeiten.',
+  ban: 'Bann: dorthin tippen, wo Wild ist. Es erstarrt, die Jäger treffen sicher.',
+  storm: 'Wirbelsturm: mit dem Finger eine Bahn über den Boden wischen. Loslassen, dann zieht der Sturm sie entlang.',
+  bolt: 'Blitz: auf ein Ziel tippen. Er setzt Gebäude in Brand, verbrennt Bäume und kann Bewohner töten.',
+};
 const HINTS = {
   get blick() { return isMobile ? 'Ziehen dreht die Welt. Zwei Finger: verschieben und zoomen.' : 'Linke Maustaste verschiebt, rechte dreht, Mausrad zoomt. In jedem Werkzeug: Leertaste oder Strg + Ziehen verschiebt.'; },
-  get hand() { return `Bewohner und Bäume: drücken und halten packt. Gepacktes bleibt in der Hand: Tippen setzt ab, schnelles Wischen wirft. Bei der Arbeit helfen: Felder säen und ernten, Tiere füttern, Fische greifen, Wild bannen, Hütten leeren. ${S.name}: antippen öffnet das Menü, langsam darüberstreichen lobt, schnell wischen tadelt.`; },
+  get hand() { return `Bewohner und Bäume: drücken und halten packt. Gepacktes bleibt in der Hand: Tippen setzt ab, schnelles Wischen wirft. Bei der Arbeit helfen: Felder säen und ernten, Tiere füttern, Fische greifen, erlegtes Wild aufheben, Hütten leeren. ${S.name}: antippen öffnet das Menü, langsam darüberstreichen lobt, schnell wischen tadelt.`; },
   sculpt: 'Gedrückt halten, um Land zu heben oder zu senken.',
-  miracle: 'Wunder wählen, dann auf die Welt tippen.'
+  get miracle() { return MIRACLE_HINTS[input.miracle] || 'Wunder wählen, dann auf die Welt tippen.'; }
 };
 
 function closeSheets() { document.querySelectorAll('.sheet').forEach(s => s.hidden = true); $('app').classList.remove('sheet-open'); }
