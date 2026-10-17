@@ -26,6 +26,7 @@ import { GIFT_GLAUBE, MEAL, eatLunch, food, giftDue, prayMul, takePortion, workM
 import { fish, killAnimal, removeAnimal, wild } from '../wildlife/land.js';
 import { removeRock, rocks } from '../world/nature.js';
 import { fishGeo, fishMesh, splash } from '../wildlife/sea.js';
+import { burning, fireAt, fires } from './fire.js';
 
 function walk(v, x, z, next) { v.state = 'walk'; v.next = next; v.stalk = next === 'aim'; setGoal(v, x, z, navV); }
 function idle(v, t) { v.state = 'idle'; v.timer = t; }
@@ -54,6 +55,7 @@ function chooseJob(v) {
   if (v.wish) { if (wish.kind && wish.by === v) { goBeg(v); return; } v.wish = false; }
   if (v.gift || (!v.role && !v.haul && !v.carry && giftDue())) { goGift(v); return; } // Gabe zum Schrein bringen
   if (v.drop && v.carry) { walkDrop(v); return; } // Ware erst an der Hütte ablegen
+  if (v.role && v.hut && burning(v.hut)) { idle(v, 2); return; } // die eigene Hütte brennt: niemand arbeitet dort
   if (v.role && v.hut) { JOB[v.role](v); return; }
   if (haulJob(v)) return;
   // Dorfbewohner beten am Schrein, ab und zu ruhen sie sich aus
@@ -89,7 +91,7 @@ function haulJob(v) {
     v.haul = null;
   }
   for (const hs of huts) {
-    if (hs.role !== 'sawyer') continue;
+    if (hs.role !== 'sawyer' || burning(hs)) continue;
     const out = hs.planks - hauling(hs, 'out');
     if (out >= 2) { v.haul = { hut: hs, kind: 'out', n: Math.min(4, out) }; const p = hutWork(hs); walk(v, p.x + rnd(.2), p.z + .25, 'pickPlanks'); return true; }
     const room = MILL_BUF - hs.logs - hauling(hs, 'in'), have = Math.floor(S.logs) - villagers.reduce((a, x) => a + (x.haul && x.haul.kind === 'in' && !x.carry ? x.haul.n : 0), 0);
@@ -98,7 +100,7 @@ function haulJob(v) {
   // Mühle und Bäckerei beliefern (abwechselnd mit dem Abholen, damit beides vorankommt)
   const feed = () => {
     for (const hs of huts) {
-      const P = PROC[hs.role]; if (!P) continue;
+      const P = PROC[hs.role]; if (!P || burning(hs)) continue;
       const room = P.buf - hs.inp - hauling(hs, 'feed'), have = Math.floor(S[P.inp]) - villagers.reduce((a, x) => a + (x.haul && x.haul.kind === 'feed' && x.haul.res === P.inp && !x.carry ? x.haul.n : 0), 0);
       if (room >= 1 && have >= 1) { v.haul = { hut: hs, kind: 'feed', res: P.inp, n: Math.min(RES[P.inp][3], room, have) }; const p = lagerDrop(); walk(v, p.x, p.z, 'pickFeed'); return true; }
     }
@@ -115,6 +117,7 @@ function haulJob(v) {
   // Waren an den Hütten abholen: die größte, nächste Menge zuerst
   let best = null, bd = 1e9;
   for (const hs of huts) for (const res in hs.goods) {
+    if (burning(hs)) break;
     const left = hs.goods[res] - hauling(hs, 'pick', res); if (left < (res === 'logs' ? 2 : 1)) continue;
     const d = Math.hypot(hs.x - v.x, hs.z - v.z) - left * 1.5; if (d < bd) { bd = d; best = { hut: hs, kind: 'pick', res, n: Math.min(RES[res][3], left) }; }
   }
@@ -375,15 +378,19 @@ function updateVillager(v, dt, t) {
   if (v.load && !(v.state === 'loadFox' || (v.state === 'walk' && v.next === 'loadFox'))) dropLoad(v);
   if (v.haste > 0) v.haste -= dt;
   if (v.cheer > 0) v.cheer -= dt;
-  const sp = .95 * (v.haste > 0 ? 2.3 : 1) * (v.state === 'walk' && pavedAt(v.x, v.z) ? 1.35 : 1) * (v.stalk && v.state === 'walk' && v.next === 'aim' ? .55 : 1); // anpirschen: langsamer
+  const sp = .95 * (v.haste > 0 ? 2.3 : 1) * (v.state === 'walk' && pavedAt(v.x, v.z) ? 1.35 : 1) * (v.stalk && v.state === 'walk' && v.next === 'aim' && !(v.prey && v.prey.stun > 0) ? .55 : 1); // anpirschen: langsamer (gebanntes Wild flieht nicht)
   switch (v.state) {
-    case 'idle': v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
+    case 'idle': {
+      const b = fires.length && fireAt(v.x, v.z, .5); if (b) { flee(v, b.x, b.z, 2.5, 1.5); break; } // zu nah am Feuer
+      v.timer -= dt; if (v.timer <= 0) chooseJob(v); break;
+    }
     case 'walk':
       if (v.next === 'aim' && v.prey) { // Jäger: in Schussweite stehen bleiben, sonst den Weg ab und zu zur ziehenden Beute neu legen
         const d = Math.hypot(v.prey.x - v.x, v.prey.z - v.z);
         if (d < (v.prey.kind === 'reh' ? 5.2 : 4.2)) { arrive(v); break; }
         if ((v.aimT = (v.aimT || 0) - dt) <= 0) { v.aimT = 2; const dx = v.x - v.prey.x, dz = v.z - v.prey.z, l = Math.hypot(dx, dz) || 1; setGoal(v, v.prey.x + dx / l * 4, v.prey.z + dz / l * 4, navV); }
       }
+      if (fires.length && fireAt(v.tx, v.tz, .4)) { idle(v, 1.5); break; } // das Ziel brennt: abwarten, bis das Feuer aus ist
       addWear(v.x, v.z, dt); if (followPath(v, sp * dt)) arrive(v); break;
     case 'chop': {
       const k = dt * (v.haste > 0 ? 2 : 1) * workMul(v), before = v.cp % 1; v.timer -= k; v.cp += k / CHOP_T;
@@ -486,6 +493,7 @@ function updateVillager(v, dt, t) {
     }
     case 'flee': v.timer -= dt; if (moveFree(v, v.tx, v.tz, 2.2 * dt, navV) === true || v.timer <= 0) idle(v, .6); break;
     case 'dizzy': v.timer -= dt; v.h += dt * 9; if (v.timer <= 0) idle(v, .3); break;
+    case 'dying': v.timer -= dt; return; // vom Blitz getroffen: sackt zusammen (death.js räumt auf)
     case 'grabbed': return;
     case 'ride': { if (!v.seat) { idle(v, .3); break; } const p = rideP; v.h = v.seat(p); v.x = p.x; v.y = p.y; v.z = p.z; return; }
     case 'falling': {
@@ -493,7 +501,9 @@ function updateVillager(v, dt, t) {
       const g = surfaceAt(v.x, v.z);
       if (v.y <= g && v.vy < 0) {
         v.y = g; const spd = Math.hypot(v.vx, v.vy, v.vz); v.vx = v.vz = v.vy = 0;
+        const hurled = v.hurled; v.hurled = false;
         if (seaAt(v.x, v.z, -.1)) { floatText(v.x, v.y + .6, v.z, 'Platsch!', 'w'); walk(v, v.x * .55, v.z * .55, 'rest'); }
+        else if (hurled) { floatText(v.x, v.y + .6, v.z, 'Uff!', 'w'); v.state = 'dizzy'; v.timer = 2.6; } // Sturm, Blitz: schwindelig
         else if (spd > 7.5) { floatText(v.x, v.y + .6, v.z, 'Uff!', 'w'); v.state = 'dizzy'; v.timer = 1.8; addGlaube(1, v.x, v.y + .3, v.z); }
         else idle(v, .5);
       }
@@ -501,6 +511,37 @@ function updateVillager(v, dt, t) {
     }
   }
   v.y = groundAt(v.x, v.z); // auf dem Steg der Fischer auf Deckhöhe
+}
+
+// Schreck (Wunder Sturm und Blitz, Feuer): Was ein Bewohner gerade tut, bricht ab; angefangene Arbeit bleibt liegen,
+// Reservierungen (Baum, Feld, Felsen) werden frei. Gilt nur für Bewohner, die wach und am Boden sind.
+const STARTLE = ['idle', 'walk', 'chop', 'plant', 'pray', 'lunch', 'beg', 'saw', 'proc', 'tend', 'sow', 'harvest', 'quarry', 'pave', 'fish', 'aim', 'loadFox', 'flee', 'dizzy'];
+const canStartle = v => STARTLE.includes(v.state) && !v.hidden;
+function interrupt(v) {
+  if (v.tree) { if (v.tree.reserved === v) v.tree.reserved = null; v.tree = null; }
+  if (v.plant) v.plant = null;
+  if (v.state === 'saw' && v.hut) { v.hut.logs++; v.carry = 0; } // der angefangene Stamm bleibt an der Säge
+  if (v.state === 'proc' && v.hut && PROC[v.role]) v.hut.inp += PROC[v.role].n;
+  if (v.state === 'pave' && v.haul && v.haul.kind === 'pave') { S.stone += 1; v.haul = null; }
+  if (v.field && (v.state === 'sow' || v.state === 'harvest' || (v.state === 'walk' && ['sow', 'harvest'].includes(v.next)))) { if (v.field.by === v) v.field.by = null; v.field = null; }
+  if (v.rock && (v.state === 'quarry' || (v.state === 'walk' && v.next === 'quarry'))) { if (v.rock.by === v) v.rock.by = null; v.rock = null; }
+  if (v.state === 'fish') { v.hooked = false; v.fp = null; }
+  v.stalk = false;
+}
+// wegrennen: d Schritte vom Ort (fx, fz) weg, höchstens t Sekunden
+function flee(v, fx, fz, d = 3, t = 2) {
+  if (!canStartle(v)) return false;
+  interrupt(v);
+  const dx = v.x - fx, dz = v.z - fz, l = Math.hypot(dx, dz) || 1, a = l < .05 ? Math.random() * 6.28 : 0;
+  v.state = 'flee'; v.timer = t; v.tx = v.x + (a ? Math.cos(a) : dx / l) * d; v.tz = v.z + (a ? Math.sin(a) : dz / l) * d;
+  return true;
+}
+// hochgewirbelt (Sturm) oder umgeworfen (Blitz): fliegt wie ein geworfener Bewohner und ist nach der Landung schwindelig
+function hurl(v, vx, vy, vz) {
+  if (!canStartle(v)) return false;
+  interrupt(v);
+  v.state = 'falling'; v.hurled = true; v.vx = vx; v.vy = vy; v.vz = vz;
+  return true;
 }
 
 // Nachts steigt ab und zu ein „Zzz“ über einem Haus auf, in dem jemand schläft
@@ -513,4 +554,4 @@ const wish = { kind: null, t: 0, dur: 90, by: null, cool: 25, checkT: 0, at: SHR
 const begSpot = () => shrinePt(rnd(.25), 1.95 + Math.random() * .15);
 function goBeg(v) { const p = begSpot(); walk(v, p.x, p.z, 'beg'); }
 
-export { masonYard, JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, dropRide, goBeg, hauling, helpLoad, idle, startRide, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };
+export { STARTLE, canStartle, flee, hurl, interrupt, masonYard, JOB, LOAD_T, MILL_BUF, REEL_T, arrows, dropLoad, dropRide, goBeg, hauling, helpLoad, idle, startRide, putDown, startFishing, updateArrows, updateFishingLines, updateSleepers, updateVillager, wish };

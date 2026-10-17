@@ -1,11 +1,13 @@
 // Bäume greifen, ausreißen und werfen
 
+import * as THREE from 'three';
 import { clamp, rnd } from '../core/util.js';
-import { segToScreen, tA, tB } from '../core/render.js';
+import { dummy, scene, segToScreen, tA, tB } from '../core/render.js';
 import { addLogs, floatText } from '../ui/feedback.js';
 import { heightAt } from '../world/terrain.js';
 import { fox } from '../creature/kinds.js';
 import { heldObjs, heldTree, input, pointerXY, rootBall, setHoldOff } from './pointer.js';
+import { COL, TK, plantMat } from '../models/nature.js';
 import { ST } from '../village/layout.js';
 import { TREE_H, trees, updateFallen } from '../world/trees.js';
 import { villagers } from '../village/villagers.js';
@@ -29,10 +31,15 @@ function treeAt(cx, cy) {
   }
   return best;
 }
-function uprootTree(tr) {
+// Baum verlässt seinen Platz (ausgerissen, vom Sturm erfasst, verbrannt): wer ihn fällen oder ziehen wollte, sucht sich einen anderen
+function freeTree(tr) {
   if (tr.reserved === 'fox') { fox.tree = null; if (fox.state === 'walk' || fox.state === 'work') foxIdle(1); }
   else if (tr.reserved) tr.reserved.tree = null;
   tr.reserved = null; tr.alive = false; tr.stumpT = 0; tr.regrow = 0;
+  if (input.treeGrab && input.treeGrab.tr === tr) input.treeGrab = null;
+}
+function uprootTree(tr) {
+  freeTree(tr);
   Object.assign(heldTree, { on: true, flying: false, type: tr.type, g: tr.g, rot: tr.rot, tilt: 0 });
   setHoldOff(tr.x, tr.z);
   floatText(tr.x, heightAt(tr.x, tr.z) + 2.2, tr.z, 'Ausgerissen!', 'w');
@@ -42,8 +49,37 @@ function throwTree() {
   const k = clamp(hand.vel.length(), 0, 12) / (hand.vel.length() || 1);
   heldTree.flying = true; heldTree.vel.set(hand.vel.x * k, hand.vel.y * .4 * k + 2, hand.vel.z * k); heldTree.spin = rnd(3);
 }
+// Vom Wirbelsturm ausgerissene Bäume: fliegen davon und werden bei der Landung zu Holz wie geworfene Bäume.
+// Eine InstancedMesh je Baumart für alle fliegenden Bäume.
+const FLY_N = 32, flying = [];
+const flyMeshes = TK.map(k => { const m = new THREE.InstancedMesh(k.geo, plantMat, FLY_N); m.castShadow = true; m.frustumCulled = false; m.count = 0; m.setColorAt(0, COL.setScalar(1)); scene.add(m); return m; });
+function flingTree(tr, vx, vy, vz) {
+  if (!tr.alive || tr.gone || flying.length >= FLY_N) return false;
+  freeTree(tr);
+  flying.push({ type: tr.type || 0, g: tr.g, rot: tr.rot, tint: tr.tint || 1, pos: new THREE.Vector3(tr.x, heightAt(tr.x, tr.z), tr.z), vel: new THREE.Vector3(vx, vy, vz), spin: 2 + Math.random() * 4, tilt: 0 });
+  return true;
+}
+function updateFlying(dt) {
+  const n = TK.map(() => 0);
+  for (let i = flying.length - 1; i >= 0; i--) {
+    const f = flying[i]; f.vel.y -= 16 * dt; f.pos.addScaledVector(f.vel, dt); f.tilt += f.spin * dt;
+    const gy = heightAt(f.pos.x, f.pos.z);
+    if (f.pos.y < Math.max(gy, 0) && f.vel.y < 0) {
+      flying.splice(i, 1);
+      if (gy < -.1) floatText(f.pos.x, .6, f.pos.z, 'Platsch!', 'w');
+      else addLogs(Math.max(1, Math.round(3 * f.g)), f.pos.x, gy + .4, f.pos.z);
+    }
+  }
+  for (const f of flying) {
+    const m = flyMeshes[f.type], k = n[f.type]++;
+    dummy.position.copy(f.pos); dummy.rotation.set(f.tilt, f.rot + f.tilt * .4, f.tilt * .3); dummy.scale.setScalar(ST * f.g); dummy.updateMatrix();
+    m.setMatrixAt(k, dummy.matrix); m.setColorAt(k, COL.setScalar(f.tint));
+  }
+  dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1);
+  flyMeshes.forEach((m, k) => { m.count = n[k]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
+}
 function updateTrees(dt, t) {
-  updateFallen(dt);
+  updateFallen(dt); updateFlying(dt);
   if (input.treeGrab) {
     if (!input.treeGrab.tr.alive) input.treeGrab = null;
     else {
@@ -71,4 +107,4 @@ function updateTrees(dt, t) {
   rootBall.position.copy(heldTree.pos); rootBall.rotation.copy(o.rotation); rootBall.scale.setScalar(heldTree.g);
 }
 
-export { throwTree, treeAt, updateTrees, uprootTree };
+export { flingTree, flying, freeTree, throwTree, treeAt, updateTrees, uprootTree };

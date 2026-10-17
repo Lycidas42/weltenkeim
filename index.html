@@ -214,6 +214,10 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
 .ctx button .cost{font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
 .ctx button.poor .cost{color:var(--warn)}
 .ctx button[aria-pressed="true"].poor .cost{color:#7a1d0c}
+/* fünf Wunder in einer Reihe (Handy 390 px): Name über den Kosten */
+#ctxMiracle{gap:5px}
+#ctxMiracle button{flex-direction:column;gap:0;padding:5px 10px;min-width:56px;font-size:13px;line-height:1.15;border-radius:14px}
+#ctxMiracle button .cost{font-size:11px}
 .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:min(440px,100%);background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:5px}
 .tools button{background:transparent;border:1px solid transparent;border-radius:12px;padding:6px 4px 7px;display:grid;justify-items:center;gap:1px}
 .tools button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -457,6 +461,9 @@ button:focus-visible{outline:2px solid var(--glaube);outline-offset:2px}
     <div class="ctx" id="ctxMiracle" hidden>
       <button data-m="rain" aria-pressed="true">Regen <span class="cost">20 ✦</span></button>
       <button data-m="haste" aria-pressed="false">Eile <span class="cost">12 ✦</span></button>
+      <button data-m="ban" aria-pressed="false">Bann <span class="cost">10 ✦</span></button>
+      <button data-m="storm" aria-pressed="false" title="Wirbelsturm" aria-label="Wirbelsturm, 40 Glaube">Sturm <span class="cost">40 ✦</span></button>
+      <button data-m="bolt" aria-pressed="false">Blitz <span class="cost">25 ✦</span></button>
     </div>
     <nav class="tools" aria-label="Werkzeuge">
       <button data-tool="blick" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Blick</span></button>

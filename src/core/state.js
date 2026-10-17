@@ -77,11 +77,16 @@ if (!Array.isArray(S.meals)) S.meals = [];
 S.meals = S.meals.filter(m => m && typeof m.d === 'number' && Array.isArray(m.k));
 if (!S.offer || typeof S.offer.d !== 'number' || typeof S.offer.k !== 'string') S.offer = null;
 if (!S.foodHints || typeof S.foodHints !== 'object') S.foodHints = {};
+// Brand und Ruß an Gebäuden (Wunder Blitz): { x, z, t (Brand in s), soot (Ruß in Spielstunden) }, siehe village/fire.js
+if (!Array.isArray(S.fires)) S.fires = [];
+S.fires = S.fires.filter(f => f && isFinite(f.x) && isFinite(f.z) && isFinite(f.t) && isFinite(f.soot));
 // Waren: Name im Spielstand (S[key]) und Bezeichnung (Einzahl, Mehrzahl); carry = was ein Bewohner davon trägt
 const RES = { logs: ['Stamm', 'Stämme', 1, 2], meat: ['Fleisch', 'Fleisch', 3, 3], fish: ['Fisch', 'Fisch', 4, 4], veg: ['Gemüse', 'Gemüse', 5, 6], milk: ['Milch', 'Milch', 6, 4], eggs: ['Ei', 'Eier', 7, 6], grain: ['Korn', 'Korn', 8, 6], flour: ['Mehl', 'Mehl', 9, 4], bread: ['Brot', 'Brote', 10, 6], stone: ['Stein', 'Steine', 11, 3] };
 // Verarbeitung: Träger bringen `inp` aus dem Lager in den Vorrat der Werkstatt (bis `buf`), der Arbeiter macht aus `n` davon `m` Stück `out`
 const PROC = { miller: { inp: 'grain', n: 2, out: 'flour', m: 2, t: 4.5, buf: 6, verb: 'gemahlen' }, baker: { inp: 'flour', n: 2, out: 'bread', m: 3, t: 6, buf: 6, verb: 'gebacken' } };
 const resText = (k, n) => `${fmt(n)} ${n === 1 ? RES[k][0] : RES[k][1]}`;
-const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' } };
+// Wunder (gott-und-hand.md 2): Kosten in Glaube; Bann, Sturm und Blitz mit Reichweite (Balancing später)
+const MIRACLES = { rain: { cost: 20, label: 'Regen' }, haste: { cost: 12, label: 'Eile' }, ban: { cost: 10, label: 'Bann', r: 6, t: 20 },
+  storm: { cost: 40, label: 'Wirbelsturm', len: 14, w: 1.5 }, bolt: { cost: 25, label: 'Blitz' } };
 
 export { MAX_POP, MIRACLES, PROC, RES, ROLES, S, SAVE_KEY, SOUL_COST, STONE_HOUSE, WORKS, cap, emit, handCost, houseCost, loaded, on, onSave, passive, prayYield, resText, save, stopSaving, templeCost };

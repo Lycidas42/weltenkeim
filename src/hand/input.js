@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { $, clamp, rnd } from '../core/util.js';
-import { PROC, RES, ROLES, S, emit, resText } from '../core/state.js';
+import { MIRACLES, PROC, RES, ROLES, S, emit, resText } from '../core/state.js';
 import { camera, canvas, controls, tmpV } from '../core/render.js';
 import { floatText, toast } from '../ui/feedback.js';
 import { heightAt, seaAt } from '../world/terrain.js';
@@ -19,9 +19,10 @@ import { HAND_POSES, hand, poseHand } from './hand.js';
 import { handAnim, updateHandAnim } from '../creature/gestures.js';
 import { fish, removeAnimal, wild } from '../wildlife/land.js';
 import { splash } from '../wildlife/sea.js';
-import { JOB, hauling, idle, wish } from '../village/ai.js';
+import { hauling, idle, wish } from '../village/ai.js';
 import { forestAlert } from '../village/forest-alert.js';
-import { tryMiracle } from './miracles.js';
+import { buildings, footCenter, roofOf } from '../village/fire.js';
+import { drawTrail, onGround, pathLen, tryMiracle } from './miracles.js';
 import { throwTree, treeAt } from './grab.js';
 import { HINTS, closeSheets, setFollow } from '../ui/sheets.js';
 import { closeRing, foxUnder, hoverFox, openRing, ringOpen } from '../ui/ring.js';
@@ -35,27 +36,20 @@ function harvestByHand(f) {
   if (f.by && f.by.field === f) { const v = f.by; v.field = null; if (v.state === 'harvest' || (v.state === 'walk' && v.next === 'harvest')) idle(v, .3); }
   f.by = null; f.state = 'leer'; f.g = 0; f.c = (f.c + 1) % CROPS.length;
 }
-// Die Hand hilft bei allem, was die Arbeiter tun: säen, ernten, Vieh füttern, Fische greifen, Wild bannen
-// und erlegtes Wild aufheben, Setzlinge pflanzen, eine Ladung in Säge, Mühle oder Bäckerei verarbeiten und Waren ins Lager bringen.
+// Die Hand hilft bei allem, was die Arbeiter tun: säen, ernten, Vieh füttern, Fische greifen,
+// erlegtes Wild aufheben, Setzlinge pflanzen, eine Ladung in Säge, Mühle oder Bäckerei verarbeiten und Waren ins Lager bringen.
 // Erst bestimmen, was die Hand an dieser Stelle tun würde (Aktion, Schild, Handhaltung), dann ausführen.
 // So zeigt die Hand schon beim Darüberfahren, was sie kann.
 function handHelp(cx, cy) { const h = helpAt(cx, cy, true); if (!h) return false; h.run(); return true; }
 function helpAt(cx, cy, picked = false) {
   if (!picked) pick(cx, cy);
-  // Wildtiere (nach Bildschirmabstand): lebend bannen, erlegt aufheben
+  // Wildtiere (nach Bildschirmabstand): erlegt aufheben; lebendes Wild bannt nur noch das Wunder Bann (gott-und-hand.md 5.1)
   let wa = null, wd = 38;
   for (const a of wild) { const d = screenDist(a.x, heightAt(a.x, a.z) + (a.kind === 'reh' ? .3 : .1), a.z, cx, cy); if (d < wd) { wd = d; wa = a; } }
   if (wa) {
     const y = heightAt(wa.x, wa.z);
     if (wa.state === 'dead') return { label: 'Aufheben', pose: 'claw', run() { const n = wa.kind === 'reh' ? 3 : 1; for (const v of villagers) if (v.prey === wa) { v.prey = null; if (v.state === 'walk' && v.next === 'pickup') idle(v, .3); } removeAnimal(wa); S.meat += n; floatText(wa.x, y + .6, wa.z, `+${resText('meat', n)}`, 'h'); } };
-    if (wa.stun > 0) return { label: 'Gebannt', pose: 'point', run() { wa.stun = 15; } };
-    return { label: 'Bannen', pose: 'point', run() {
-      wa.stun = 15; wa.state = 'idle'; wa.timer = 1; floatText(wa.x, y + .7, wa.z, 'Gebannt', 's');
-      // der nächste freie Jäger nimmt es ins Visier
-      const hs = villagers.filter(v => v.role === 'hunter' && v.hut && !v.carry && ['idle', 'walk', 'aim'].includes(v.state) && !(v.prey && v.prey.state === 'dead'));
-      hs.sort((a, b) => Math.hypot(a.x - wa.x, a.z - wa.z) - Math.hypot(b.x - wa.x, b.z - wa.z));
-      if (hs[0]) { for (const v of villagers) if (v.prey === wa) v.prey = null; hs[0].prey = null; JOB.hunter(hs[0]); }
-    } };
+    return { label: null, pose: 'relax', run() { toast('Bannen ist jetzt ein Wunder: im Wunder-Werkzeug „Bann“ wählen und auf das Wild tippen.', 3); } };
   }
   if (!hitOk) return null;
   // Felder: leer → säen, reif → ernten (wachsen lässt sie nur das Wunder Regen)
@@ -124,7 +118,7 @@ function updateHandHover(dt) {
   if ((hoverT -= dt) <= 0) {
     hoverT = .12;
     let best = null, bd = 40;
-    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine') continue; const d = screenDist(v.x, v.y + .25, v.z, pointerXY.x, pointerXY.y); if (d < bd) { bd = d; best = v; } }
+    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine' || v.state === 'dying') continue; const d = screenDist(v.x, v.y + .25, v.z, pointerXY.x, pointerXY.y); if (d < bd) { bd = d; best = v; } }
     hoverHelp = best ? { label: 'Packen', pose: 'grab' } : helpAt(pointerXY.x, pointerXY.y);
     if (!hoverHelp && treeAt(pointerXY.x, pointerXY.y)) hoverHelp = { label: 'Ausreißen', pose: 'claw' };
     pick(pointerXY.x, pointerXY.y); // Trefferpunkt wieder auf den Zeiger (für die Hand)
@@ -157,12 +151,36 @@ function updatePointer(dt) {
     if (!input.drop) pick(input.hold.x, input.hold.y);
   } else if (input.primary !== null || (input.handShown && input.tool !== 'blick')) pick(pointerXY.x, pointerXY.y - touchLift());
   if (input.pressing && input.tool === 'sculpt' && hitOk) sculpt(hit.x, hit.z, input.sculptDir, dt);
+  if (stormPath && input.primary !== null) extendStorm();
   if (press.cand) { // Bewohner unter dem Finger zuckt, bis er gepackt wird
     const v = press.cand;
-    if (['grabbed', 'falling', 'sleep', 'mine'].includes(v.state)) press.cand = null;
+    if (['grabbed', 'falling', 'sleep', 'mine', 'dying'].includes(v.state)) press.cand = null;
     else if (press.t >= GRAB_T || press.moved) { press.cand = null; grab(v); }
     else v.h += Math.sin(press.t * 45) * dt * 5;
   }
+}
+// Wirbelsturm: Der Finger wischt eine Bahn über den Boden (genau unter dem Finger), höchstens MIRACLES.storm.len lang.
+// Loslassen wirkt den Sturm; ein Tipp ohne Wischen kostet nichts und zeigt, wie es geht (tryMiracle).
+let stormPath = null;
+function extendStorm() {
+  if (!pick(pointerXY.x, pointerXY.y)) return;
+  const P = stormPath, last = P[P.length - 1], d = Math.hypot(hit.x - last.x, hit.z - last.z), left = MIRACLES.storm.len - pathLen(P);
+  if (d < .2 || left <= .01) return;
+  const k = Math.min(1, left / d); P.push({ x: last.x + (hit.x - last.x) * k, z: last.z + (hit.z - last.z) * k });
+  drawTrail(P);
+}
+function endStorm(cast) { const P = stormPath; stormPath = null; drawTrail(null); if (cast && P) tryMiracle({ path: P, x: P[0].x, z: P[0].z }); }
+// Blitz: Ziel unter dem Finger (Bewohner, Wild, Gebäude, Baum), sonst der Bodenpunkt
+function boltPoint(cx, cy) {
+  let best = null, bd = 30;
+  for (const v of villagers) { if (!onGround(v)) continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
+  for (const a of wild) { if (a.state === 'dead') continue; const d = screenDist(a.x, heightAt(a.x, a.z) + (a.kind === 'reh' ? .3 : .1), a.z, cx, cy); if (d < bd) { bd = d; best = a; } }
+  if (best) return { x: best.x, z: best.z };
+  let bb = null; bd = 40;
+  for (const b of buildings()) { const c = footCenter(b), d = screenDist(c.x, heightAt(c.x, c.z) + roofOf(b) * .45, c.z, cx, cy); if (d < bd) { bd = d; bb = c; } }
+  if (bb) return bb;
+  const tr = treeAt(cx, cy); if (tr) return { x: tr.x, z: tr.z };
+  return { x: hit.x, z: hit.z };
 }
 function grab(v) {
   input.grabbed = v; setHoldOff(v.x, v.z); v.state = 'grabbed';
@@ -224,10 +242,13 @@ function onToolDown(cx, cy) {
   if (input.tool === 'hand') {
     if (foxUnder(cx, cy)) { press.fox = { dist: 0, n: 1, on: 1, x: cx, y: cy }; input.pressing = false; return; }
     let best = null, bd = 40;
-    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
+    for (const v of villagers) { if (v.state === 'grabbed' || v.state === 'falling' || v.state === 'sleep' || v.state === 'mine' || v.state === 'dying') continue; const d = screenDist(v.x, v.y + .25, v.z, cx, cy); if (d < bd) { bd = d; best = v; } }
     if (best) press.cand = best; // gepackt wird nach kurzem Halten oder beim Ziehen (updatePointer)
     else if (!heldTree.on && !handHelp(cx, cy)) { const tr = treeAt(cx, cy); if (tr) input.treeGrab = { tr, prog: 0, lastY: cy }; }
-  } else if (input.tool === 'miracle' && hitOk) { tryMiracle(hit); input.pressing = false; return; }
+  } else if (input.tool === 'miracle' && hitOk) {
+    if (input.miracle === 'storm') { stormPath = [{ x: hit.x, z: hit.z }]; input.pressing = true; return; }
+    tryMiracle(input.miracle === 'bolt' ? boltPoint(cx, cy) : hit); input.pressing = false; return;
+  }
   input.pressing = true;
 }
 // Finger angehoben: kurzer Tipp mit voller Hand setzt dort ab, schnelles Wischen wirft, sonst hält die Hand weiter
@@ -239,6 +260,7 @@ function onToolUp() {
     else if (F.dist < TAP_PX * 2) openRing();
     return;
   }
+  if (stormPath) endStorm(true);
   if (input.treeGrab) input.treeGrab = null; // losgelassen, bevor der Baum nachgab
   if (press.cand) { const v = press.cand; press.cand = null; floatText(v.x, v.y + .75, v.z, 'Halten zum Aufnehmen', 's'); } // kurzer Tipp auf einen Bewohner
   if (input.tool === 'hand' && heldKind() && press.mode) {
@@ -249,7 +271,7 @@ function onToolUp() {
 }
 // Zweiter Finger (Zoomen, Verschieben): der Druck endet, ohne dass etwas fällt
 function cancelPress() {
-  if (input.treeGrab) input.treeGrab = null; press.cand = null; press.fox = null;
+  if (input.treeGrab) input.treeGrab = null; press.cand = null; press.fox = null; endStorm(false);
   input.pressing = false; press.mode = null;
 }
 function swipeSpeed() {
@@ -342,7 +364,7 @@ canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && 
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 function setTool(t) {
   if (input.drop && t !== 'hand') letGo('drop'); // ein begonnenes Absetzen wird abgeschlossen
-  input.tool = t; // Werkzeugwechsel lässt nichts fallen
+  input.tool = t; endStorm(false); // Werkzeugwechsel lässt nichts fallen
   document.querySelectorAll('.tools button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   $('ctxSculpt').hidden = t !== 'sculpt'; $('ctxMiracle').hidden = t !== 'miracle';
   $('hint').textContent = HINTS[t];
@@ -352,7 +374,7 @@ function setTool(t) {
 }
 document.querySelectorAll('.tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(b => b.addEventListener('click', () => { input.sculptDir = +b.dataset.dir; document.querySelectorAll('#ctxSculpt button[data-dir]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
-function chooseMiracle(m) { input.miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); }
+function chooseMiracle(m) { input.miracle = m; document.querySelectorAll('#ctxMiracle button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m))); if (input.tool === 'miracle') $('hint').textContent = HINTS.miracle; }
 document.querySelectorAll('#ctxMiracle button').forEach(b => b.addEventListener('click', () => chooseMiracle(b.dataset.m)));
 $('forestAlert').addEventListener('click', () => {
   const A = forestAlert; if (!A.hut) return;
@@ -363,4 +385,4 @@ $('forestAlert').addEventListener('click', () => {
 });
 $('wish').addEventListener('click', () => { if (!wish.kind) return; setTool('miracle'); chooseMiracle(wish.kind); toast(wish.kind === 'rain' ? 'Tippe auf den Wald, um Regen zu wirken.' : 'Tippe dorthin, wo die Bewohner arbeiten, um ihnen Eile zu schenken.', 3); });
 
-export { carryGrabbed, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer };
+export { boltPoint, carryGrabbed, chooseMiracle, handHelp, harvestByHand, helpAt, holdState, setTool, updateHand, updateHandHover, updatePointer };
